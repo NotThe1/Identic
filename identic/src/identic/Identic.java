@@ -1,9 +1,11 @@
 package identic;
 
 import java.awt.CardLayout;
+import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.EventQueue;
+import java.awt.Font;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
@@ -12,18 +14,34 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
+import java.io.File;
+import java.io.FilenameFilter;
+import java.io.IOException;
+import java.net.URISyntaxException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
 import java.util.prefs.Preferences;
 
+import javax.swing.Box;
 import javax.swing.BoxLayout;
+import javax.swing.DefaultComboBoxModel;
 import javax.swing.JButton;
+import javax.swing.JComboBox;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JSplitPane;
 import javax.swing.border.BevelBorder;
+import javax.swing.border.CompoundBorder;
+import javax.swing.border.LineBorder;
+import javax.swing.border.TitledBorder;
 
 public class Identic {
 
@@ -31,6 +49,9 @@ public class Identic {
 	private JButton[] sideMenuButtons;
 	private JPanel[] sideMenuPanels;
 	private String[] sideMenuPanelNames;
+	private DefaultComboBoxModel typeListModel = new DefaultComboBoxModel();
+
+	private String fileListDirectory;
 
 	/**
 	 * Launch the application.
@@ -61,12 +82,10 @@ public class Identic {
 		} // for
 		CardLayout cl = (CardLayout) (panelDetails.getLayout());
 		cl.show(panelDetails, targetPanelName);
-		
+
 		cl = (CardLayout) (panelMain.getLayout());
 		cl.show(panelMain, targetPanelName);
-		
-		
-		lblStatus.setText(targetPanelName);
+
 		panelSideMenu.validate();
 	}// doSideMenu
 
@@ -75,6 +94,86 @@ public class Identic {
 		System.exit(0);
 	}// doFileExit
 		// ---------------------------------------------------------
+
+	class ListFilter implements FilenameFilter {
+
+		@Override
+		public boolean accept(File arg0, String arg1) {
+			if (arg1.endsWith(LIST_SUFFIX)) {
+				return true;
+			} // if
+			return false;
+		}// accept
+	}// ListFilter
+
+	private void initFileTypes() {
+
+		// see if the directory has been set up already
+		if (fileListDirectory.equals(EMPTY_STRING)) {
+			fileListDirectory = System.getProperty("java.io.tmpdir");
+			fileListDirectory = fileListDirectory.replace("Temp", "Identic");
+
+			Path p = Paths.get(fileListDirectory);
+			if (!Files.exists(p)) {
+				JOptionPane.showMessageDialog(frmIdentic, "Initializing File Type lists in " + p.toString(),
+						"Initialization", JOptionPane.INFORMATION_MESSAGE);
+				System.err.println("Making new directory");
+				try {
+					Files.createDirectories(p);
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				} // try
+			} // if exits
+
+		} // if not there
+
+		// we have the directory, do we have lists ?
+
+		File targetDirectory = new File(fileListDirectory);
+		File[] files = targetDirectory.listFiles(new ListFilter());
+
+		// if files empty - initialize the directory
+		if (files.length == 0) {
+
+			String[] initalListFiles = new String[] { "/VB.typeList", "/Music.typeList", "/MusicAndPictures.typeList",
+					"/Pictures.typeList" };
+			ArrayList<Path> sources = new ArrayList<>();
+			Path newDir = Paths.get(fileListDirectory);
+			Path source = null;
+			for (int i = 0; i < initalListFiles.length; i++) {
+				try {
+					// sources.add(Paths.get(this.getClass().getResource(initalListFiles[i] ).toURI()));
+					source = Paths.get(this.getClass().getResource(initalListFiles[i]).toURI());
+					Files.move(source, newDir.resolve(source.getFileName()), StandardCopyOption.REPLACE_EXISTING);
+				} catch (URISyntaxException | IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				} // try
+			} // for
+			files = targetDirectory.listFiles(new ListFilter());
+		} // if no type list files in target directory
+		
+		//set up cbo model
+		
+		typeListModel.removeAllElements();
+		
+		for (File f:files){
+			typeListModel.addElement(f.getName().replace(LIST_SUFFIX_DOT, EMPTY_STRING));
+		}//for
+		
+		cboTypeLists.setModel(typeListModel);
+		
+		Preferences myPrefs = Preferences.userNodeForPackage(Identic.class).node(this.getClass().getSimpleName());
+		cboTypeLists.setSelectedItem(myPrefs.get("ActiveList","Pictures"));
+		myPrefs = null;
+
+		
+//		cboTypeLists.
+		
+
+		// lblStatus.setText(url.getPath());
+	}// initFileTypes
 
 	private void appClose() {
 		Preferences myPrefs = Preferences.userNodeForPackage(Identic.class).node(this.getClass().getSimpleName());
@@ -85,20 +184,25 @@ public class Identic {
 		myPrefs.putInt("LocX", point.x);
 		myPrefs.putInt("LocY", point.y);
 		myPrefs.putInt("Divider", splitPane1.getDividerLocation());
+		myPrefs.put("ListDirectory", fileListDirectory);
+		myPrefs.put("ActiveList",(String) cboTypeLists.getSelectedItem());
 		myPrefs = null;
 	}// appClose
 
 	private void appInit() {
+
 		Preferences myPrefs = Preferences.userNodeForPackage(Identic.class).node(this.getClass().getSimpleName());
 		frmIdentic.setSize(myPrefs.getInt("Width", 761), myPrefs.getInt("Height", 693));
 		frmIdentic.setLocation(myPrefs.getInt("LocX", 100), myPrefs.getInt("LocY", 100));
 		splitPane1.setDividerLocation(myPrefs.getInt("Divider", 250));
+
+		fileListDirectory = myPrefs.get("ListDirectory", EMPTY_STRING);
+		cboTypeLists.setSelectedItem(myPrefs.get("ActiveList","Pictures"));
 		myPrefs = null;
 
+		// These two arrays are synchronized to control the button positions and the selection of the correct panels.
 		sideMenuButtons = new JButton[] { btnFindDuplicates, btnFindDuplicatesByName, btnDisplayResults,
 				btnCopyMoveRemove, btnFileTypes };
-		sideMenuPanels = new JPanel[] { panelFindDuplicates, panelFindDuplicatesByName, panelDisplayResults,
-				panelCopyMoveRemove, panelFileTypes };
 		sideMenuPanelNames = new String[] { panelFindDuplicates.getName(), panelFindDuplicatesByName.getName(),
 				panelDisplayResults.getName(), panelCopyMoveRemove.getName(), panelFileTypes.getName() };
 
@@ -107,6 +211,7 @@ public class Identic {
 	public Identic() {
 		initialize();
 		appInit();
+		initFileTypes();
 	}// Constructor
 
 	/**
@@ -198,23 +303,59 @@ public class Identic {
 
 		panelFindDuplicates = new JPanel();
 		panelFindDuplicates.setName(PNL_FIND_DUPS);
-		panelDetails.add(panelFindDuplicates, PNL_FIND_DUPS); //"name_669947978631479"
-		GridBagLayout gbl_panelFindDuplicates = new GridBagLayout();
-		gbl_panelFindDuplicates.columnWidths = new int[] { 0, 0 };
-		gbl_panelFindDuplicates.rowHeights = new int[] { 0, 0 };
-		gbl_panelFindDuplicates.columnWeights = new double[] { 0.0, Double.MIN_VALUE };
-		gbl_panelFindDuplicates.rowWeights = new double[] { 0.0, Double.MIN_VALUE };
-		panelFindDuplicates.setLayout(gbl_panelFindDuplicates);
+		panelDetails.add(panelFindDuplicates, PNL_FIND_DUPS);
+		panelFindDuplicates.setLayout(new BoxLayout(panelFindDuplicates, BoxLayout.Y_AXIS));
 
-		JLabel lblFindDuplicates = new JLabel("Find Duplicates");
-		GridBagConstraints gbc_lblFindDuplicates = new GridBagConstraints();
-		gbc_lblFindDuplicates.gridx = 0;
-		gbc_lblFindDuplicates.gridy = 0;
-		panelFindDuplicates.add(lblFindDuplicates, gbc_lblFindDuplicates);
+		Component verticalStrut = Box.createVerticalStrut(20);
+		panelFindDuplicates.add(verticalStrut);
+
+		JPanel panel1 = new JPanel();
+		panel1.setAlignmentY(Component.BOTTOM_ALIGNMENT);
+		panel1.setBorder(new CompoundBorder(new TitledBorder(new LineBorder(new Color(0, 0, 0), 1, true), "Active List",
+				TitledBorder.CENTER, TitledBorder.TOP, null, new Color(0, 0, 0)), null));
+		panel1.setMaximumSize(new Dimension(150, 100));
+		panelFindDuplicates.add(panel1);
+		GridBagLayout gbl_panel1 = new GridBagLayout();
+		gbl_panel1.columnWidths = new int[] { 113, 0 };
+		gbl_panel1.rowHeights = new int[] { 10, 0, 10, 0 };
+		gbl_panel1.columnWeights = new double[] { 1.0, Double.MIN_VALUE };
+		gbl_panel1.rowWeights = new double[] { 0.0, 0.0, 0.0, Double.MIN_VALUE };
+		panel1.setLayout(gbl_panel1);
+
+		JLabel lblNewLabel_2 = new JLabel("No Active List");
+		lblNewLabel_2.setFont(new Font("Tahoma", Font.BOLD, 13));
+		GridBagConstraints gbc_lblNewLabel_2 = new GridBagConstraints();
+		gbc_lblNewLabel_2.insets = new Insets(0, 0, 5, 0);
+		gbc_lblNewLabel_2.gridx = 0;
+		gbc_lblNewLabel_2.gridy = 1;
+		panel1.add(lblNewLabel_2, gbc_lblNewLabel_2);
+
+		JLabel lblNewLabel_3 = new JLabel("New label");
+		lblNewLabel_3.setFont(new Font("Tahoma", Font.BOLD, 11));
+		GridBagConstraints gbc_lblNewLabel_3 = new GridBagConstraints();
+		gbc_lblNewLabel_3.gridx = 0;
+		gbc_lblNewLabel_3.gridy = 2;
+		panel1.add(lblNewLabel_3, gbc_lblNewLabel_3);
+
+		Component verticalStrut_1 = Box.createVerticalStrut(20);
+		panelFindDuplicates.add(verticalStrut_1);
+
+		cboTypeLists = new JComboBox();
+		cboTypeLists.addActionListener(identicAdapter);
+		cboTypeLists.setName(CBO_FILE_TYPES);
+		cboTypeLists.setMaximumSize(new Dimension(32767, 30));
+//		cboTypeLists.setModel(new DefaultComboBoxModel(new String[] { "panelFindDuplicates.getName()",
+//				"panelFindDuplicatesByName.getName()", "panelDisplayResults.getName()", "panelCopyMoveRemove.getName()",
+//				"panelFileTypespanelFindDuplicates.getName()", "panelFindDuplicatesByName.getName()",
+//				"panelDisplayResults.getName()", "panelCopyMoveRemove.getName()",
+//				"panelFileTypespanelFindDuplicates.getName()", "panelFindDuplicatesByName.getName()",
+//				"panelDisplayResults.getName()", "panelCopyMoveRemove.getName()", "panelFileTypes" }));
+		panelFindDuplicates.add(cboTypeLists
+				);
 
 		panelFindDuplicatesByName = new JPanel();
 		panelFindDuplicatesByName.setName(PNL_FIND_DUPS_BY_NAME);
-		panelDetails.add(panelFindDuplicatesByName, PNL_FIND_DUPS_BY_NAME);//"name_669979253199403"
+		panelDetails.add(panelFindDuplicatesByName, PNL_FIND_DUPS_BY_NAME);// "name_669979253199403"
 		GridBagLayout gbl_panelFindDuplicatesByName = new GridBagLayout();
 		gbl_panelFindDuplicatesByName.columnWidths = new int[] { 0, 0 };
 		gbl_panelFindDuplicatesByName.rowHeights = new int[] { 0, 0 };
@@ -230,7 +371,7 @@ public class Identic {
 
 		panelDisplayResults = new JPanel();
 		panelDisplayResults.setName(PNL_DISPLAY_RESULTS);
-		panelDetails.add(panelDisplayResults, PNL_DISPLAY_RESULTS);//"name_670006781010300"
+		panelDetails.add(panelDisplayResults, PNL_DISPLAY_RESULTS);// "name_670006781010300"
 		GridBagLayout gbl_panelDisplayResults = new GridBagLayout();
 		gbl_panelDisplayResults.columnWidths = new int[] { 0, 0 };
 		gbl_panelDisplayResults.rowHeights = new int[] { 0, 0 };
@@ -246,7 +387,7 @@ public class Identic {
 
 		panelCopyMoveRemove = new JPanel();
 		panelCopyMoveRemove.setName(PNL_COPY_MOVE_REMOVE);
-		panelDetails.add(panelCopyMoveRemove, PNL_COPY_MOVE_REMOVE);//"name_670030448605218"
+		panelDetails.add(panelCopyMoveRemove, PNL_COPY_MOVE_REMOVE);// "name_670030448605218"
 		GridBagLayout gbl_panelCopyMoveRemove = new GridBagLayout();
 		gbl_panelCopyMoveRemove.columnWidths = new int[] { 0, 0 };
 		gbl_panelCopyMoveRemove.rowHeights = new int[] { 0, 0 };
@@ -262,7 +403,7 @@ public class Identic {
 
 		panelFileTypes = new JPanel();
 		panelFileTypes.setName(PNL_FILE_TYPES);
-		panelDetails.add(panelFileTypes,PNL_FILE_TYPES);// "name_670049977688605"
+		panelDetails.add(panelFileTypes, PNL_FILE_TYPES);// "name_670049977688605"
 		GridBagLayout gbl_panelFileTypes = new GridBagLayout();
 		gbl_panelFileTypes.columnWidths = new int[] { 0, 0 };
 		gbl_panelFileTypes.rowHeights = new int[] { 0, 0 };
@@ -279,76 +420,76 @@ public class Identic {
 		panelMain = new JPanel();
 		splitPane1.setRightComponent(panelMain);
 		panelMain.setLayout(new CardLayout(0, 0));
-		
+
 		JPanel panelMainFIndDuplicates = new JPanel();
 		panelMain.add(panelMainFIndDuplicates, PNL_FIND_DUPS);
 		GridBagLayout gbl_panelMainFIndDuplicates = new GridBagLayout();
-		gbl_panelMainFIndDuplicates.columnWidths = new int[]{0, 0};
-		gbl_panelMainFIndDuplicates.rowHeights = new int[]{0, 0};
-		gbl_panelMainFIndDuplicates.columnWeights = new double[]{0.0, Double.MIN_VALUE};
-		gbl_panelMainFIndDuplicates.rowWeights = new double[]{0.0, Double.MIN_VALUE};
+		gbl_panelMainFIndDuplicates.columnWidths = new int[] { 0, 0 };
+		gbl_panelMainFIndDuplicates.rowHeights = new int[] { 0, 0 };
+		gbl_panelMainFIndDuplicates.columnWeights = new double[] { 0.0, Double.MIN_VALUE };
+		gbl_panelMainFIndDuplicates.rowWeights = new double[] { 0.0, Double.MIN_VALUE };
 		panelMainFIndDuplicates.setLayout(gbl_panelMainFIndDuplicates);
-		
+
 		JLabel lblFindDuplicates_1 = new JLabel("Find Duplicates");
 		GridBagConstraints gbc_lblFindDuplicates_1 = new GridBagConstraints();
 		gbc_lblFindDuplicates_1.gridx = 0;
 		gbc_lblFindDuplicates_1.gridy = 0;
 		panelMainFIndDuplicates.add(lblFindDuplicates_1, gbc_lblFindDuplicates_1);
-		
+
 		JPanel panelMainFIndDuplicatesByName = new JPanel();
 		panelMain.add(panelMainFIndDuplicatesByName, PNL_FIND_DUPS_BY_NAME);
 		GridBagLayout gbl_panelMainFIndDuplicatesByName = new GridBagLayout();
-		gbl_panelMainFIndDuplicatesByName.columnWidths = new int[]{0, 0};
-		gbl_panelMainFIndDuplicatesByName.rowHeights = new int[]{0, 0};
-		gbl_panelMainFIndDuplicatesByName.columnWeights = new double[]{0.0, Double.MIN_VALUE};
-		gbl_panelMainFIndDuplicatesByName.rowWeights = new double[]{0.0, Double.MIN_VALUE};
+		gbl_panelMainFIndDuplicatesByName.columnWidths = new int[] { 0, 0 };
+		gbl_panelMainFIndDuplicatesByName.rowHeights = new int[] { 0, 0 };
+		gbl_panelMainFIndDuplicatesByName.columnWeights = new double[] { 0.0, Double.MIN_VALUE };
+		gbl_panelMainFIndDuplicatesByName.rowWeights = new double[] { 0.0, Double.MIN_VALUE };
 		panelMainFIndDuplicatesByName.setLayout(gbl_panelMainFIndDuplicatesByName);
-		
+
 		JLabel lblFindDuplicatesBy_1 = new JLabel("Find Duplicates by Name");
 		GridBagConstraints gbc_lblFindDuplicatesBy_1 = new GridBagConstraints();
 		gbc_lblFindDuplicatesBy_1.gridx = 0;
 		gbc_lblFindDuplicatesBy_1.gridy = 0;
 		panelMainFIndDuplicatesByName.add(lblFindDuplicatesBy_1, gbc_lblFindDuplicatesBy_1);
-		
+
 		JPanel panelMainDisplayResults = new JPanel();
 		panelMain.add(panelMainDisplayResults, PNL_DISPLAY_RESULTS);
 		GridBagLayout gbl_panelMainDisplayResults = new GridBagLayout();
-		gbl_panelMainDisplayResults.columnWidths = new int[]{0, 0};
-		gbl_panelMainDisplayResults.rowHeights = new int[]{0, 0};
-		gbl_panelMainDisplayResults.columnWeights = new double[]{0.0, Double.MIN_VALUE};
-		gbl_panelMainDisplayResults.rowWeights = new double[]{0.0, Double.MIN_VALUE};
+		gbl_panelMainDisplayResults.columnWidths = new int[] { 0, 0 };
+		gbl_panelMainDisplayResults.rowHeights = new int[] { 0, 0 };
+		gbl_panelMainDisplayResults.columnWeights = new double[] { 0.0, Double.MIN_VALUE };
+		gbl_panelMainDisplayResults.rowWeights = new double[] { 0.0, Double.MIN_VALUE };
 		panelMainDisplayResults.setLayout(gbl_panelMainDisplayResults);
-		
+
 		JLabel lblDisplayResults_1 = new JLabel("Display Results");
 		GridBagConstraints gbc_lblDisplayResults_1 = new GridBagConstraints();
 		gbc_lblDisplayResults_1.gridx = 0;
 		gbc_lblDisplayResults_1.gridy = 0;
 		panelMainDisplayResults.add(lblDisplayResults_1, gbc_lblDisplayResults_1);
-		
+
 		JPanel panelMainCopyMoveRemove = new JPanel();
 		panelMain.add(panelMainCopyMoveRemove, PNL_COPY_MOVE_REMOVE);
 		GridBagLayout gbl_panelMainCopyMoveRemove = new GridBagLayout();
-		gbl_panelMainCopyMoveRemove.columnWidths = new int[]{0, 0};
-		gbl_panelMainCopyMoveRemove.rowHeights = new int[]{0, 0};
-		gbl_panelMainCopyMoveRemove.columnWeights = new double[]{0.0, Double.MIN_VALUE};
-		gbl_panelMainCopyMoveRemove.rowWeights = new double[]{0.0, Double.MIN_VALUE};
+		gbl_panelMainCopyMoveRemove.columnWidths = new int[] { 0, 0 };
+		gbl_panelMainCopyMoveRemove.rowHeights = new int[] { 0, 0 };
+		gbl_panelMainCopyMoveRemove.columnWeights = new double[] { 0.0, Double.MIN_VALUE };
+		gbl_panelMainCopyMoveRemove.rowWeights = new double[] { 0.0, Double.MIN_VALUE };
 		panelMainCopyMoveRemove.setLayout(gbl_panelMainCopyMoveRemove);
-		
+
 		JLabel lblCopyMoveRemove = new JLabel("Copy Move Remove");
 		GridBagConstraints gbc_lblCopyMoveRemove = new GridBagConstraints();
 		gbc_lblCopyMoveRemove.gridx = 0;
 		gbc_lblCopyMoveRemove.gridy = 0;
 		panelMainCopyMoveRemove.add(lblCopyMoveRemove, gbc_lblCopyMoveRemove);
-		
+
 		JPanel panelMainFileTypes = new JPanel();
 		panelMain.add(panelMainFileTypes, PNL_FILE_TYPES);
 		GridBagLayout gbl_panelMainFileTypes = new GridBagLayout();
-		gbl_panelMainFileTypes.columnWidths = new int[]{0, 0};
-		gbl_panelMainFileTypes.rowHeights = new int[]{0, 0};
-		gbl_panelMainFileTypes.columnWeights = new double[]{0.0, Double.MIN_VALUE};
-		gbl_panelMainFileTypes.rowWeights = new double[]{0.0, Double.MIN_VALUE};
+		gbl_panelMainFileTypes.columnWidths = new int[] { 0, 0 };
+		gbl_panelMainFileTypes.rowHeights = new int[] { 0, 0 };
+		gbl_panelMainFileTypes.columnWeights = new double[] { 0.0, Double.MIN_VALUE };
+		gbl_panelMainFileTypes.rowWeights = new double[] { 0.0, Double.MIN_VALUE };
 		panelMainFileTypes.setLayout(gbl_panelMainFileTypes);
-		
+
 		JLabel lblNewLabel_1 = new JLabel("File Types");
 		GridBagConstraints gbc_lblNewLabel_1 = new GridBagConstraints();
 		gbc_lblNewLabel_1.gridx = 0;
@@ -363,7 +504,7 @@ public class Identic {
 		gbc_panelStatus.gridx = 0;
 		gbc_panelStatus.gridy = 2;
 		frmIdentic.getContentPane().add(panelStatus, gbc_panelStatus);
-		
+
 		lblStatus = new JLabel("Status");
 		panelStatus.add(lblStatus);
 
@@ -428,6 +569,11 @@ public class Identic {
 			case BTN_FILE_TYPES:
 				doSideMenu((JButton) actionEvent.getSource());
 				break;
+				
+				//Other
+			case CBO_FILE_TYPES:
+				System.out.println("CBO_FILE_TYPES");
+				break;
 
 			default:
 
@@ -436,6 +582,10 @@ public class Identic {
 		}// actionPerformed
 
 	}// class IdenticAdapter
+
+	private static final String EMPTY_STRING = "";
+	private static final String LIST_SUFFIX = "typeList";
+	private static final String LIST_SUFFIX_DOT = ".typeList";
 
 	private static final String MNU_FILE_EXIT = "mnuFileExit";
 	private static final String MNU_REPORTS_LOG_FILES = "mnuReportsLogFiles";
@@ -446,7 +596,9 @@ public class Identic {
 	private static final String BTN_FIND_DUPS_BY_NAME = "btnFindDuplicatesByName";
 	private static final String BTN_DISPLAY_RESULTS = "btnDisplayResults";
 	private static final String BTN_COPY_MOVE_REMOVE = "btnCopyMoveRemove";
-	private static final String BTN_FILE_TYPES = "btnFIleTypes";
+	private static final String BTN_FILE_TYPES = "btnFileTypes";
+	
+	private static final String CBO_FILE_TYPES = "cboFileTypes";
 
 	private static final String PNL_FIND_DUPS = "pnlFindDuplicates";
 	private static final String PNL_FIND_DUPS_BY_NAME = "pnlFindDuplicatesByName";
@@ -472,5 +624,6 @@ public class Identic {
 	private JPanel panelFileTypes;
 	private JLabel lblStatus;
 	private JPanel panelMain;
+	private JComboBox cboTypeLists;
 
 }// class GUItemplate
