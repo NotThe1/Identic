@@ -12,6 +12,10 @@ import java.awt.Insets;
 import java.awt.Point;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.FocusEvent;
+import java.awt.event.FocusListener;
+import java.awt.event.MouseEvent;
+import java.awt.event.MouseListener;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.io.File;
@@ -23,6 +27,9 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Vector;
 import java.util.prefs.Preferences;
 
 import javax.swing.Box;
@@ -32,24 +39,34 @@ import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
+import javax.swing.JList;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
+import javax.swing.JTextField;
+import javax.swing.SwingConstants;
+import javax.swing.UIManager;
 import javax.swing.border.BevelBorder;
 import javax.swing.border.CompoundBorder;
 import javax.swing.border.LineBorder;
 import javax.swing.border.TitledBorder;
+import javax.swing.event.ListSelectionEvent;
+import javax.swing.event.ListSelectionListener;
 
 public class Identic {
 
 	private IdenticAdapter identicAdapter = new IdenticAdapter();
 	private JButton[] sideMenuButtons;
-	private JPanel[] sideMenuPanels;
-	private String[] sideMenuPanelNames;
-	private DefaultComboBoxModel typeListModel = new DefaultComboBoxModel();
+	private String[] sideMenuPanelNames; // SortedComboBoxModel
+//	private SortedComboBoxModel typeListModel = new SortedComboBoxModel();
+//	private SortedComboBoxModel activeListModel = new SortedComboBoxModel();
+	 private DefaultComboBoxModel<String> typeListModel = new DefaultComboBoxModel<>();
+	 private DefaultComboBoxModel<String> activeListModel = new DefaultComboBoxModel<>();
+	private ArrayList<String> targetSuffixes = new ArrayList<>();
 
 	private String fileListDirectory;
 
@@ -68,7 +85,111 @@ public class Identic {
 			}// run
 		});
 	}// main
-		// ---------------------------------------------------------
+		// ---------------FileTypes--------------------------------
+
+	private void loadTargetList() {
+		String listName = (String) cboTypeLists.getSelectedItem();
+		lblActiveList.setText(listName);
+		String listFile = fileListDirectory + listName + LIST_SUFFIX_DOT;
+		lblStatus.setText(listFile);
+
+		Path p = Paths.get(listFile);
+		try {
+			targetSuffixes = (ArrayList<String>) Files.readAllLines(p);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} // try
+		lblActiveListCount.setText(String.format("%d", targetSuffixes.size()));
+	}// loadTargetList
+
+	private void loadTargetEdit() {
+		if (listFileTypes.isSelectionEmpty()) {
+			listFileTypes.setSelectedIndex(0);
+		} // ensure a selection
+		String editName = (String) listFileTypes.getSelectedValue();
+		lblHotList.setText(editName);
+		txtEditList.setText(editName);
+		lblStatus.setText((String) listFileTypes.getSelectedValue());
+
+		String editFile = fileListDirectory + editName + LIST_SUFFIX_DOT;
+		Path p = Paths.get(editFile);
+		try {
+			ArrayList<String> lines = (ArrayList<String>) Files.readAllLines(p);
+			activeListModel.removeAllElements();
+			for (String line : lines) {
+				activeListModel.addElement(line);
+			} // for
+		} catch (IOException e) {
+			// TODO Auto-generated catch block activeListModel
+			e.printStackTrace();
+		} // try
+
+		manageEditButtons("Load");
+
+	}// loadTargetEdit
+
+	private void loadNewTargetEdit() {
+		String editName = NEW_LIST;
+		txtEditList.setText(editName);
+		lblHotList.setText(editName);
+		activeListModel.removeAllElements();
+		manageEditButtons("New");
+	}// loadNewTargetEdit
+
+	private void doNameChanged() {
+		String newName = txtEditList.getText().trim();
+		if (!lblHotList.getText().equals(newName)) {
+			lblHotList.setText(newName);
+			manageEditButtons("NameChanged");
+		} // if
+		listActiveList.clearSelection();
+	}// doNameChanged
+
+	private void doEditListMember() {
+		if (!txtEditListMember.getText().equals(EMPTY_STRING)) {
+			listActiveList.clearSelection();
+			btnAddRemove.setText(EDIT_ADD);
+		} //
+	}// doEditListMember
+
+	private void manageEditButtons(String action) {
+		switch (action) {
+		case "Load":
+			btnFileListNew.setEnabled(true);
+			btnFileListSave.setEnabled(true);
+			btnFileListSaveAs.setEnabled(true);
+			btnFileListDelete.setEnabled(true);
+			break;
+		case "New":
+			btnFileListNew.setEnabled(false);
+			btnFileListSave.setEnabled(false);
+			btnFileListSaveAs.setEnabled(false);
+			btnFileListDelete.setEnabled(false);
+			break;
+		case "NameChanged":
+			btnFileListNew.setEnabled(true);
+			btnFileListSave.setEnabled(true);
+			btnFileListSaveAs.setEnabled(false);
+			btnFileListDelete.setEnabled(false);
+			break;
+		}// switch
+
+	}// manageEditButtons
+	
+	private void doAddRemove(){
+		if(btnAddRemove.getText().equals(EDIT_REMOVE)){
+			int index = listActiveList.getSelectedIndex();
+			activeListModel.removeElementAt(index);
+		}else if(btnAddRemove.getText().equals(EDIT_ADD)){
+			activeListModel.insertElementAt(txtEditListMember.getText().toUpperCase(), 0);
+			txtEditListMember.setText(EMPTY_STRING);
+		}//if
+		btnAddRemove.setText(EDIT_ADD_REMOVE);
+	}//doAddRemove
+
+	// ---------------------------------------------------------
+	// ---------------------------------------------------------
 
 	private void doSideMenu(JButton button) {
 		String targetPanelName = null;
@@ -153,24 +274,23 @@ public class Identic {
 			} // for
 			files = targetDirectory.listFiles(new ListFilter());
 		} // if no type list files in target directory
-		
-		//set up cbo model
-		
+
+		// set up cbo model
+
 		typeListModel.removeAllElements();
-		
-		for (File f:files){
+
+		for (File f : files) {
 			typeListModel.addElement(f.getName().replace(LIST_SUFFIX_DOT, EMPTY_STRING));
-		}//for
-		
+		} // for
+
 		cboTypeLists.setModel(typeListModel);
-		
+
 		Preferences myPrefs = Preferences.userNodeForPackage(Identic.class).node(this.getClass().getSimpleName());
-		cboTypeLists.setSelectedItem(myPrefs.get("ActiveList","Pictures"));
+		cboTypeLists.setSelectedItem(myPrefs.get("ActiveList", "Pictures"));
+		listFileTypes.setModel(typeListModel);
 		myPrefs = null;
 
-		
-//		cboTypeLists.
-		
+		// cboTypeLists.
 
 		// lblStatus.setText(url.getPath());
 	}// initFileTypes
@@ -185,7 +305,7 @@ public class Identic {
 		myPrefs.putInt("LocY", point.y);
 		myPrefs.putInt("Divider", splitPane1.getDividerLocation());
 		myPrefs.put("ListDirectory", fileListDirectory);
-		myPrefs.put("ActiveList",(String) cboTypeLists.getSelectedItem());
+		myPrefs.put("ActiveList", (String) cboTypeLists.getSelectedItem());
 		myPrefs = null;
 	}// appClose
 
@@ -197,7 +317,7 @@ public class Identic {
 		splitPane1.setDividerLocation(myPrefs.getInt("Divider", 250));
 
 		fileListDirectory = myPrefs.get("ListDirectory", EMPTY_STRING);
-		cboTypeLists.setSelectedItem(myPrefs.get("ActiveList","Pictures"));
+		cboTypeLists.setSelectedItem(myPrefs.get("ActiveList", "Pictures"));
 		myPrefs = null;
 
 		// These two arrays are synchronized to control the button positions and the selection of the correct panels.
@@ -205,7 +325,7 @@ public class Identic {
 				btnCopyMoveRemove, btnFileTypes };
 		sideMenuPanelNames = new String[] { panelFindDuplicates.getName(), panelFindDuplicatesByName.getName(),
 				panelDisplayResults.getName(), panelCopyMoveRemove.getName(), panelFileTypes.getName() };
-
+		listActiveList.setModel(activeListModel);
 	}// appInit
 
 	public Identic() {
@@ -306,13 +426,10 @@ public class Identic {
 		panelDetails.add(panelFindDuplicates, PNL_FIND_DUPS);
 		panelFindDuplicates.setLayout(new BoxLayout(panelFindDuplicates, BoxLayout.Y_AXIS));
 
-		Component verticalStrut = Box.createVerticalStrut(20);
-		panelFindDuplicates.add(verticalStrut);
-
 		JPanel panel1 = new JPanel();
 		panel1.setAlignmentY(Component.BOTTOM_ALIGNMENT);
-		panel1.setBorder(new CompoundBorder(new TitledBorder(new LineBorder(new Color(0, 0, 0), 1, true), "Active List",
-				TitledBorder.CENTER, TitledBorder.TOP, null, new Color(0, 0, 0)), null));
+		panel1.setBorder(new CompoundBorder(new TitledBorder(new LineBorder(new Color(0, 0, 0), 1, true),
+				"FInd Duplicates", TitledBorder.CENTER, TitledBorder.TOP, null, new Color(0, 0, 0)), null));
 		panel1.setMaximumSize(new Dimension(150, 100));
 		panelFindDuplicates.add(panel1);
 		GridBagLayout gbl_panel1 = new GridBagLayout();
@@ -337,21 +454,18 @@ public class Identic {
 		gbc_lblNewLabel_3.gridy = 2;
 		panel1.add(lblNewLabel_3, gbc_lblNewLabel_3);
 
-		Component verticalStrut_1 = Box.createVerticalStrut(20);
-		panelFindDuplicates.add(verticalStrut_1);
-
-		cboTypeLists = new JComboBox();
-		cboTypeLists.addActionListener(identicAdapter);
-		cboTypeLists.setName(CBO_FILE_TYPES);
-		cboTypeLists.setMaximumSize(new Dimension(32767, 30));
-//		cboTypeLists.setModel(new DefaultComboBoxModel(new String[] { "panelFindDuplicates.getName()",
-//				"panelFindDuplicatesByName.getName()", "panelDisplayResults.getName()", "panelCopyMoveRemove.getName()",
-//				"panelFileTypespanelFindDuplicates.getName()", "panelFindDuplicatesByName.getName()",
-//				"panelDisplayResults.getName()", "panelCopyMoveRemove.getName()",
-//				"panelFileTypespanelFindDuplicates.getName()", "panelFindDuplicatesByName.getName()",
-//				"panelDisplayResults.getName()", "panelCopyMoveRemove.getName()", "panelFileTypes" }));
-		panelFindDuplicates.add(cboTypeLists
-				);
+		// cboTypeListsOld = new JComboBox();
+		// cboTypeListsOld.addActionListener(identicAdapter);
+		// cboTypeListsOld.setName(CBO_FILE_TYPES);
+		// cboTypeListsOld.setMaximumSize(new Dimension(32767, 30));
+		//// cboTypeLists.setModel(new DefaultComboBoxModel(new String[] { "panelFindDuplicates.getName()",
+		//// "panelFindDuplicatesByName.getName()", "panelDisplayResults.getName()", "panelCopyMoveRemove.getName()",
+		//// "panelFileTypespanelFindDuplicates.getName()", "panelFindDuplicatesByName.getName()",
+		//// "panelDisplayResults.getName()", "panelCopyMoveRemove.getName()",
+		//// "panelFileTypespanelFindDuplicates.getName()", "panelFindDuplicatesByName.getName()",
+		//// "panelDisplayResults.getName()", "panelCopyMoveRemove.getName()", "panelFileTypes" }));
+		// panelFindDuplicates.add(cboTypeListsOld
+		// );
 
 		panelFindDuplicatesByName = new JPanel();
 		panelFindDuplicatesByName.setName(PNL_FIND_DUPS_BY_NAME);
@@ -403,19 +517,52 @@ public class Identic {
 
 		panelFileTypes = new JPanel();
 		panelFileTypes.setName(PNL_FILE_TYPES);
-		panelDetails.add(panelFileTypes, PNL_FILE_TYPES);// "name_670049977688605"
-		GridBagLayout gbl_panelFileTypes = new GridBagLayout();
-		gbl_panelFileTypes.columnWidths = new int[] { 0, 0 };
-		gbl_panelFileTypes.rowHeights = new int[] { 0, 0 };
-		gbl_panelFileTypes.columnWeights = new double[] { 0.0, Double.MIN_VALUE };
-		gbl_panelFileTypes.rowWeights = new double[] { 0.0, Double.MIN_VALUE };
-		panelFileTypes.setLayout(gbl_panelFileTypes);
+		panelDetails.add(panelFileTypes, PNL_FILE_TYPES);
+		panelFileTypes.setLayout(new BoxLayout(panelFileTypes, BoxLayout.Y_AXIS));
 
 		JLabel lblNewLabel = new JLabel("File Types");
-		GridBagConstraints gbc_lblNewLabel = new GridBagConstraints();
-		gbc_lblNewLabel.gridx = 0;
-		gbc_lblNewLabel.gridy = 0;
-		panelFileTypes.add(lblNewLabel, gbc_lblNewLabel);
+		panelFileTypes.add(lblNewLabel);
+
+		Component verticalStrut_2 = Box.createVerticalStrut(20);
+		panelFileTypes.add(verticalStrut_2);
+
+		JPanel panel = new JPanel();
+		panel.setMaximumSize(new Dimension(150, 100));
+		panel.setBorder(new CompoundBorder(new TitledBorder(new LineBorder(new Color(0, 0, 0), 1, true), "Active List",
+
+				TitledBorder.CENTER, TitledBorder.TOP, null, new Color(0, 0, 0)), null));
+		panel.setAlignmentY(1.0f);
+		panelFileTypes.add(panel);
+		GridBagLayout gbl_panel = new GridBagLayout();
+		gbl_panel.columnWidths = new int[] { 113, 0 };
+		gbl_panel.rowHeights = new int[] { 10, 0, 10, 0 };
+		gbl_panel.columnWeights = new double[] { 1.0, Double.MIN_VALUE };
+		gbl_panel.rowWeights = new double[] { 0.0, 0.0, 0.0, Double.MIN_VALUE };
+		panel.setLayout(gbl_panel);
+
+		lblActiveList = new JLabel("No Active List");
+		lblActiveList.setFont(new Font("Tahoma", Font.BOLD, 13));
+		GridBagConstraints gbc_lblActiveList = new GridBagConstraints();
+		gbc_lblActiveList.insets = new Insets(0, 0, 5, 0);
+		gbc_lblActiveList.gridx = 0;
+		gbc_lblActiveList.gridy = 1;
+		panel.add(lblActiveList, gbc_lblActiveList);
+
+		lblActiveListCount = new JLabel("New label");
+		lblActiveListCount.setFont(new Font("Tahoma", Font.BOLD, 11));
+		GridBagConstraints gbc_lblActiveListCount = new GridBagConstraints();
+		gbc_lblActiveListCount.gridx = 0;
+		gbc_lblActiveListCount.gridy = 2;
+		panel.add(lblActiveListCount, gbc_lblActiveListCount);
+
+		Component verticalStrut_3 = Box.createVerticalStrut(20);
+		panelFileTypes.add(verticalStrut_3);
+
+		cboTypeLists = new JComboBox();
+		cboTypeLists.setName(CBO_FILE_TYPES);
+		cboTypeLists.addActionListener(identicAdapter);
+		cboTypeLists.setMaximumSize(new Dimension(32767, 30));
+		panelFileTypes.add(cboTypeLists);
 
 		panelMain = new JPanel();
 		splitPane1.setRightComponent(panelMain);
@@ -484,17 +631,302 @@ public class Identic {
 		JPanel panelMainFileTypes = new JPanel();
 		panelMain.add(panelMainFileTypes, PNL_FILE_TYPES);
 		GridBagLayout gbl_panelMainFileTypes = new GridBagLayout();
-		gbl_panelMainFileTypes.columnWidths = new int[] { 0, 0 };
-		gbl_panelMainFileTypes.rowHeights = new int[] { 0, 0 };
-		gbl_panelMainFileTypes.columnWeights = new double[] { 0.0, Double.MIN_VALUE };
-		gbl_panelMainFileTypes.rowWeights = new double[] { 0.0, Double.MIN_VALUE };
+		gbl_panelMainFileTypes.columnWidths = new int[] { 0, 227, 161, 0, 0 };
+		gbl_panelMainFileTypes.rowHeights = new int[] { 0, 0, 0, 0 };
+		gbl_panelMainFileTypes.columnWeights = new double[] { 0.0, 0.0, 0.0, 0.0, Double.MIN_VALUE };
+		gbl_panelMainFileTypes.rowWeights = new double[] { 0.0, 0.0, 1.0, Double.MIN_VALUE };
 		panelMainFileTypes.setLayout(gbl_panelMainFileTypes);
 
-		JLabel lblNewLabel_1 = new JLabel("File Types");
+		JLabel lblNewLabel_1 = new JLabel("Manage Lists");
 		GridBagConstraints gbc_lblNewLabel_1 = new GridBagConstraints();
-		gbc_lblNewLabel_1.gridx = 0;
+		gbc_lblNewLabel_1.fill = GridBagConstraints.HORIZONTAL;
+		gbc_lblNewLabel_1.insets = new Insets(0, 0, 5, 5);
+		gbc_lblNewLabel_1.gridx = 1;
 		gbc_lblNewLabel_1.gridy = 0;
 		panelMainFileTypes.add(lblNewLabel_1, gbc_lblNewLabel_1);
+
+		JPanel panelFileTypes1 = new JPanel();
+		panelFileTypes1.setBorder(new CompoundBorder(
+				new TitledBorder(UIManager.getBorder("TitledBorder.border"), "Available Lists", TitledBorder.LEADING,
+						TitledBorder.TOP, null, new Color(0, 0, 0)),
+				new BevelBorder(BevelBorder.LOWERED, null, null, null, null)));
+		GridBagConstraints gbc_panelFileTypes1 = new GridBagConstraints();
+		gbc_panelFileTypes1.anchor = GridBagConstraints.WEST;
+		gbc_panelFileTypes1.insets = new Insets(0, 0, 0, 5);
+		gbc_panelFileTypes1.fill = GridBagConstraints.VERTICAL;
+		gbc_panelFileTypes1.gridx = 1;
+		gbc_panelFileTypes1.gridy = 2;
+		panelMainFileTypes.add(panelFileTypes1, gbc_panelFileTypes1);
+		GridBagLayout gbl_panelFileTypes1 = new GridBagLayout();
+		gbl_panelFileTypes1.columnWidths = new int[] { 0, 0 };
+		gbl_panelFileTypes1.rowHeights = new int[] { 0, 0, 0, 0 };
+		gbl_panelFileTypes1.columnWeights = new double[] { 0.0, Double.MIN_VALUE };
+		gbl_panelFileTypes1.rowWeights = new double[] { 1.0, 0.0, 0.0, Double.MIN_VALUE };
+		panelFileTypes1.setLayout(gbl_panelFileTypes1);
+
+		JScrollPane scrollPane = new JScrollPane();
+		scrollPane.setMinimumSize(new Dimension(200, 23));
+		scrollPane.setPreferredSize(new Dimension(200, 2));
+		GridBagConstraints gbc_scrollPane = new GridBagConstraints();
+		gbc_scrollPane.anchor = GridBagConstraints.WEST;
+		gbc_scrollPane.insets = new Insets(0, 0, 5, 0);
+		gbc_scrollPane.fill = GridBagConstraints.VERTICAL;
+		gbc_scrollPane.gridx = 0;
+		gbc_scrollPane.gridy = 0;
+		panelFileTypes1.add(scrollPane, gbc_scrollPane);
+
+		listFileTypes = new JList();
+		listFileTypes.addMouseListener(identicAdapter);
+		listFileTypes.setName(LIST_FILE_TYPES);
+		listFileTypes.setPreferredSize(new Dimension(150, 0));
+		listFileTypes.setMinimumSize(new Dimension(150, 0));
+		scrollPane.setViewportView(listFileTypes);
+
+		Component verticalStrut = Box.createVerticalStrut(20);
+		GridBagConstraints gbc_verticalStrut = new GridBagConstraints();
+		gbc_verticalStrut.insets = new Insets(0, 0, 5, 0);
+		gbc_verticalStrut.gridx = 0;
+		gbc_verticalStrut.gridy = 1;
+		panelFileTypes1.add(verticalStrut, gbc_verticalStrut);
+
+		JButton btnSelectList = new JButton("Select List");
+		btnSelectList.addActionListener(identicAdapter);
+		btnSelectList.setName(BTN_SELECT_LIST);
+		GridBagConstraints gbc_btnSelectList = new GridBagConstraints();
+		gbc_btnSelectList.gridx = 0;
+		gbc_btnSelectList.gridy = 2;
+		panelFileTypes1.add(btnSelectList, gbc_btnSelectList);
+
+		JPanel panelFileTypes2 = new JPanel();
+		panelFileTypes2.setBorder(null);
+		GridBagConstraints gbc_panelFileTypes2 = new GridBagConstraints();
+		gbc_panelFileTypes2.insets = new Insets(0, 0, 0, 5);
+		gbc_panelFileTypes2.fill = GridBagConstraints.BOTH;
+		gbc_panelFileTypes2.gridx = 2;
+		gbc_panelFileTypes2.gridy = 2;
+		panelMainFileTypes.add(panelFileTypes2, gbc_panelFileTypes2);
+		GridBagLayout gbl_panelFileTypes2 = new GridBagLayout();
+		gbl_panelFileTypes2.columnWidths = new int[] { 0, 0 };
+		gbl_panelFileTypes2.rowHeights = new int[] { 0, 0, 0, 0 };
+		gbl_panelFileTypes2.columnWeights = new double[] { 1.0, Double.MIN_VALUE };
+		gbl_panelFileTypes2.rowWeights = new double[] { 0.0, 0.0, 0.0, Double.MIN_VALUE };
+		panelFileTypes2.setLayout(gbl_panelFileTypes2);
+
+		Component verticalStrut_1 = Box.createVerticalStrut(20);
+		GridBagConstraints gbc_verticalStrut_1 = new GridBagConstraints();
+		gbc_verticalStrut_1.insets = new Insets(0, 0, 5, 0);
+		gbc_verticalStrut_1.gridx = 0;
+		gbc_verticalStrut_1.gridy = 0;
+		panelFileTypes2.add(verticalStrut_1, gbc_verticalStrut_1);
+
+		JPanel panelFileType2A = new JPanel();
+		panelFileType2A.setBorder(new CompoundBorder(new TitledBorder(new LineBorder(new Color(0, 0, 0)),
+				"Manage Lists", TitledBorder.CENTER, TitledBorder.ABOVE_TOP, null, new Color(0, 0, 0)), null));
+		GridBagConstraints gbc_panelFileType2A = new GridBagConstraints();
+		gbc_panelFileType2A.insets = new Insets(0, 0, 5, 0);
+		gbc_panelFileType2A.fill = GridBagConstraints.HORIZONTAL;
+		gbc_panelFileType2A.gridx = 0;
+		gbc_panelFileType2A.gridy = 1;
+		panelFileTypes2.add(panelFileType2A, gbc_panelFileType2A);
+		GridBagLayout gbl_panelFileType2A = new GridBagLayout();
+		gbl_panelFileType2A.columnWidths = new int[] { 0, 0 };
+		gbl_panelFileType2A.rowHeights = new int[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+		gbl_panelFileType2A.columnWeights = new double[] { 1.0, Double.MIN_VALUE };
+		gbl_panelFileType2A.rowWeights = new double[] { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+				Double.MIN_VALUE };
+		panelFileType2A.setLayout(gbl_panelFileType2A);
+
+		Component verticalStrut_5 = Box.createVerticalStrut(20);
+		GridBagConstraints gbc_verticalStrut_5 = new GridBagConstraints();
+		gbc_verticalStrut_5.insets = new Insets(0, 0, 5, 0);
+		gbc_verticalStrut_5.gridx = 0;
+		gbc_verticalStrut_5.gridy = 0;
+		panelFileType2A.add(verticalStrut_5, gbc_verticalStrut_5);
+
+		txtEditList = new JTextField();
+		txtEditList.addFocusListener(identicAdapter);
+		txtEditList.setName(TXT_EDIT_LIST);
+		txtEditList.setHorizontalAlignment(SwingConstants.CENTER);
+		txtEditList.setPreferredSize(new Dimension(300, 23));
+		txtEditList.setMinimumSize(new Dimension(300, 23));
+		txtEditList.setMaximumSize(new Dimension(300, 23));
+		GridBagConstraints gbc_txtEditList = new GridBagConstraints();
+		gbc_txtEditList.insets = new Insets(0, 0, 5, 0);
+		gbc_txtEditList.fill = GridBagConstraints.HORIZONTAL;
+		gbc_txtEditList.gridx = 0;
+		gbc_txtEditList.gridy = 1;
+		panelFileType2A.add(txtEditList, gbc_txtEditList);
+		txtEditList.setColumns(10);
+
+		Component verticalStrut_6 = Box.createVerticalStrut(20);
+		GridBagConstraints gbc_verticalStrut_6 = new GridBagConstraints();
+		gbc_verticalStrut_6.insets = new Insets(0, 0, 5, 0);
+		gbc_verticalStrut_6.gridx = 0;
+		gbc_verticalStrut_6.gridy = 2;
+		panelFileType2A.add(verticalStrut_6, gbc_verticalStrut_6);
+
+		btnFileListNew = new JButton("New");
+		btnFileListNew.addActionListener(identicAdapter);
+		btnFileListNew.setName(BTN_FILE_LIST_NEW);
+		btnFileListNew.setMaximumSize(new Dimension(75, 23));
+		btnFileListNew.setMinimumSize(new Dimension(75, 23));
+		btnFileListNew.setPreferredSize(new Dimension(75, 23));
+		GridBagConstraints gbc_btnFileListNew = new GridBagConstraints();
+		gbc_btnFileListNew.fill = GridBagConstraints.HORIZONTAL;
+		gbc_btnFileListNew.insets = new Insets(0, 0, 5, 0);
+		gbc_btnFileListNew.gridx = 0;
+		gbc_btnFileListNew.gridy = 3;
+		panelFileType2A.add(btnFileListNew, gbc_btnFileListNew);
+
+		Component verticalStrut_7 = Box.createVerticalStrut(20);
+		GridBagConstraints gbc_verticalStrut_7 = new GridBagConstraints();
+		gbc_verticalStrut_7.insets = new Insets(0, 0, 5, 0);
+		gbc_verticalStrut_7.gridx = 0;
+		gbc_verticalStrut_7.gridy = 4;
+		panelFileType2A.add(verticalStrut_7, gbc_verticalStrut_7);
+
+		btnFileListSave = new JButton("Save");
+		btnFileListSave.setEnabled(false);
+		btnFileListSave.addActionListener(identicAdapter);
+		btnFileListSave.setName(BTN_FILE_LIST_SAVE);
+		btnFileListSave.setMaximumSize(new Dimension(75, 23));
+		btnFileListSave.setMinimumSize(new Dimension(75, 23));
+		btnFileListSave.setPreferredSize(new Dimension(75, 23));
+		GridBagConstraints gbc_btnFileListSave = new GridBagConstraints();
+		gbc_btnFileListSave.fill = GridBagConstraints.HORIZONTAL;
+		gbc_btnFileListSave.insets = new Insets(0, 0, 5, 0);
+		gbc_btnFileListSave.gridx = 0;
+		gbc_btnFileListSave.gridy = 5;
+		panelFileType2A.add(btnFileListSave, gbc_btnFileListSave);
+
+		Component verticalStrut_8 = Box.createVerticalStrut(20);
+		GridBagConstraints gbc_verticalStrut_8 = new GridBagConstraints();
+		gbc_verticalStrut_8.insets = new Insets(0, 0, 5, 0);
+		gbc_verticalStrut_8.gridx = 0;
+		gbc_verticalStrut_8.gridy = 6;
+		panelFileType2A.add(verticalStrut_8, gbc_verticalStrut_8);
+
+		btnFileListSaveAs = new JButton("Save As");
+		btnFileListSaveAs.setEnabled(false);
+		btnFileListSaveAs.addActionListener(identicAdapter);
+		btnFileListSaveAs.setName(BTN_FILE_LIST_SAVE_AS);
+		btnFileListSaveAs.setPreferredSize(new Dimension(75, 23));
+		btnFileListSaveAs.setMinimumSize(new Dimension(75, 23));
+		btnFileListSaveAs.setMaximumSize(new Dimension(75, 23));
+		GridBagConstraints gbc_btnFileListSaveAs = new GridBagConstraints();
+		gbc_btnFileListSaveAs.fill = GridBagConstraints.HORIZONTAL;
+		gbc_btnFileListSaveAs.insets = new Insets(0, 0, 5, 0);
+		gbc_btnFileListSaveAs.gridx = 0;
+		gbc_btnFileListSaveAs.gridy = 7;
+		panelFileType2A.add(btnFileListSaveAs, gbc_btnFileListSaveAs);
+
+		Component verticalStrut_9 = Box.createVerticalStrut(20);
+		GridBagConstraints gbc_verticalStrut_9 = new GridBagConstraints();
+		gbc_verticalStrut_9.insets = new Insets(0, 0, 5, 0);
+		gbc_verticalStrut_9.gridx = 0;
+		gbc_verticalStrut_9.gridy = 8;
+		panelFileType2A.add(verticalStrut_9, gbc_verticalStrut_9);
+
+		btnFileListDelete = new JButton("Delete");
+		btnFileListDelete.setEnabled(false);
+		btnFileListDelete.addActionListener(identicAdapter);
+		btnFileListDelete.setName(BTN_FILE_LIST_DELETE);
+		btnFileListDelete.setMaximumSize(new Dimension(75, 23));
+		btnFileListDelete.setMinimumSize(new Dimension(75, 23));
+		btnFileListDelete.setPreferredSize(new Dimension(75, 23));
+		GridBagConstraints gbc_btnFileListDelete = new GridBagConstraints();
+		gbc_btnFileListDelete.insets = new Insets(0, 0, 5, 0);
+		gbc_btnFileListDelete.fill = GridBagConstraints.HORIZONTAL;
+		gbc_btnFileListDelete.gridx = 0;
+		gbc_btnFileListDelete.gridy = 9;
+		panelFileType2A.add(btnFileListDelete, gbc_btnFileListDelete);
+
+		Component verticalStrut_10 = Box.createVerticalStrut(20);
+		GridBagConstraints gbc_verticalStrut_10 = new GridBagConstraints();
+		gbc_verticalStrut_10.gridx = 0;
+		gbc_verticalStrut_10.gridy = 10;
+		panelFileType2A.add(verticalStrut_10, gbc_verticalStrut_10);
+
+		Component verticalStrut_4 = Box.createVerticalStrut(20);
+		GridBagConstraints gbc_verticalStrut_4 = new GridBagConstraints();
+		gbc_verticalStrut_4.gridx = 0;
+		gbc_verticalStrut_4.gridy = 2;
+		panelFileTypes2.add(verticalStrut_4, gbc_verticalStrut_4);
+
+		JPanel panelFileTypes3 = new JPanel();
+		panelFileTypes3.setBorder(new CompoundBorder(
+				new TitledBorder(UIManager.getBorder("TitledBorder.border"), "List Being Edited", TitledBorder.LEADING,
+						TitledBorder.TOP, null, new Color(0, 0, 0)),
+				new BevelBorder(BevelBorder.LOWERED, null, null, null, null)));
+		GridBagConstraints gbc_panelFileTypes3 = new GridBagConstraints();
+		gbc_panelFileTypes3.anchor = GridBagConstraints.WEST;
+		gbc_panelFileTypes3.fill = GridBagConstraints.VERTICAL;
+		gbc_panelFileTypes3.gridx = 3;
+		gbc_panelFileTypes3.gridy = 2;
+		panelMainFileTypes.add(panelFileTypes3, gbc_panelFileTypes3);
+		GridBagLayout gbl_panelFileTypes3 = new GridBagLayout();
+		gbl_panelFileTypes3.columnWidths = new int[] { 0, 0 };
+		gbl_panelFileTypes3.rowHeights = new int[] { 0, 0, 0, 0, 0, 0 };
+		gbl_panelFileTypes3.columnWeights = new double[] { 1.0, Double.MIN_VALUE };
+		gbl_panelFileTypes3.rowWeights = new double[] { 1.0, 0.0, 0.0, 0.0, 0.0, Double.MIN_VALUE };
+		panelFileTypes3.setLayout(gbl_panelFileTypes3);
+
+		JScrollPane scrollPane_1 = new JScrollPane();
+		scrollPane_1.setPreferredSize(new Dimension(200, 2));
+		scrollPane_1.setMinimumSize(new Dimension(200, 23));
+		GridBagConstraints gbc_scrollPane_1 = new GridBagConstraints();
+		gbc_scrollPane_1.fill = GridBagConstraints.BOTH;
+		gbc_scrollPane_1.insets = new Insets(0, 0, 5, 0);
+		gbc_scrollPane_1.gridx = 0;
+		gbc_scrollPane_1.gridy = 0;
+		panelFileTypes3.add(scrollPane_1, gbc_scrollPane_1);
+
+		listActiveList = new JList();
+		listActiveList.addListSelectionListener(identicAdapter);
+		listActiveList.setName(LIST_ACTIVE_LIST);
+
+		scrollPane_1.setViewportView(listActiveList);
+
+		lblHotList = new JLabel("<none>");
+		lblHotList.setForeground(Color.BLUE);
+		lblHotList.setHorizontalAlignment(SwingConstants.CENTER);
+		scrollPane_1.setColumnHeaderView(lblHotList);
+
+		Component verticalStrut_12 = Box.createVerticalStrut(20);
+		GridBagConstraints gbc_verticalStrut_12 = new GridBagConstraints();
+		gbc_verticalStrut_12.fill = GridBagConstraints.HORIZONTAL;
+		gbc_verticalStrut_12.insets = new Insets(0, 0, 5, 0);
+		gbc_verticalStrut_12.gridx = 0;
+		gbc_verticalStrut_12.gridy = 1;
+		panelFileTypes3.add(verticalStrut_12, gbc_verticalStrut_12);
+
+		txtEditListMember = new JTextField();
+		txtEditListMember.addFocusListener(identicAdapter);
+		txtEditListMember.setName(TXT_EDIT_LIST_MEMBER);
+		GridBagConstraints gbc_txtEditListMember = new GridBagConstraints();
+		gbc_txtEditListMember.insets = new Insets(0, 0, 5, 0);
+		gbc_txtEditListMember.fill = GridBagConstraints.HORIZONTAL;
+		gbc_txtEditListMember.gridx = 0;
+		gbc_txtEditListMember.gridy = 2;
+		panelFileTypes3.add(txtEditListMember, gbc_txtEditListMember);
+		txtEditListMember.setColumns(10);
+
+		Component verticalStrut_11 = Box.createVerticalStrut(20);
+		GridBagConstraints gbc_verticalStrut_11 = new GridBagConstraints();
+		gbc_verticalStrut_11.fill = GridBagConstraints.HORIZONTAL;
+		gbc_verticalStrut_11.insets = new Insets(0, 0, 5, 0);
+		gbc_verticalStrut_11.gridx = 0;
+		gbc_verticalStrut_11.gridy = 3;
+		panelFileTypes3.add(verticalStrut_11, gbc_verticalStrut_11);
+
+		btnAddRemove = new JButton("Add/Remove");
+		btnAddRemove.addActionListener(identicAdapter);
+		btnAddRemove.setName(BTN_ADD_REMOVE);
+		GridBagConstraints gbc_btnAddRemove = new GridBagConstraints();
+		gbc_btnAddRemove.fill = GridBagConstraints.HORIZONTAL;
+		gbc_btnAddRemove.gridx = 0;
+		gbc_btnAddRemove.gridy = 4;
+		panelFileTypes3.add(btnAddRemove, gbc_btnAddRemove);
 		splitPane1.setDividerLocation(250);
 
 		JPanel panelStatus = new JPanel();
@@ -539,7 +971,48 @@ public class Identic {
 
 	}// initialize
 
-	class IdenticAdapter implements ActionListener {
+	class SortedComboBoxModel extends DefaultComboBoxModel {
+		public SortedComboBoxModel() {
+			super();
+		}
+
+		public SortedComboBoxModel(Object[] items) {
+			Arrays.sort(items);
+			int size = items.length;
+			for (int i = 0; i < size; i++) {
+				super.addElement(items[i]);
+			}
+			setSelectedItem(items[0]);
+		}
+
+		public SortedComboBoxModel(Vector items) {
+			Collections.sort(items);
+			int size = items.size();
+			for (int i = 0; i < size; i++) {
+				super.addElement(items.elementAt(i));
+			}
+			setSelectedItem(items.elementAt(0));
+		}
+
+		@Override
+		public void addElement(Object element) {
+			insertElementAt(element, 0);
+		}
+
+		@Override
+		public void insertElementAt(Object element, int index) {
+			int size = getSize();
+			for (index = 0; index < size; index++) {
+				Comparable c = (Comparable) getElementAt(index);
+				if (c.compareTo(element) > 0) {
+					break;
+				}
+			}
+			super.insertElementAt(element, index);
+		}
+	}// class SortedComboBoxModel
+
+	class IdenticAdapter implements ActionListener, MouseListener, FocusListener, ListSelectionListener {
 
 		@Override
 		public void actionPerformed(ActionEvent actionEvent) {
@@ -569,11 +1042,32 @@ public class Identic {
 			case BTN_FILE_TYPES:
 				doSideMenu((JButton) actionEvent.getSource());
 				break;
-				
-				//Other
-			case CBO_FILE_TYPES:
-				System.out.println("CBO_FILE_TYPES");
+
+			case BTN_SELECT_LIST:
+				loadTargetEdit();
 				break;
+
+			case BTN_FILE_LIST_NEW:
+				loadNewTargetEdit();
+				break;
+			case BTN_FILE_LIST_SAVE:
+				break;
+			case BTN_FILE_LIST_SAVE_AS:
+				break;
+			case BTN_FILE_LIST_DELETE:
+				break;
+			case BTN_ADD_REMOVE:
+				doAddRemove();
+				break;
+
+			// Other
+			case CBO_FILE_TYPES:
+				loadTargetList();
+				break;
+
+			// case LIST_FILE_TYPES:
+			//
+			// break;
 
 			default:
 
@@ -581,8 +1075,70 @@ public class Identic {
 
 		}// actionPerformed
 
+		@Override
+		public void mouseClicked(MouseEvent mouseEvent) {
+			// TODO Auto-generated method stub
+			if (mouseEvent.getClickCount() > 1) {
+				String name = ((Component) mouseEvent.getSource()).getName();
+				if (name.equals(LIST_FILE_TYPES)) {
+					loadTargetEdit();
+				} // if list
+			} // if count > 1
+		}// mouseClicked
+
+		@Override
+		public void mouseEntered(MouseEvent e) {
+		}//
+
+		@Override
+		public void mouseExited(MouseEvent e) {
+		}//
+
+		@Override
+		public void mousePressed(MouseEvent e) {
+		}//
+
+		@Override
+		public void mouseReleased(MouseEvent e) {
+		}//
+
+		@Override
+		public void focusGained(FocusEvent arg0) {
+		}//
+
+		@Override
+		public void focusLost(FocusEvent focusEvent) {
+			String name = ((Component) focusEvent.getSource()).getName();
+			switch (name) {
+			case TXT_EDIT_LIST_MEMBER:
+				flag1 = true;
+				doEditListMember();
+				break;
+			case TXT_EDIT_LIST:
+				doNameChanged();
+				break;
+			}// switch
+
+		}// focusLost
+	private boolean flag1 = false;  // control the echo of events
+
+		@Override
+		public void valueChanged(ListSelectionEvent e) {
+			if (!flag1) {
+				txtEditListMember.setText(EMPTY_STRING);
+				btnAddRemove.setText(EDIT_REMOVE);
+			}//if flag
+			flag1 = false;
+		}// valueChanged
+
 	}// class IdenticAdapter
 
+
+	private static final String EDIT_ADD = "Add";
+	private static final String EDIT_REMOVE = "Remove";
+	private static final String EDIT_ADD_REMOVE = "Add/Remove";
+	
+	private static final String NEW_LIST = "<NEW>";
 	private static final String EMPTY_STRING = "";
 	private static final String LIST_SUFFIX = "typeList";
 	private static final String LIST_SUFFIX_DOT = ".typeList";
@@ -597,9 +1153,19 @@ public class Identic {
 	private static final String BTN_DISPLAY_RESULTS = "btnDisplayResults";
 	private static final String BTN_COPY_MOVE_REMOVE = "btnCopyMoveRemove";
 	private static final String BTN_FILE_TYPES = "btnFileTypes";
-	
-	private static final String CBO_FILE_TYPES = "cboFileTypes";
 
+	private static final String BTN_SELECT_LIST = "btnSelectList";
+	private static final String BTN_FILE_LIST_NEW = "btnFileListNew";
+	private static final String BTN_FILE_LIST_SAVE = "btnFileListSave";
+	private static final String BTN_FILE_LIST_SAVE_AS = "btnFileListSaveAs";
+	private static final String BTN_FILE_LIST_DELETE = "btnFileListDelete";
+	private static final String BTN_ADD_REMOVE = "btnAddRemove";
+
+	private static final String CBO_FILE_TYPES = "cboFileTypes";
+	private static final String LIST_FILE_TYPES = "listFileTypes";
+	private static final String LIST_ACTIVE_LIST = "listActiveList";
+	private static final String TXT_EDIT_LIST = "txtEditList";
+	private static final String TXT_EDIT_LIST_MEMBER = "txtEditListMember";
 	private static final String PNL_FIND_DUPS = "pnlFindDuplicates";
 	private static final String PNL_FIND_DUPS_BY_NAME = "pnlFindDuplicatesByName";
 	private static final String PNL_DISPLAY_RESULTS = "pnlDisplayResults";
@@ -624,6 +1190,19 @@ public class Identic {
 	private JPanel panelFileTypes;
 	private JLabel lblStatus;
 	private JPanel panelMain;
+	private JComboBox cboTypeListsOld;
 	private JComboBox cboTypeLists;
+	private JList listFileTypes;
+	private JTextField txtEditList;
+	private JTextField txtEditListMember;
+	private JList listActiveList;
+	private JLabel lblActiveList;
+	private JLabel lblActiveListCount;
+	private JLabel lblHotList;
+	private JButton btnFileListNew;
+	private JButton btnFileListSave;
+	private JButton btnFileListSaveAs;
+	private JButton btnFileListDelete;
+	private JButton btnAddRemove;
 
 }// class GUItemplate
