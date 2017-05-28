@@ -26,6 +26,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -62,10 +63,10 @@ public class Identic {
 	private IdenticAdapter identicAdapter = new IdenticAdapter();
 	private JButton[] sideMenuButtons;
 	private String[] sideMenuPanelNames; // SortedComboBoxModel
-//	private SortedComboBoxModel typeListModel = new SortedComboBoxModel();
-//	private SortedComboBoxModel activeListModel = new SortedComboBoxModel();
-	 private DefaultComboBoxModel<String> typeListModel = new DefaultComboBoxModel<>();
-	 private DefaultComboBoxModel<String> activeListModel = new DefaultComboBoxModel<>();
+	// private SortedComboBoxModel typeListModel = new SortedComboBoxModel();
+	// private SortedComboBoxModel activeListModel = new SortedComboBoxModel();
+	private DefaultComboBoxModel<String> typeListModel = new DefaultComboBoxModel<>();
+	private DefaultComboBoxModel<String> activeListModel = new DefaultComboBoxModel<>();
 	private ArrayList<String> targetSuffixes = new ArrayList<>();
 
 	private String fileListDirectory;
@@ -88,6 +89,9 @@ public class Identic {
 		// ---------------FileTypes--------------------------------
 
 	private void loadTargetList() {
+		if(cboTypeLists.getSelectedIndex()== -1){//Nothing selected
+			return;
+		}
 		String listName = (String) cboTypeLists.getSelectedItem();
 		lblActiveList.setText(listName);
 		String listFile = fileListDirectory + listName + LIST_SUFFIX_DOT;
@@ -150,43 +154,51 @@ public class Identic {
 		if (!txtEditListMember.getText().equals(EMPTY_STRING)) {
 			listActiveList.clearSelection();
 			btnAddRemove.setText(EDIT_ADD);
-		} //
+		} else {
+			btnAddRemove.setText(EDIT_ADD_REMOVE);
+		} // if
 	}// doEditListMember
 
 	private void manageEditButtons(String action) {
 		switch (action) {
 		case "Load":
-			btnFileListNew.setEnabled(true);
+			btnFileListLoad.setEnabled(true);
 			btnFileListSave.setEnabled(true);
-			btnFileListSaveAs.setEnabled(true);
+			btnFileListNew.setEnabled(true);
 			btnFileListDelete.setEnabled(true);
 			break;
 		case "New":
+			btnFileListLoad.setEnabled(true);
 			btnFileListNew.setEnabled(false);
 			btnFileListSave.setEnabled(false);
-			btnFileListSaveAs.setEnabled(false);
 			btnFileListDelete.setEnabled(false);
 			break;
 		case "NameChanged":
+			btnFileListLoad.setEnabled(true);
 			btnFileListNew.setEnabled(true);
 			btnFileListSave.setEnabled(true);
-			btnFileListSaveAs.setEnabled(false);
 			btnFileListDelete.setEnabled(false);
+			break;
+		case "Save":
+			btnFileListLoad.setEnabled(true);
+			btnFileListNew.setEnabled(true);
+			btnFileListSave.setEnabled(true);
+			btnFileListDelete.setEnabled(true);
 			break;
 		}// switch
 
 	}// manageEditButtons
-	
-	private void doAddRemove(){
-		if(btnAddRemove.getText().equals(EDIT_REMOVE)){
+
+	private void doAddRemove() {
+		if (btnAddRemove.getText().equals(EDIT_REMOVE)) {
 			int index = listActiveList.getSelectedIndex();
 			activeListModel.removeElementAt(index);
-		}else if(btnAddRemove.getText().equals(EDIT_ADD)){
+		} else if (btnAddRemove.getText().equals(EDIT_ADD)) {
 			activeListModel.insertElementAt(txtEditListMember.getText().toUpperCase(), 0);
 			txtEditListMember.setText(EMPTY_STRING);
-		}//if
+		} // if
 		btnAddRemove.setText(EDIT_ADD_REMOVE);
-	}//doAddRemove
+	}// doAddRemove
 
 	// ---------------------------------------------------------
 	// ---------------------------------------------------------
@@ -214,7 +226,55 @@ public class Identic {
 		appClose();
 		System.exit(0);
 	}// doFileExit
-		// ---------------------------------------------------------
+
+	private void doSaveList() {
+		String listFile = fileListDirectory + txtEditList.getText().toUpperCase() + LIST_SUFFIX_DOT;
+		Path listPath = Paths.get(listFile);
+		if (Files.exists(listPath)) {
+			int ans = JOptionPane.showConfirmDialog(frmIdentic, "List Exits, Do you want to overwrite?",
+					"Save File Suffix List", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+			if (ans == JOptionPane.NO_OPTION) {
+				return;
+			} // if
+
+		} // if file exists
+		ArrayList<String> lines = new ArrayList<>();
+		for (int i = 0; i < activeListModel.getSize(); i++) {
+			lines.add(activeListModel.getElementAt(i));
+		} // for
+
+		try {
+			Path p = Files.write(listPath, lines, StandardOpenOption.CREATE);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} // try
+		
+		initFileTypes();
+		manageEditButtons("Save");
+	}// doSaveList
+	
+	private void doDeleteList(){
+		String listFile = fileListDirectory + txtEditList.getText().toUpperCase() + LIST_SUFFIX_DOT;
+		Path listPath = Paths.get(listFile);
+		if (Files.exists(listPath)) {
+			int ans = JOptionPane.showConfirmDialog(frmIdentic, "Do you want to delete the list?",
+					"Delete Suffix List", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+			if (ans == JOptionPane.NO_OPTION) {
+				return;
+			} // if			
+		} // if file exists
+		try {
+			Files.deleteIfExists(listPath);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}//try
+		initFileTypes();
+		loadNewTargetEdit();
+	}//doDeleteList
+
+	// ---------------------------------------------------------
 
 	class ListFilter implements FilenameFilter {
 
@@ -294,6 +354,8 @@ public class Identic {
 
 		// lblStatus.setText(url.getPath());
 	}// initFileTypes
+	
+	//private void display
 
 	private void appClose() {
 		Preferences myPrefs = Preferences.userNodeForPackage(Identic.class).node(this.getClass().getSimpleName());
@@ -637,18 +699,10 @@ public class Identic {
 		gbl_panelMainFileTypes.rowWeights = new double[] { 0.0, 0.0, 1.0, Double.MIN_VALUE };
 		panelMainFileTypes.setLayout(gbl_panelMainFileTypes);
 
-		JLabel lblNewLabel_1 = new JLabel("Manage Lists");
-		GridBagConstraints gbc_lblNewLabel_1 = new GridBagConstraints();
-		gbc_lblNewLabel_1.fill = GridBagConstraints.HORIZONTAL;
-		gbc_lblNewLabel_1.insets = new Insets(0, 0, 5, 5);
-		gbc_lblNewLabel_1.gridx = 1;
-		gbc_lblNewLabel_1.gridy = 0;
-		panelMainFileTypes.add(lblNewLabel_1, gbc_lblNewLabel_1);
-
 		JPanel panelFileTypes1 = new JPanel();
 		panelFileTypes1.setBorder(new CompoundBorder(
-				new TitledBorder(UIManager.getBorder("TitledBorder.border"), "Available Lists", TitledBorder.LEADING,
-						TitledBorder.TOP, null, new Color(0, 0, 0)),
+				new TitledBorder(UIManager.getBorder("TitledBorder.border"), "Available Lists", TitledBorder.CENTER,
+						TitledBorder.ABOVE_TOP, null, new Color(0, 0, 0)),
 				new BevelBorder(BevelBorder.LOWERED, null, null, null, null)));
 		GridBagConstraints gbc_panelFileTypes1 = new GridBagConstraints();
 		gbc_panelFileTypes1.anchor = GridBagConstraints.WEST;
@@ -668,9 +722,9 @@ public class Identic {
 		scrollPane.setMinimumSize(new Dimension(200, 23));
 		scrollPane.setPreferredSize(new Dimension(200, 2));
 		GridBagConstraints gbc_scrollPane = new GridBagConstraints();
+		gbc_scrollPane.fill = GridBagConstraints.VERTICAL;
 		gbc_scrollPane.anchor = GridBagConstraints.WEST;
 		gbc_scrollPane.insets = new Insets(0, 0, 5, 0);
-		gbc_scrollPane.fill = GridBagConstraints.VERTICAL;
 		gbc_scrollPane.gridx = 0;
 		gbc_scrollPane.gridy = 0;
 		panelFileTypes1.add(scrollPane, gbc_scrollPane);
@@ -682,20 +736,13 @@ public class Identic {
 		listFileTypes.setMinimumSize(new Dimension(150, 0));
 		scrollPane.setViewportView(listFileTypes);
 
-		Component verticalStrut = Box.createVerticalStrut(20);
-		GridBagConstraints gbc_verticalStrut = new GridBagConstraints();
-		gbc_verticalStrut.insets = new Insets(0, 0, 5, 0);
-		gbc_verticalStrut.gridx = 0;
-		gbc_verticalStrut.gridy = 1;
-		panelFileTypes1.add(verticalStrut, gbc_verticalStrut);
-
-		JButton btnSelectList = new JButton("Select List");
-		btnSelectList.addActionListener(identicAdapter);
-		btnSelectList.setName(BTN_SELECT_LIST);
-		GridBagConstraints gbc_btnSelectList = new GridBagConstraints();
-		gbc_btnSelectList.gridx = 0;
-		gbc_btnSelectList.gridy = 2;
-		panelFileTypes1.add(btnSelectList, gbc_btnSelectList);
+		// JButton btnSelectList = new JButton("Select List");
+		// btnSelectList.addActionListener(identicAdapter);
+		// btnSelectList.setName(BTN_SELECT_LIST);
+		// GridBagConstraints gbc_btnSelectList = new GridBagConstraints();
+		// gbc_btnSelectList.gridx = 0;
+		// gbc_btnSelectList.gridy = 2;
+		// panelFileTypes1.add(btnSelectList, gbc_btnSelectList);
 
 		JPanel panelFileTypes2 = new JPanel();
 		panelFileTypes2.setBorder(null);
@@ -730,9 +777,9 @@ public class Identic {
 		panelFileTypes2.add(panelFileType2A, gbc_panelFileType2A);
 		GridBagLayout gbl_panelFileType2A = new GridBagLayout();
 		gbl_panelFileType2A.columnWidths = new int[] { 0, 0 };
-		gbl_panelFileType2A.rowHeights = new int[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+		gbl_panelFileType2A.rowHeights = new int[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 		gbl_panelFileType2A.columnWeights = new double[] { 1.0, Double.MIN_VALUE };
-		gbl_panelFileType2A.rowWeights = new double[] { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+		gbl_panelFileType2A.rowWeights = new double[] { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
 				Double.MIN_VALUE };
 		panelFileType2A.setLayout(gbl_panelFileType2A);
 
@@ -767,6 +814,24 @@ public class Identic {
 
 		btnFileListNew = new JButton("New");
 		btnFileListNew.addActionListener(identicAdapter);
+
+		btnFileListLoad = new JButton("Load");
+		btnFileListLoad.addActionListener(identicAdapter);
+		btnFileListLoad.setName(BTN_FILE_LIST_LOAD);
+		btnFileListLoad.setToolTipText("Load a list from from selection on left");
+		GridBagConstraints gbc_btnFileListLoad = new GridBagConstraints();
+		gbc_btnFileListLoad.fill = GridBagConstraints.HORIZONTAL;
+		gbc_btnFileListLoad.insets = new Insets(0, 0, 5, 0);
+		gbc_btnFileListLoad.gridx = 0;
+		gbc_btnFileListLoad.gridy = 3;
+		panelFileType2A.add(btnFileListLoad, gbc_btnFileListLoad);
+
+		Component verticalStrut_13 = Box.createVerticalStrut(20);
+		GridBagConstraints gbc_verticalStrut_13 = new GridBagConstraints();
+		gbc_verticalStrut_13.insets = new Insets(0, 0, 5, 0);
+		gbc_verticalStrut_13.gridx = 0;
+		gbc_verticalStrut_13.gridy = 4;
+		panelFileType2A.add(verticalStrut_13, gbc_verticalStrut_13);
 		btnFileListNew.setName(BTN_FILE_LIST_NEW);
 		btnFileListNew.setMaximumSize(new Dimension(75, 23));
 		btnFileListNew.setMinimumSize(new Dimension(75, 23));
@@ -775,14 +840,14 @@ public class Identic {
 		gbc_btnFileListNew.fill = GridBagConstraints.HORIZONTAL;
 		gbc_btnFileListNew.insets = new Insets(0, 0, 5, 0);
 		gbc_btnFileListNew.gridx = 0;
-		gbc_btnFileListNew.gridy = 3;
+		gbc_btnFileListNew.gridy = 5;
 		panelFileType2A.add(btnFileListNew, gbc_btnFileListNew);
 
 		Component verticalStrut_7 = Box.createVerticalStrut(20);
 		GridBagConstraints gbc_verticalStrut_7 = new GridBagConstraints();
 		gbc_verticalStrut_7.insets = new Insets(0, 0, 5, 0);
 		gbc_verticalStrut_7.gridx = 0;
-		gbc_verticalStrut_7.gridy = 4;
+		gbc_verticalStrut_7.gridy = 6;
 		panelFileType2A.add(verticalStrut_7, gbc_verticalStrut_7);
 
 		btnFileListSave = new JButton("Save");
@@ -796,35 +861,28 @@ public class Identic {
 		gbc_btnFileListSave.fill = GridBagConstraints.HORIZONTAL;
 		gbc_btnFileListSave.insets = new Insets(0, 0, 5, 0);
 		gbc_btnFileListSave.gridx = 0;
-		gbc_btnFileListSave.gridy = 5;
+		gbc_btnFileListSave.gridy = 7;
 		panelFileType2A.add(btnFileListSave, gbc_btnFileListSave);
 
-		Component verticalStrut_8 = Box.createVerticalStrut(20);
-		GridBagConstraints gbc_verticalStrut_8 = new GridBagConstraints();
-		gbc_verticalStrut_8.insets = new Insets(0, 0, 5, 0);
-		gbc_verticalStrut_8.gridx = 0;
-		gbc_verticalStrut_8.gridy = 6;
-		panelFileType2A.add(verticalStrut_8, gbc_verticalStrut_8);
-
-		btnFileListSaveAs = new JButton("Save As");
-		btnFileListSaveAs.setEnabled(false);
-		btnFileListSaveAs.addActionListener(identicAdapter);
-		btnFileListSaveAs.setName(BTN_FILE_LIST_SAVE_AS);
-		btnFileListSaveAs.setPreferredSize(new Dimension(75, 23));
-		btnFileListSaveAs.setMinimumSize(new Dimension(75, 23));
-		btnFileListSaveAs.setMaximumSize(new Dimension(75, 23));
-		GridBagConstraints gbc_btnFileListSaveAs = new GridBagConstraints();
-		gbc_btnFileListSaveAs.fill = GridBagConstraints.HORIZONTAL;
-		gbc_btnFileListSaveAs.insets = new Insets(0, 0, 5, 0);
-		gbc_btnFileListSaveAs.gridx = 0;
-		gbc_btnFileListSaveAs.gridy = 7;
-		panelFileType2A.add(btnFileListSaveAs, gbc_btnFileListSaveAs);
+		// btnFileListSaveAs = new JButton("Save As");
+		// btnFileListSaveAs.setEnabled(false);
+		// btnFileListSaveAs.addActionListener(identicAdapter);
+		// btnFileListSaveAs.setName(BTN_FILE_LIST_SAVE_AS);
+		// btnFileListSaveAs.setPreferredSize(new Dimension(75, 23));
+		// btnFileListSaveAs.setMinimumSize(new Dimension(75, 23));
+		// btnFileListSaveAs.setMaximumSize(new Dimension(75, 23));
+		// GridBagConstraints gbc_btnFileListSaveAs = new GridBagConstraints();
+		// gbc_btnFileListSaveAs.fill = GridBagConstraints.HORIZONTAL;
+		// gbc_btnFileListSaveAs.insets = new Insets(0, 0, 5, 0);
+		// gbc_btnFileListSaveAs.gridx = 0;
+		// gbc_btnFileListSaveAs.gridy = 9;
+		// panelFileType2A.add(btnFileListSaveAs, gbc_btnFileListSaveAs);
 
 		Component verticalStrut_9 = Box.createVerticalStrut(20);
 		GridBagConstraints gbc_verticalStrut_9 = new GridBagConstraints();
 		gbc_verticalStrut_9.insets = new Insets(0, 0, 5, 0);
 		gbc_verticalStrut_9.gridx = 0;
-		gbc_verticalStrut_9.gridy = 8;
+		gbc_verticalStrut_9.gridy = 10;
 		panelFileType2A.add(verticalStrut_9, gbc_verticalStrut_9);
 
 		btnFileListDelete = new JButton("Delete");
@@ -838,13 +896,13 @@ public class Identic {
 		gbc_btnFileListDelete.insets = new Insets(0, 0, 5, 0);
 		gbc_btnFileListDelete.fill = GridBagConstraints.HORIZONTAL;
 		gbc_btnFileListDelete.gridx = 0;
-		gbc_btnFileListDelete.gridy = 9;
+		gbc_btnFileListDelete.gridy = 11;
 		panelFileType2A.add(btnFileListDelete, gbc_btnFileListDelete);
 
 		Component verticalStrut_10 = Box.createVerticalStrut(20);
 		GridBagConstraints gbc_verticalStrut_10 = new GridBagConstraints();
 		gbc_verticalStrut_10.gridx = 0;
-		gbc_verticalStrut_10.gridy = 10;
+		gbc_verticalStrut_10.gridy = 12;
 		panelFileType2A.add(verticalStrut_10, gbc_verticalStrut_10);
 
 		Component verticalStrut_4 = Box.createVerticalStrut(20);
@@ -855,8 +913,8 @@ public class Identic {
 
 		JPanel panelFileTypes3 = new JPanel();
 		panelFileTypes3.setBorder(new CompoundBorder(
-				new TitledBorder(UIManager.getBorder("TitledBorder.border"), "List Being Edited", TitledBorder.LEADING,
-						TitledBorder.TOP, null, new Color(0, 0, 0)),
+				new TitledBorder(UIManager.getBorder("TitledBorder.border"), "List Being Edited", TitledBorder.CENTER,
+						TitledBorder.ABOVE_TOP, null, new Color(0, 0, 0)),
 				new BevelBorder(BevelBorder.LOWERED, null, null, null, null)));
 		GridBagConstraints gbc_panelFileTypes3 = new GridBagConstraints();
 		gbc_panelFileTypes3.anchor = GridBagConstraints.WEST;
@@ -1043,7 +1101,7 @@ public class Identic {
 				doSideMenu((JButton) actionEvent.getSource());
 				break;
 
-			case BTN_SELECT_LIST:
+			case BTN_FILE_LIST_LOAD:
 				loadTargetEdit();
 				break;
 
@@ -1051,10 +1109,10 @@ public class Identic {
 				loadNewTargetEdit();
 				break;
 			case BTN_FILE_LIST_SAVE:
-				break;
-			case BTN_FILE_LIST_SAVE_AS:
+				doSaveList();
 				break;
 			case BTN_FILE_LIST_DELETE:
+				doDeleteList();
 				break;
 			case BTN_ADD_REMOVE:
 				doAddRemove();
@@ -1120,24 +1178,24 @@ public class Identic {
 			}// switch
 
 		}// focusLost
-	private boolean flag1 = false;  // control the echo of events
+
+		private boolean flag1 = false; // control the echo of events
 
 		@Override
 		public void valueChanged(ListSelectionEvent e) {
 			if (!flag1) {
 				txtEditListMember.setText(EMPTY_STRING);
 				btnAddRemove.setText(EDIT_REMOVE);
-			}//if flag
+			} // if flag
 			flag1 = false;
 		}// valueChanged
 
 	}// class IdenticAdapter
 
-
 	private static final String EDIT_ADD = "Add";
 	private static final String EDIT_REMOVE = "Remove";
 	private static final String EDIT_ADD_REMOVE = "Add/Remove";
-	
+
 	private static final String NEW_LIST = "<NEW>";
 	private static final String EMPTY_STRING = "";
 	private static final String LIST_SUFFIX = "typeList";
@@ -1154,7 +1212,7 @@ public class Identic {
 	private static final String BTN_COPY_MOVE_REMOVE = "btnCopyMoveRemove";
 	private static final String BTN_FILE_TYPES = "btnFileTypes";
 
-	private static final String BTN_SELECT_LIST = "btnSelectList";
+	private static final String BTN_FILE_LIST_LOAD = "btnFileListLoad";
 	private static final String BTN_FILE_LIST_NEW = "btnFileListNew";
 	private static final String BTN_FILE_LIST_SAVE = "btnFileListSave";
 	private static final String BTN_FILE_LIST_SAVE_AS = "btnFileListSaveAs";
@@ -1204,5 +1262,6 @@ public class Identic {
 	private JButton btnFileListSaveAs;
 	private JButton btnFileListDelete;
 	private JButton btnAddRemove;
+	private JButton btnFileListLoad;
 
 }// class GUItemplate
