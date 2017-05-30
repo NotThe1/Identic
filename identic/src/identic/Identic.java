@@ -793,6 +793,7 @@ public class Identic {
 		panelActiveList.add(scrollPane_2, gbc_scrollPane_2);
 
 		listFindDuplicatesActive = new JList();
+		listFindDuplicatesActive.setEnabled(false);
 		listFindDuplicatesActive.setMinimumSize(new Dimension(150, 0));
 		listFindDuplicatesActive.setPreferredSize(new Dimension(145, 0));
 		scrollPane_2.setViewportView(listFindDuplicatesActive);
