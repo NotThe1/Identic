@@ -12,6 +12,8 @@ import java.awt.Insets;
 import java.awt.Point;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.io.File;
@@ -42,22 +44,20 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
-import javax.swing.JTextField;
+import javax.swing.JTextArea;
 import javax.swing.SwingConstants;
 import javax.swing.border.BevelBorder;
 import javax.swing.border.CompoundBorder;
 import javax.swing.border.LineBorder;
 import javax.swing.border.TitledBorder;
+import javax.swing.text.JTextComponent;
 
 public class Identic {
 
 	private IdenticAdapter identicAdapter = new IdenticAdapter();
 	private JButton[] sideMenuButtons;
 	private String[] sideMenuPanelNames; // SortedComboBoxModel
-	// private SortedComboBoxModel typeListModel = new SortedComboBoxModel();
-	// private SortedComboBoxModel activeListModel = new SortedComboBoxModel();
 	private DefaultComboBoxModel<String> typeListModel = new DefaultComboBoxModel<>();
-//	private DefaultComboBoxModel<String> activeListModel = new DefaultComboBoxModel<>();
 	private DefaultListModel<String> targetModel = new DefaultListModel<>();
 	private ArrayList<String> targetSuffixes = new ArrayList<>();
 
@@ -106,9 +106,9 @@ public class Identic {
 					JOptionPane.DEFAULT_OPTION, JOptionPane.ERROR_MESSAGE);
 			return;
 		} // if
-		TitledBorder tb = (TitledBorder) panelActiveList.getBorder();
-		lblStatus.setText(tb.getTitle());
-		tb.setTitle(" set title");
+//		TitledBorder tb = (TitledBorder) panelActiveList.getBorder();
+//		lblStatus.setText(tb.getTitle());
+//		tb.setTitle(" set title");
 	}// doStart
 
 	// ---------------Find Duplicates--------------------------------
@@ -119,7 +119,6 @@ public class Identic {
 			return;
 		}
 		String listName = (String) cboTypeLists1.getSelectedItem();
-//		lblActiveList.setText(listName);
 		lblActiveListFind.setText(listName);
 		String listFile = fileListDirectory + listName + LIST_SUFFIX_DOT;
 		lblStatus.setText(listFile);
@@ -135,104 +134,7 @@ public class Identic {
 		for (String line : targetSuffixes) {
 			targetModel.addElement(line);
 		} // for
-
-//		lblActiveListCount.setText(String.format("%d", targetSuffixes.size()));
 	}// loadTargetList
-
-	// private void loadTargetEdit() {
-	// if (listFileTypes.isSelectionEmpty()) {
-	// listFileTypes.setSelectedIndex(0);
-	// } // ensure a selection
-	// String editName = (String) listFileTypes.getSelectedValue();
-	// lblHotList.setText(editName);
-	// txtEditList.setText(editName);
-	// lblStatus.setText((String) listFileTypes.getSelectedValue());
-	//
-	// String editFile = fileListDirectory + editName + LIST_SUFFIX_DOT;
-	// Path p = Paths.get(editFile);
-	// try {
-	// ArrayList<String> lines = (ArrayList<String>) Files.readAllLines(p);
-	// activeListModel.removeAllElements();
-	// for (String line : lines) {
-	// activeListModel.addElement(line);
-	// } // for
-	// } catch (IOException e) {
-	// e.printStackTrace();
-	// } // try
-	//
-	// manageEditButtons("Load");
-	//
-	// }// loadTargetEdit
-
-	// private void loadNewTargetEdit() {
-	// String editName = NEW_LIST;
-	// txtEditList.setText(editName);
-	// lblHotList.setText(editName);
-	// activeListModel.removeAllElements();
-	// manageEditButtons("New");
-	// }// loadNewTargetEdit
-
-	// private void doNameChanged() {
-	// String newName = txtEditList.getText().trim();
-	// if (!lblHotList.getText().equals(newName)) {
-	// lblHotList.setText(newName);
-	// manageEditButtons("NameChanged");
-	// } // if
-	// listActiveList.clearSelection();
-	// }// doNameChanged
-
-	// private void doEditListMember() {
-	// if (!txtEditListMember.getText().equals(EMPTY_STRING)) {
-	// listActiveList.clearSelection();
-	// btnAddRemove.setText(EDIT_ADD);
-	// } else {
-	// btnAddRemove.setText(EDIT_ADD_REMOVE);
-	// } // if
-	// }// doEditListMember
-
-	// private void manageEditButtons(String action) {
-	// switch (action) {
-	// case "Load":
-	// btnFileListLoad.setEnabled(true);
-	// btnFileListSave.setEnabled(true);
-	// btnFileListNew.setEnabled(true);
-	// btnFileListDelete.setEnabled(true);
-	// break;
-	// case "New":
-	// btnFileListLoad.setEnabled(true);
-	// btnFileListNew.setEnabled(false);
-	// btnFileListSave.setEnabled(false);
-	// btnFileListDelete.setEnabled(false);
-	// break;
-	// case "NameChanged":
-	// btnFileListLoad.setEnabled(true);
-	// btnFileListNew.setEnabled(true);
-	// btnFileListSave.setEnabled(true);
-	// btnFileListDelete.setEnabled(false);
-	// break;
-	// case "Save":
-	// btnFileListLoad.setEnabled(true);
-	// btnFileListNew.setEnabled(true);
-	// btnFileListSave.setEnabled(true);
-	// btnFileListDelete.setEnabled(true);
-	// break;
-	// }// switch
-	//
-	// }// manageEditButtons
-
-	// private void doAddRemove() {
-	// if (btnAddRemove.getText().equals(EDIT_REMOVE)) {
-	// int index = listActiveList.getSelectedIndex();
-	// activeListModel.removeElementAt(index);
-	// } else if (btnAddRemove.getText().equals(EDIT_ADD)) {
-	// activeListModel.insertElementAt(txtEditListMember.getText().toUpperCase(), 0);
-	// txtEditListMember.setText(EMPTY_STRING);
-	// } // if
-	// btnAddRemove.setText(EDIT_ADD_REMOVE);
-	// }// doAddRemove
-	// ---------------FileTypes--------------------------------
-
-	// ---------------------------------------------------------
 
 	private void doSideMenu(JButton button) {
 		String targetPanelName = null;
@@ -259,55 +161,7 @@ public class Identic {
 		System.exit(0);
 	}// doFileExit
 
-	// private void doSaveList() {
-	// String listFile = fileListDirectory + txtEditList.getText().toUpperCase() + LIST_SUFFIX_DOT;
-	// Path listPath = Paths.get(listFile);
-	// if (Files.exists(listPath)) {
-	// int ans = JOptionPane.showConfirmDialog(frmIdentic, "List Exits, Do you want to overwrite?",
-	// "Save File Suffix List", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
-	// if (ans == JOptionPane.NO_OPTION) {
-	// return;
-	// } // if
-	//
-	// } // if file exists
-	// ArrayList<String> lines = new ArrayList<>();
-	// for (int i = 0; i < activeListModel.getSize(); i++) {
-	// lines.add(activeListModel.getElementAt(i));
-	// } // for
-	//
-	// try {
-	// Files.write(listPath, lines, StandardOpenOption.CREATE);
-	// } catch (IOException e) {
-	// e.printStackTrace();
-	// } // try
-	//
-	// initFileTypes();
-	// manageEditButtons("Save");
-	// }// doSaveList
-
-	// private void doDeleteList() {
-	// String listFile = fileListDirectory + txtEditList.getText().toUpperCase() + LIST_SUFFIX_DOT;
-	// Path listPath = Paths.get(listFile);
-	// if (Files.exists(listPath)) {
-	// int ans = JOptionPane.showConfirmDialog(frmIdentic, "Do you want to delete the list?", "Delete Suffix List",
-	// JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
-	// if (ans == JOptionPane.NO_OPTION) {
-	// return;
-	// } // if
-	// } // if file exists
-	// try {
-	// Files.deleteIfExists(listPath);
-	// } catch (IOException e) {
-	// e.printStackTrace();
-	// } // try
-	// initFileTypes();
-	// loadNewTargetEdit();
-	// }// doDeleteList
-
-	// ---------------------------------------------------------
-
 	class ListFilter implements FilenameFilter {
-
 		@Override
 		public boolean accept(File arg0, String arg1) {
 			if (arg1.endsWith(LIST_SUFFIX)) {
@@ -319,16 +173,9 @@ public class Identic {
 
 	private void initPanels() {
 		doSideMenu(sideMenuButtons[sideButtonIndex]);
-		// CardLayout cl = (CardLayout) (panelDetails.getLayout());
-		// cl.show(panelDetails, sideButtonPanelName);
-		//
-		// cl = (CardLayout) (panelMain.getLayout());
-		// cl.show(panelMain, sideButtonPanelName);
-		// panelSideMenu.validate();
 	}// initPanels
 
 	private void initFileTypes() {
-
 		// see if the directory has been set up already
 		if (fileListDirectory.equals(EMPTY_STRING)) {
 			fileListDirectory = System.getProperty("java.io.tmpdir");
@@ -345,11 +192,8 @@ public class Identic {
 					e.printStackTrace();
 				} // try
 			} // if exits
-
 		} // if not there
-
-		// we have the directory, do we have lists ?
-
+			// we have the directory, do we have lists ?
 		File targetDirectory = new File(fileListDirectory);
 		File[] files = targetDirectory.listFiles(new ListFilter());
 
@@ -376,24 +220,14 @@ public class Identic {
 		// set up cbo model
 
 		typeListModel.removeAllElements();
-
 		for (File f : files) {
 			typeListModel.addElement(f.getName().replace(LIST_SUFFIX_DOT, EMPTY_STRING));
 		} // for
-
 		cboTypeLists.setModel(typeListModel);
-
 		Preferences myPrefs = Preferences.userNodeForPackage(Identic.class).node(this.getClass().getSimpleName());
 		cboTypeLists.setSelectedItem(myPrefs.get("ActiveList", "Pictures"));
-//		listFileTypes.setModel(typeListModel);
 		myPrefs = null;
-
-		// cboTypeLists.
-
-		// lblStatus.setText(url.getPath());
 	}// initFileTypes
-
-	// private void display
 
 	private void appClose() {
 		Preferences myPrefs = Preferences.userNodeForPackage(Identic.class).node(this.getClass().getSimpleName());
@@ -422,14 +256,17 @@ public class Identic {
 		// cboTypeLists.setSelectedItem(myPrefs.get("ActiveList", "Pictures"));
 		sideButtonIndex = myPrefs.getInt("SideButtonIndex", 0);
 		lblSourceFolder.setText(myPrefs.get("SourceDirectory", NOT_SET));
+		
+		txtLog.setText(EMPTY_STRING);
+		txtLog.append(String.format("Width  = %d%n", myPrefs.getInt("Width", 761)));
+		txtLog.append(String.format("Height = %d%n", myPrefs.getInt("Height", 693)));
 		myPrefs = null;
 
 		// These two arrays are synchronized to control the button positions and the selection of the correct panels.
 		sideMenuButtons = new JButton[] { btnFindDuplicates, btnFindDuplicatesByName, btnDisplayResults,
 				btnCopyMoveRemove, btnFileTypes };
 		sideMenuPanelNames = new String[] { panelFindDuplicates.getName(), panelFindDuplicatesByName.getName(),
-				panelDisplayResults.getName(), panelCopyMoveRemove.getName(), panelFileTypes.getName() };
-//		listActiveList.setModel(activeListModel);
+				panelDisplayResults.getName(), panelCopyMoveRemove.getName(), panelLog.getName() };
 		listFindDuplicatesActive.setModel(targetModel);
 	}// appInit
 
@@ -457,7 +294,7 @@ public class Identic {
 		GridBagLayout gridBagLayout = new GridBagLayout();
 		gridBagLayout.columnWidths = new int[] { 0, 0 };
 		gridBagLayout.rowHeights = new int[] { 0, 0, 25, 0 };
-		gridBagLayout.columnWeights = new double[] { 1.0, Double.MIN_VALUE };
+		gridBagLayout.columnWeights = new double[] { 0.0, Double.MIN_VALUE };
 		gridBagLayout.rowWeights = new double[] { 0.0, 1.0, 0.0, Double.MIN_VALUE };
 		frmIdentic.getContentPane().setLayout(gridBagLayout);
 
@@ -516,10 +353,10 @@ public class Identic {
 		btnCopyMoveRemove.setMaximumSize(new Dimension(1000, 23));
 		panelSideMenu.add(btnCopyMoveRemove);
 
-		btnFileTypes = new JButton("File Types");
+		btnFileTypes = new JButton("Application Log");
 		btnFileTypes.setAlignmentX(Component.CENTER_ALIGNMENT);
 		btnFileTypes.addActionListener(identicAdapter);
-		btnFileTypes.setName(BTN_FILE_TYPES);
+		btnFileTypes.setName(BTN_LOG);
 		btnFileTypes.setMaximumSize(new Dimension(1000, 23));
 		panelSideMenu.add(btnFileTypes);
 
@@ -671,7 +508,7 @@ public class Identic {
 		gbl_panel_3.rowWeights = new double[] { 0.0, Double.MIN_VALUE };
 		panel_3.setLayout(gbl_panel_3);
 
-		cboTypeLists = new JComboBox();
+		cboTypeLists = new JComboBox<String>();
 		GridBagConstraints gbc_cboTypeLists = new GridBagConstraints();
 		gbc_cboTypeLists.anchor = GridBagConstraints.NORTH;
 		gbc_cboTypeLists.fill = GridBagConstraints.HORIZONTAL;
@@ -742,22 +579,14 @@ public class Identic {
 		gbc_lblCopymoveremove.gridy = 0;
 		panelCopyMoveRemove.add(lblCopymoveremove, gbc_lblCopymoveremove);
 
-		panelFileTypes = new JPanel();
-		panelFileTypes.setName(PNL_FILE_TYPES);
-		panelDetails.add(panelFileTypes, PNL_FILE_TYPES);
-		panelFileTypes.setLayout(new BoxLayout(panelFileTypes, BoxLayout.Y_AXIS));
+		panelLog = new JPanel();
+		panelLog.setName(PNL_LOG);
+		panelDetails.add(panelLog, PNL_LOG);
+		panelLog.setLayout(new BoxLayout(panelLog, BoxLayout.Y_AXIS));
 
-		JLabel lblNewLabel = new JLabel("File Types");
-		panelFileTypes.add(lblNewLabel);
-
-		Component verticalStrut_3 = Box.createVerticalStrut(20);
-		panelFileTypes.add(verticalStrut_3);
-
-//		cboTypeLists1 = new JComboBox<String>();
-//		cboTypeLists1.setName(CBO_TYPES_LIST);
-//		cboTypeLists1.addActionListener(identicAdapter);
-//		cboTypeLists1.setMaximumSize(new Dimension(32767, 30));
-//		panelFileTypes.add(cboTypeLists1);
+		JLabel lblNewLabel = new JLabel("Application Log");
+		lblNewLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+		panelLog.add(lblNewLabel);
 
 		panelMain = new JPanel();
 		splitPane1.setRightComponent(panelMain);
@@ -814,7 +643,7 @@ public class Identic {
 		gbc_scrollPane_2.gridy = 0;
 		panelActiveList.add(scrollPane_2, gbc_scrollPane_2);
 
-		listFindDuplicatesActive = new JList();
+		listFindDuplicatesActive = new JList<String>();
 		listFindDuplicatesActive.setEnabled(false);
 		listFindDuplicatesActive.setMinimumSize(new Dimension(150, 0));
 		listFindDuplicatesActive.setPreferredSize(new Dimension(145, 0));
@@ -869,7 +698,7 @@ public class Identic {
 		gbc_scrollPane_3.gridy = 2;
 		panelExclusions.add(scrollPane_3, gbc_scrollPane_3);
 
-		listExcluded = new JList();
+		listExcluded = new JList<String>();
 		scrollPane_3.setViewportView(listExcluded);
 
 		JLabel label = new JLabel("Found & Excluded");
@@ -945,77 +774,41 @@ public class Identic {
 		panelMainCopyMoveRemove.add(lblCopyMoveRemove, gbc_lblCopyMoveRemove);
 
 		JPanel panelMainFileTypes = new JPanel();
-		panelMain.add(panelMainFileTypes, PNL_FILE_TYPES);
+		panelMainFileTypes.setPreferredSize(new Dimension(0, 0));
+		panelMainFileTypes.setMaximumSize(new Dimension(0, 0));
+		panelMainFileTypes.setMinimumSize(new Dimension(0, 0));
+		panelMain.add(panelMainFileTypes, PNL_LOG);
 		GridBagLayout gbl_panelMainFileTypes = new GridBagLayout();
-		gbl_panelMainFileTypes.columnWidths = new int[] { 0, 227, 161, 0, 0 };
-		gbl_panelMainFileTypes.rowHeights = new int[] { 0, 0, 0, 0 };
-		gbl_panelMainFileTypes.columnWeights = new double[] { 0.0, 0.0, 0.0, 0.0, Double.MIN_VALUE };
-		gbl_panelMainFileTypes.rowWeights = new double[] { 0.0, 0.0, 1.0, Double.MIN_VALUE };
+		gbl_panelMainFileTypes.columnWidths = new int[] { 0, 0 };
+		gbl_panelMainFileTypes.rowHeights = new int[] { 0, 0 };
+		gbl_panelMainFileTypes.columnWeights = new double[] { 1.0, Double.MIN_VALUE };
+		gbl_panelMainFileTypes.rowWeights = new double[] { 1.0, Double.MIN_VALUE };
 		panelMainFileTypes.setLayout(gbl_panelMainFileTypes);
-
-//		JPanel panelFileTypes1 = new JPanel();
-//		panelFileTypes1.setBorder(new CompoundBorder(
-//				new TitledBorder(UIManager.getBorder("TitledBorder.border"), "Available Lists", TitledBorder.CENTER,
-//						TitledBorder.ABOVE_TOP, null, new Color(0, 0, 0)),
-//				new BevelBorder(BevelBorder.LOWERED, null, null, null, null)));
-//		GridBagConstraints gbc_panelFileTypes1 = new GridBagConstraints();
-//		gbc_panelFileTypes1.anchor = GridBagConstraints.WEST;
-//		gbc_panelFileTypes1.insets = new Insets(0, 0, 0, 5);
-//		gbc_panelFileTypes1.fill = GridBagConstraints.VERTICAL;
-//		gbc_panelFileTypes1.gridx = 1;
-//		gbc_panelFileTypes1.gridy = 2;
-//		panelMainFileTypes.add(panelFileTypes1, gbc_panelFileTypes1);
-//		GridBagLayout gbl_panelFileTypes1 = new GridBagLayout();
-//		gbl_panelFileTypes1.columnWidths = new int[] { 0, 0 };
-//		gbl_panelFileTypes1.rowHeights = new int[] { 0, 0, 0, 0 };
-//		gbl_panelFileTypes1.columnWeights = new double[] { 0.0, Double.MIN_VALUE };
-//		gbl_panelFileTypes1.rowWeights = new double[] { 1.0, 0.0, 0.0, Double.MIN_VALUE };
-//		panelFileTypes1.setLayout(gbl_panelFileTypes1);
-//
-//		JScrollPane scrollPane = new JScrollPane();
-//		scrollPane.setMinimumSize(new Dimension(200, 23));
-//		scrollPane.setPreferredSize(new Dimension(200, 2));
-//		GridBagConstraints gbc_scrollPane = new GridBagConstraints();
-//		gbc_scrollPane.fill = GridBagConstraints.VERTICAL;
-//		gbc_scrollPane.anchor = GridBagConstraints.WEST;
-//		gbc_scrollPane.insets = new Insets(0, 0, 5, 0);
-//		gbc_scrollPane.gridx = 0;
-//		gbc_scrollPane.gridy = 0;
-//		panelFileTypes1.add(scrollPane, gbc_scrollPane);
-//
-//		listFileTypes = new JList<String>();
-//		listFileTypes.addMouseListener(identicAdapter);
-//		listFileTypes.setName(LIST_FILE_TYPES);
-//		listFileTypes.setPreferredSize(new Dimension(150, 0));
-//		listFileTypes.setMinimumSize(new Dimension(150, 0));
-//		scrollPane.setViewportView(listFileTypes);
-
-//		listActiveList = new JList<String>();
-//		listActiveList.addListSelectionListener(identicAdapter);
-//		listActiveList.setName(LIST_ACTIVE_LIST);
-//
-//		scrollPane_1.setViewportView(listActiveList);
-
-//		txtEditListMember = new JTextField();
-//		txtEditListMember.addFocusListener(identicAdapter);
-//		txtEditListMember.setName(TXT_EDIT_LIST_MEMBER);
-//		GridBagConstraints gbc_txtEditListMember = new GridBagConstraints();
-//		gbc_txtEditListMember.insets = new Insets(0, 0, 5, 0);
-//		gbc_txtEditListMember.fill = GridBagConstraints.HORIZONTAL;
-//		gbc_txtEditListMember.gridx = 0;
-//		gbc_txtEditListMember.gridy = 2;
-//		panelFileTypes3.add(txtEditListMember, gbc_txtEditListMember);
-//		txtEditListMember.setColumns(10);
-
-//		btnAddRemove = new JButton("Add/Remove");
-//		btnAddRemove.addActionListener(identicAdapter);
-//		btnAddRemove.setName(BTN_ADD_REMOVE);
-//		GridBagConstraints gbc_btnAddRemove = new GridBagConstraints();
-//		gbc_btnAddRemove.fill = GridBagConstraints.HORIZONTAL;
-//		gbc_btnAddRemove.gridx = 0;
-//		gbc_btnAddRemove.gridy = 4;
-//		panelFileTypes3.add(btnAddRemove, gbc_btnAddRemove);
-//		splitPane1.setDividerLocation(250);
+		
+		JScrollPane scrollPane = new JScrollPane();
+		GridBagConstraints gbc_scrollPane = new GridBagConstraints();
+		gbc_scrollPane.fill = GridBagConstraints.BOTH;
+		gbc_scrollPane.gridx = 0;
+		gbc_scrollPane.gridy = 0;
+		panelMainFileTypes.add(scrollPane, gbc_scrollPane);
+		
+		txtLog = new JTextArea();
+		txtLog.addMouseListener(new MouseAdapter() {
+			@Override
+			public void mouseClicked(MouseEvent arg0) {
+				if (arg0.getClickCount()> 1){
+					((JTextComponent) arg0.getSource()).setText(EMPTY_STRING);
+				}//if 
+			}//mouseClicked
+		});
+		txtLog.setFont(new Font("Courier New", Font.PLAIN, 15));
+		scrollPane.setViewportView(txtLog);
+		
+		JLabel lblNewLabel_2 = new JLabel("Application Log");
+		lblNewLabel_2.setHorizontalAlignment(SwingConstants.CENTER);
+		lblNewLabel_2.setForeground(new Color(139, 69, 19));
+		lblNewLabel_2.setFont(new Font("Courier New", Font.BOLD, 16));
+		scrollPane.setColumnHeaderView(lblNewLabel_2);
 
 		JPanel panelStatus = new JPanel();
 		panelStatus.setBorder(new BevelBorder(BevelBorder.LOWERED, null, null, null, null));
@@ -1059,48 +852,7 @@ public class Identic {
 
 	}// initialize
 
-	// class SortedComboBoxModel extends DefaultComboBoxModel {
-	// public SortedComboBoxModel() {
-	// super();
-	// }
-	//
-	// public SortedComboBoxModel(Object[] items) {
-	// Arrays.sort(items);
-	// int size = items.length;
-	// for (int i = 0; i < size; i++) {
-	// super.addElement(items[i]);
-	// }
-	// setSelectedItem(items[0]);
-	// }
-	//
-	// public SortedComboBoxModel(Vector items) {
-	// Collections.sort(items);
-	// int size = items.size();
-	// for (int i = 0; i < size; i++) {
-	// super.addElement(items.elementAt(i));
-	// }
-	// setSelectedItem(items.elementAt(0));
-	// }
-	//
-	// @Override
-	// public void addElement(Object element) {
-	// insertElementAt(element, 0);
-	// }
-	//
-	// @Override
-	// public void insertElementAt(Object element, int index) {
-	// int size = getSize();
-	// for (index = 0; index < size; index++) {
-	// Comparable c = (Comparable) getElementAt(index);
-	// if (c.compareTo(element) > 0) {
-	// break;
-	// }
-	// }
-	// super.insertElementAt(element, index);
-	// }
-	// }// class SortedComboBoxModel
-
-	class IdenticAdapter implements ActionListener{
+	class IdenticAdapter implements ActionListener {
 
 		@Override
 		public void actionPerformed(ActionEvent actionEvent) {
@@ -1127,7 +879,7 @@ public class Identic {
 				// break;
 			case BTN_COPY_MOVE_REMOVE:
 				// break;
-			case BTN_FILE_TYPES:
+			case BTN_LOG:
 				doSideMenu((JButton) actionEvent.getSource());
 				break;
 
@@ -1143,32 +895,10 @@ public class Identic {
 				doManageTypeList();
 				break;
 
-			// // File Type Buttons
-			// case BTN_FILE_LIST_LOAD:
-			// loadTargetEdit();
-			// break;
-			//
-			// case BTN_FILE_LIST_NEW:
-			// loadNewTargetEdit();
-			// break;
-			// case BTN_FILE_LIST_SAVE:
-			// doSaveList();
-			// break;
-			// case BTN_FILE_LIST_DELETE:
-			// doDeleteList();
-			// break;
-			// case BTN_ADD_REMOVE:
-			// doAddRemove();
-			// break;
-
 			// Other
 			case CBO_TYPES_LIST:
 				loadTargetList();
 				break;
-
-			// case LIST_FILE_TYPES:
-			//
-			// break;
 
 			default:
 
@@ -1176,67 +906,7 @@ public class Identic {
 
 		}// actionPerformed
 
-//		@Override
-//		public void mouseClicked(MouseEvent mouseEvent) {
-//			// if (mouseEvent.getClickCount() > 1) {
-//			// String name = ((Component) mouseEvent.getSource()).getName();
-//			// if (name.equals(LIST_FILE_TYPES)) {
-//			// loadTargetEdit();
-//			// } // if list
-//			// } // if count > 1
-//		}// mouseClicked
-//
-//		@Override
-//		public void mouseEntered(MouseEvent e) {
-//		}//
-//
-//		@Override
-//		public void mouseExited(MouseEvent e) {
-//		}//
-//
-//		@Override
-//		public void mousePressed(MouseEvent e) {
-//		}//
-//
-//		@Override
-//		public void mouseReleased(MouseEvent e) {
-//		}//
-//
-//		@Override
-//		public void focusGained(FocusEvent arg0) {
-//		}//
-//
-//		@Override
-//		public void focusLost(FocusEvent focusEvent) {
-//			// String name = ((Component) focusEvent.getSource()).getName();
-//			// switch (name) {
-//			// case TXT_EDIT_LIST_MEMBER:
-//			// flag1 = true;
-//			// doEditListMember();
-//			// break;
-//			// case TXT_EDIT_LIST:
-//			// doNameChanged();
-//			// break;
-//			// }// switch
-//
-//		}// focusLost
-//
-//		// private boolean flag1 = false; // control the echo of events
-//
-//		@Override
-//		public void valueChanged(ListSelectionEvent e) {
-//			// if (!flag1) {
-//			// txtEditListMember.setText(EMPTY_STRING);
-//			// btnAddRemove.setText(EDIT_REMOVE);
-//			// } // if flag
-//			// flag1 = false;
-//		}// valueChanged
-
 	}// class IdenticAdapter
-
-	// private static final String EDIT_ADD = "Add";
-	// private static final String EDIT_REMOVE = "Remove";
-	// private static final String EDIT_ADD_REMOVE = "Add/Remove";
 
 	// private static final String NEW_LIST = "<NEW>";
 	private static final String NOT_SET = "<Not Set>";
@@ -1257,24 +927,15 @@ public class Identic {
 	private static final String BTN_FIND_DUPS_BY_NAME = "btnFindDuplicatesByName";
 	private static final String BTN_DISPLAY_RESULTS = "btnDisplayResults";
 	private static final String BTN_COPY_MOVE_REMOVE = "btnCopyMoveRemove";
-	private static final String BTN_FILE_TYPES = "btnFileTypes";
+	private static final String BTN_LOG = "btnFileTypes";
 	// File Type Buttons
-	private static final String BTN_FILE_LIST_LOAD = "btnFileListLoad";
-	private static final String BTN_FILE_LIST_NEW = "btnFileListNew";
-	private static final String BTN_FILE_LIST_SAVE = "btnFileListSave";
-	private static final String BTN_FILE_LIST_DELETE = "btnFileListDelete";
-	private static final String BTN_ADD_REMOVE = "btnAddRemove";
 
 	private static final String CBO_TYPES_LIST = "cboTypeLists";
-	private static final String LIST_FILE_TYPES = "listFileTypes";
-	private static final String LIST_ACTIVE_LIST = "listActiveList";
-	private static final String TXT_EDIT_LIST = "txtEditList";
-	private static final String TXT_EDIT_LIST_MEMBER = "txtEditListMember";
 	private static final String PNL_FIND_DUPS = "pnlFindDuplicates";
 	private static final String PNL_FIND_DUPS_BY_NAME = "pnlFindDuplicatesByName";
 	private static final String PNL_DISPLAY_RESULTS = "pnlDisplayResults";
 	private static final String PNL_COPY_MOVE_REMOVE = "pnlCopyMoveRemove";
-	private static final String PNL_FILE_TYPES = "pnlFileTypes";
+	private static final String PNL_LOG = "pnlLog";
 
 	private JFrame frmIdentic;
 	private JSplitPane splitPane1;
@@ -1291,28 +952,19 @@ public class Identic {
 	private JPanel panelFindDuplicatesByName;
 	private JPanel panelDisplayResults;
 	private JPanel panelCopyMoveRemove;
-	private JPanel panelFileTypes;
+	private JPanel panelLog;
 	private JLabel lblStatus;
 	private JPanel panelMain;
-	// private JComboBox cboTypeListsOld;
 	private JComboBox<String> cboTypeLists1;
-	private JList<String> listFileTypes;
-	private JTextField txtEditList;
-	private JTextField txtEditListMember;
-	private JList<String> listActiveList;
-	private JButton btnFileListNew;
-	private JButton btnFileListSave;
-	// private JButton btnFileListSaveAs;
-	private JButton btnFileListDelete;
-	private JButton btnAddRemove;
-	private JButton btnFileListLoad;
+
 	private JLabel lblFileCount;
 	private JLabel lblFolderCount;
 	private JLabel lblSourceFolder;
 	private JPanel panelActiveList;
 	private JLabel lblActiveListFind;
-	private JList listFindDuplicatesActive;
-	private JList listExcluded;
-	private JComboBox cboTypeLists;
+	private JList<String> listFindDuplicatesActive;
+	private JList<String> listExcluded;
+	private JComboBox<String> cboTypeLists;
+	private JTextArea txtLog;
 
 }// class GUItemplate
