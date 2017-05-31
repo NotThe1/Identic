@@ -24,6 +24,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.prefs.Preferences;
 
@@ -45,12 +46,15 @@ import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
 import javax.swing.JTextArea;
+import javax.swing.ScrollPaneConstants;
 import javax.swing.SwingConstants;
 import javax.swing.border.BevelBorder;
 import javax.swing.border.CompoundBorder;
 import javax.swing.border.LineBorder;
 import javax.swing.border.TitledBorder;
 import javax.swing.text.JTextComponent;
+
+
 
 public class Identic {
 
@@ -59,10 +63,17 @@ public class Identic {
 	private String[] sideMenuPanelNames; // SortedComboBoxModel
 	private DefaultComboBoxModel<String> typeListModel = new DefaultComboBoxModel<>();
 	private DefaultListModel<String> targetModel = new DefaultListModel<>();
+	
+	private DefaultListModel<String> excludeModel = new DefaultListModel<>();
 	private ArrayList<String> targetSuffixes = new ArrayList<>();
+	
+	private ArrayDeque<Path> subjects = new ArrayDeque<Path>();
+	private ArrayDeque<Path> rejects = new ArrayDeque<Path>();
+
 
 	private String fileListDirectory;
 	private int sideButtonIndex;
+	private int fileUp,fileDown,folderUp,folderDown;
 
 	/**
 	 * Launch the application.
@@ -100,40 +111,72 @@ public class Identic {
 	}// doManageTypeList
 
 	private void doStart() {
-		Path p = Paths.get(lblSourceFolder.getText());
-		if (!Files.exists(p)) {
+		Path pathStartFolder = Paths.get(lblSourceFolder.getText());
+		if (!Files.exists(pathStartFolder)) {
 			JOptionPane.showConfirmDialog(frmIdentic, "Starting Folder NOT Valid!", "Find Duplicates - Start",
 					JOptionPane.DEFAULT_OPTION, JOptionPane.ERROR_MESSAGE);
 			return;
 		} // if
-//		TitledBorder tb = (TitledBorder) panelActiveList.getBorder();
-//		lblStatus.setText(tb.getTitle());
-//		tb.setTitle(" set title");
+		subjects.clear();
+		rejects.clear();
+		
+		fileUp = 0;fileDown=0;folderUp=0;folderDown=0;
+		reportUpAndDown("Start");
+		
+		IdentifySubjects identifySubjects = new IdentifySubjects(subjects,rejects,pathStartFolder,targetSuffixes);
+		Thread threadIdentify = new Thread(identifySubjects);
+		threadIdentify.start();
+		
+		MakeFileKey  makeFileKey= new MakeFileKey(threadIdentify,subjects,txtLog);
+		Thread threadShow = new Thread(makeFileKey);
+		threadShow.start();
+		
+		ShowRejects showRejects =new ShowRejects(threadIdentify,rejects, excludeModel);
+		Thread threadRejects = new Thread(showRejects);
+		threadRejects.start();
+		
+		try{
+			threadIdentify.join();
+			threadShow.join();
+			threadRejects.join();
+		}catch (InterruptedException e){
+			e.printStackTrace();
+		}//try
+		
 	}// doStart
+	
+	private void reportUpAndDown(String msg){
+		txtLog.append(String.format("%n%n%S%n", msg));
+		
+		txtLog.append(String.format("fileUp     = %d%n", fileUp));
+		txtLog.append(String.format("fileDown   = %d%n", fileDown));
+		txtLog.append(String.format("folderUp   = %d%n", folderUp));
+		txtLog.append(String.format("folderDown = %d%n", folderDown));
+	}
 
 	// ---------------Find Duplicates--------------------------------
 	// ---------------FileTypes--------------------------------
 
 	private void loadTargetList() {
-		if (cboTypeLists1.getSelectedIndex() == -1) {// Nothing selected
+		if (cboTypeLists.getSelectedIndex() == -1) {// Nothing selected
 			return;
 		}
-		String listName = (String) cboTypeLists1.getSelectedItem();
+		String listName = (String) cboTypeLists.getSelectedItem();
 		lblActiveListFind.setText(listName);
 		String listFile = fileListDirectory + listName + LIST_SUFFIX_DOT;
 		lblStatus.setText(listFile);
 
-		Path p = Paths.get(listFile);
+		Path pathTypeList	 = Paths.get(listFile);
 		try {
-			targetSuffixes = (ArrayList<String>) Files.readAllLines(p);
+			targetSuffixes = (ArrayList<String>) Files.readAllLines(pathTypeList);
 		} catch (IOException e) {
 			e.printStackTrace();
 		} // try targetModel
-			// mmm listFindDuplicatesActive.setModel((ListModel) targetSuffixes);
 		targetModel.removeAllElements();
 		for (String line : targetSuffixes) {
 			targetModel.addElement(line);
 		} // for
+		
 	}// loadTargetList
 
 	private void doSideMenu(JButton button) {
@@ -223,7 +266,6 @@ public class Identic {
 		for (File f : files) {
 			typeListModel.addElement(f.getName().replace(LIST_SUFFIX_DOT, EMPTY_STRING));
 		} // for
-		cboTypeLists.setModel(typeListModel);
 		Preferences myPrefs = Preferences.userNodeForPackage(Identic.class).node(this.getClass().getSimpleName());
 		cboTypeLists.setSelectedItem(myPrefs.get("ActiveList", "Pictures"));
 		myPrefs = null;
@@ -248,18 +290,15 @@ public class Identic {
 	private void appInit() {
 
 		Preferences myPrefs = Preferences.userNodeForPackage(Identic.class).node(this.getClass().getSimpleName());
-		frmIdentic.setSize(myPrefs.getInt("Width", 761), myPrefs.getInt("Height", 693));
+		frmIdentic.setSize(886, 779);
 		frmIdentic.setLocation(myPrefs.getInt("LocX", 100), myPrefs.getInt("LocY", 100));
-		splitPane1.setDividerLocation(myPrefs.getInt("Divider", 250));
+		splitPane1.setDividerLocation(174);
 
 		fileListDirectory = myPrefs.get("ListDirectory", EMPTY_STRING);
 		// cboTypeLists.setSelectedItem(myPrefs.get("ActiveList", "Pictures"));
 		sideButtonIndex = myPrefs.getInt("SideButtonIndex", 0);
 		lblSourceFolder.setText(myPrefs.get("SourceDirectory", NOT_SET));
 		
-		txtLog.setText(EMPTY_STRING);
-		txtLog.append(String.format("Width  = %d%n", myPrefs.getInt("Width", 761)));
-		txtLog.append(String.format("Height = %d%n", myPrefs.getInt("Height", 693)));
 		myPrefs = null;
 
 		// These two arrays are synchronized to control the button positions and the selection of the correct panels.
@@ -267,7 +306,12 @@ public class Identic {
 				btnCopyMoveRemove, btnFileTypes };
 		sideMenuPanelNames = new String[] { panelFindDuplicates.getName(), panelFindDuplicatesByName.getName(),
 				panelDisplayResults.getName(), panelCopyMoveRemove.getName(), panelLog.getName() };
+		
+		cboTypeLists.setModel(typeListModel);
+
 		listFindDuplicatesActive.setModel(targetModel);
+		listExcluded.setModel(excludeModel);
+		txtLog.setText(EMPTY_STRING);
 	}// appInit
 
 	public Identic() {
@@ -294,7 +338,7 @@ public class Identic {
 		GridBagLayout gridBagLayout = new GridBagLayout();
 		gridBagLayout.columnWidths = new int[] { 0, 0 };
 		gridBagLayout.rowHeights = new int[] { 0, 0, 25, 0 };
-		gridBagLayout.columnWeights = new double[] { 0.0, Double.MIN_VALUE };
+		gridBagLayout.columnWeights = new double[] { 1.0, Double.MIN_VALUE };
 		gridBagLayout.rowWeights = new double[] { 0.0, 1.0, 0.0, Double.MIN_VALUE };
 		frmIdentic.getContentPane().setLayout(gridBagLayout);
 
@@ -509,6 +553,8 @@ public class Identic {
 		panel_3.setLayout(gbl_panel_3);
 
 		cboTypeLists = new JComboBox<String>();
+		cboTypeLists.addActionListener(identicAdapter);
+		cboTypeLists.setName(CBO_TYPES_LIST);
 		GridBagConstraints gbc_cboTypeLists = new GridBagConstraints();
 		gbc_cboTypeLists.anchor = GridBagConstraints.NORTH;
 		gbc_cboTypeLists.fill = GridBagConstraints.HORIZONTAL;
@@ -595,9 +641,9 @@ public class Identic {
 		JPanel panelMainFIndDuplicates = new JPanel();
 		panelMain.add(panelMainFIndDuplicates, PNL_FIND_DUPS);
 		GridBagLayout gbl_panelMainFIndDuplicates = new GridBagLayout();
-		gbl_panelMainFIndDuplicates.columnWidths = new int[] { 0, 0, 0, 0, 0, 0, 0 };
+		gbl_panelMainFIndDuplicates.columnWidths = new int[] { 0, 0, 0, 0, 0, 0 };
 		gbl_panelMainFIndDuplicates.rowHeights = new int[] { 0, 0, 0, 0 };
-		gbl_panelMainFIndDuplicates.columnWeights = new double[] { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, Double.MIN_VALUE };
+		gbl_panelMainFIndDuplicates.columnWeights = new double[] { 0.0, 0.0, 0.0, 0.0, 0.0, Double.MIN_VALUE };
 		gbl_panelMainFIndDuplicates.rowWeights = new double[] { 0.0, 0.0, 1.0, Double.MIN_VALUE };
 		panelMainFIndDuplicates.setLayout(gbl_panelMainFIndDuplicates);
 
@@ -620,6 +666,10 @@ public class Identic {
 		panelMainFIndDuplicates.add(lblSourceFolder, gbc_lblSourceFolder);
 
 		panelActiveList = new JPanel();
+		panelActiveList.setAlignmentX(Component.LEFT_ALIGNMENT);
+		panelActiveList.setMinimumSize(new Dimension(150, 0));
+		panelActiveList.setPreferredSize(new Dimension(165, 0));
+		panelActiveList.setMaximumSize(new Dimension(165, 0));
 		panelActiveList.setBorder(new BevelBorder(BevelBorder.LOWERED, null, null, null, null));
 		GridBagConstraints gbc_panelActiveList = new GridBagConstraints();
 		gbc_panelActiveList.insets = new Insets(0, 0, 0, 5);
@@ -635,8 +685,9 @@ public class Identic {
 		panelActiveList.setLayout(gbl_panelActiveList);
 
 		JScrollPane scrollPane_2 = new JScrollPane();
-		scrollPane_2.setPreferredSize(new Dimension(150, 0));
-		scrollPane_2.setMinimumSize(new Dimension(150, 23));
+		scrollPane_2.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED);
+		scrollPane_2.setPreferredSize(new Dimension(160, 0));
+		scrollPane_2.setMinimumSize(new Dimension(160, 0));
 		GridBagConstraints gbc_scrollPane_2 = new GridBagConstraints();
 		gbc_scrollPane_2.fill = GridBagConstraints.BOTH;
 		gbc_scrollPane_2.gridx = 0;
@@ -645,8 +696,8 @@ public class Identic {
 
 		listFindDuplicatesActive = new JList<String>();
 		listFindDuplicatesActive.setEnabled(false);
-		listFindDuplicatesActive.setMinimumSize(new Dimension(150, 0));
-		listFindDuplicatesActive.setPreferredSize(new Dimension(145, 0));
+		listFindDuplicatesActive.setMinimumSize(new Dimension(145, 0));
+		listFindDuplicatesActive.setPreferredSize(new Dimension(145, 500));
 		scrollPane_2.setViewportView(listFindDuplicatesActive);
 
 		lblActiveListFind = new JLabel("New label");
@@ -673,8 +724,7 @@ public class Identic {
 		panelTotals.setLayout(gbl_panelTotals);
 
 		JPanel panelExclusions = new JPanel();
-		panelExclusions.setBorder(new TitledBorder(new BevelBorder(BevelBorder.LOWERED, null, null, null, null),
-				"Excluded Files", TitledBorder.LEADING, TitledBorder.TOP, null, new Color(0, 0, 0)));
+		panelExclusions.setBorder(new TitledBorder(new BevelBorder(BevelBorder.LOWERED, null, null, null, null), "Excluded File Types", TitledBorder.LEADING, TitledBorder.TOP, null, new Color(0, 0, 0)));
 		GridBagConstraints gbc_panelExclusions = new GridBagConstraints();
 		gbc_panelExclusions.insets = new Insets(0, 0, 0, 5);
 		gbc_panelExclusions.fill = GridBagConstraints.VERTICAL;
@@ -955,7 +1005,6 @@ public class Identic {
 	private JPanel panelLog;
 	private JLabel lblStatus;
 	private JPanel panelMain;
-	private JComboBox<String> cboTypeLists1;
 
 	private JLabel lblFileCount;
 	private JLabel lblFolderCount;
