@@ -10,19 +10,20 @@ import javax.swing.DefaultListModel;
 public class ShowRejects implements Runnable {
 
 	private HashMap<String,Integer> members = new HashMap<>();
-	private ArrayDeque<Path> rejects = new ArrayDeque<Path>();
+	private ArrayDeque<FileStatReject> qRejects = new ArrayDeque<FileStatReject>();
 	private DefaultListModel<String> excludeModel = new DefaultListModel<>();
 	private Thread priorThread;
 
-	public ShowRejects(Thread priorThread, ArrayDeque<Path> subjects, DefaultListModel<String> excludeModel) {
+	public ShowRejects(Thread priorThread, ArrayDeque<FileStatReject> qRejects, DefaultListModel<String> excludeModel) {
 		this.priorThread = priorThread;
-		this.rejects = subjects;
+		this.qRejects = qRejects;
 		this.excludeModel = excludeModel;
 	}// Constructor
 
 	@Override
 	public void run() {
 		excludeModel.clear();
+		FileStatReject reject;
 		Path path = null;
 		String fileName = null;
 		String filePart = null;
@@ -30,8 +31,9 @@ public class ShowRejects implements Runnable {
 		Integer occurances;
 		while (true) {
 			try {
-				path = rejects.remove();
-				fileName = path.getFileName().toString();
+				reject = qRejects.remove();
+				path = reject.getFilePath();
+				fileName = reject.getFileName();
 				String[] parts = fileName.split("\\.");
 				partsCount = parts.length;
 

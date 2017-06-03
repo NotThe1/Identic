@@ -12,8 +12,6 @@ import java.awt.Insets;
 import java.awt.Point;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.io.File;
@@ -45,14 +43,14 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
-import javax.swing.JTextArea;
+import javax.swing.JTextPane;
 import javax.swing.ScrollPaneConstants;
 import javax.swing.SwingConstants;
 import javax.swing.border.BevelBorder;
 import javax.swing.border.CompoundBorder;
 import javax.swing.border.LineBorder;
 import javax.swing.border.TitledBorder;
-import javax.swing.text.JTextComponent;
+import javax.swing.text.BadLocationException;
 
 
 
@@ -68,7 +66,9 @@ public class Identic {
 	private ArrayList<String> targetSuffixes = new ArrayList<>();
 	
 	private ArrayDeque<Path> subjects = new ArrayDeque<Path>();
-	private ArrayDeque<Path> rejects = new ArrayDeque<Path>();
+	private ArrayDeque<FileStatReject> qRejects = new ArrayDeque<FileStatReject>();
+	
+	private  AppLogger appLogger= AppLogger.getInstance();
 
 
 	private String fileListDirectory;
@@ -118,20 +118,21 @@ public class Identic {
 			return;
 		} // if
 		subjects.clear();
-		rejects.clear();
+		qRejects.clear();
 		
 		fileUp = 0;fileDown=0;folderUp=0;folderDown=0;
-		reportUpAndDown("Start");
+//		reportUpAndDown("Start");
+		appLogger.addTimeStamp("Start :");
 		
-		IdentifySubjects identifySubjects = new IdentifySubjects(subjects,rejects,pathStartFolder,targetSuffixes);
+		IdentifySubjects identifySubjects = new IdentifySubjects(subjects,qRejects,pathStartFolder,targetSuffixes);
 		Thread threadIdentify = new Thread(identifySubjects);
 		threadIdentify.start();
 		
-		MakeFileKey  makeFileKey= new MakeFileKey(threadIdentify,subjects,txtLog);
+		MakeFileKey  makeFileKey= new MakeFileKey(threadIdentify,subjects);
 		Thread threadShow = new Thread(makeFileKey);
 		threadShow.start();
 		
-		ShowRejects showRejects =new ShowRejects(threadIdentify,rejects, excludeModel);
+		ShowRejects showRejects =new ShowRejects(threadIdentify,qRejects, excludeModel);
 		Thread threadRejects = new Thread(showRejects);
 		threadRejects.start();
 		
@@ -142,20 +143,13 @@ public class Identic {
 		}catch (InterruptedException e){
 			e.printStackTrace();
 		}//try
+		appLogger.addTimeStamp("End :");
 		
 	}// doStart
 	
-	private void reportUpAndDown(String msg){
-		txtLog.append(String.format("%n%n%S%n", msg));
-		
-		txtLog.append(String.format("fileUp     = %d%n", fileUp));
-		txtLog.append(String.format("fileDown   = %d%n", fileDown));
-		txtLog.append(String.format("folderUp   = %d%n", folderUp));
-		txtLog.append(String.format("folderDown = %d%n", folderDown));
-	}
-
 	// ---------------Find Duplicates--------------------------------
 	// ---------------FileTypes--------------------------------
+	
 
 	private void loadTargetList() {
 		if (cboTypeLists.getSelectedIndex() == -1) {// Nothing selected
@@ -198,6 +192,15 @@ public class Identic {
 
 		panelSideMenu.validate();
 	}// doSideMenu
+	
+	private void doClearLog(){
+		try {
+			txtLog.getDocument().remove(0, txtLog.getDocument().getLength());
+		} catch (BadLocationException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}//try
+	}//doClearLog
 
 	private void doFileExit() {
 		appClose();
@@ -303,15 +306,16 @@ public class Identic {
 
 		// These two arrays are synchronized to control the button positions and the selection of the correct panels.
 		sideMenuButtons = new JButton[] { btnFindDuplicates, btnFindDuplicatesByName, btnDisplayResults,
-				btnCopyMoveRemove, btnFileTypes };
+				btnCopyMoveRemove, btnApplicationLog };
 		sideMenuPanelNames = new String[] { panelFindDuplicates.getName(), panelFindDuplicatesByName.getName(),
-				panelDisplayResults.getName(), panelCopyMoveRemove.getName(), panelLog.getName() };
+				panelDisplayResults.getName(), panelCopyMoveRemove.getName(), paneApplicationlLog.getName() };
 		
 		cboTypeLists.setModel(typeListModel);
 
 		listFindDuplicatesActive.setModel(targetModel);
 		listExcluded.setModel(excludeModel);
 		txtLog.setText(EMPTY_STRING);
+		appLogger.setDoc(txtLog.getStyledDocument());
 	}// appInit
 
 	public Identic() {
@@ -397,12 +401,12 @@ public class Identic {
 		btnCopyMoveRemove.setMaximumSize(new Dimension(1000, 23));
 		panelSideMenu.add(btnCopyMoveRemove);
 
-		btnFileTypes = new JButton("Application Log");
-		btnFileTypes.setAlignmentX(Component.CENTER_ALIGNMENT);
-		btnFileTypes.addActionListener(identicAdapter);
-		btnFileTypes.setName(BTN_LOG);
-		btnFileTypes.setMaximumSize(new Dimension(1000, 23));
-		panelSideMenu.add(btnFileTypes);
+		btnApplicationLog = new JButton("Application Log");
+		btnApplicationLog.setAlignmentX(Component.CENTER_ALIGNMENT);
+		btnApplicationLog.addActionListener(identicAdapter);
+		btnApplicationLog.setName(BTN_APPLICATION_LOG);
+		btnApplicationLog.setMaximumSize(new Dimension(1000, 23));
+		panelSideMenu.add(btnApplicationLog);
 
 		panelDetails = new JPanel();
 		panelSideMenu.add(panelDetails);
@@ -625,14 +629,22 @@ public class Identic {
 		gbc_lblCopymoveremove.gridy = 0;
 		panelCopyMoveRemove.add(lblCopymoveremove, gbc_lblCopymoveremove);
 
-		panelLog = new JPanel();
-		panelLog.setName(PNL_LOG);
-		panelDetails.add(panelLog, PNL_LOG);
-		panelLog.setLayout(new BoxLayout(panelLog, BoxLayout.Y_AXIS));
+		paneApplicationlLog = new JPanel();
+		paneApplicationlLog.setName(PNL_APPLICATION_LOG);
+		panelDetails.add(paneApplicationlLog, PNL_APPLICATION_LOG);
+		paneApplicationlLog.setLayout(new BoxLayout(paneApplicationlLog, BoxLayout.Y_AXIS));
 
 		JLabel lblNewLabel = new JLabel("Application Log");
 		lblNewLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
-		panelLog.add(lblNewLabel);
+		paneApplicationlLog.add(lblNewLabel);
+		
+		Component verticalStrut_1 = Box.createVerticalStrut(20);
+		paneApplicationlLog.add(verticalStrut_1);
+		
+		JButton btnClearLog = new JButton("Clear Log");
+		btnClearLog.addActionListener(identicAdapter);
+		btnClearLog.setName(BTN_CLEAR_LOG);
+		paneApplicationlLog.add(btnClearLog);
 
 		panelMain = new JPanel();
 		splitPane1.setRightComponent(panelMain);
@@ -823,34 +835,26 @@ public class Identic {
 		gbc_lblCopyMoveRemove.gridy = 0;
 		panelMainCopyMoveRemove.add(lblCopyMoveRemove, gbc_lblCopyMoveRemove);
 
-		JPanel panelMainFileTypes = new JPanel();
-		panelMainFileTypes.setPreferredSize(new Dimension(0, 0));
-		panelMainFileTypes.setMaximumSize(new Dimension(0, 0));
-		panelMainFileTypes.setMinimumSize(new Dimension(0, 0));
-		panelMain.add(panelMainFileTypes, PNL_LOG);
-		GridBagLayout gbl_panelMainFileTypes = new GridBagLayout();
-		gbl_panelMainFileTypes.columnWidths = new int[] { 0, 0 };
-		gbl_panelMainFileTypes.rowHeights = new int[] { 0, 0 };
-		gbl_panelMainFileTypes.columnWeights = new double[] { 1.0, Double.MIN_VALUE };
-		gbl_panelMainFileTypes.rowWeights = new double[] { 1.0, Double.MIN_VALUE };
-		panelMainFileTypes.setLayout(gbl_panelMainFileTypes);
+		JPanel panelMainApplicationLog = new JPanel();
+		panelMainApplicationLog.setPreferredSize(new Dimension(0, 0));
+		panelMainApplicationLog.setMaximumSize(new Dimension(0, 0));
+		panelMainApplicationLog.setMinimumSize(new Dimension(0, 0));
+		panelMain.add(panelMainApplicationLog, PNL_APPLICATION_LOG);
+		GridBagLayout gbl_panelMainApplicationLog = new GridBagLayout();
+		gbl_panelMainApplicationLog.columnWidths = new int[] { 0, 0 };
+		gbl_panelMainApplicationLog.rowHeights = new int[] { 0, 0 };
+		gbl_panelMainApplicationLog.columnWeights = new double[] { 1.0, Double.MIN_VALUE };
+		gbl_panelMainApplicationLog.rowWeights = new double[] { 1.0, Double.MIN_VALUE };
+		panelMainApplicationLog.setLayout(gbl_panelMainApplicationLog);
 		
 		JScrollPane scrollPane = new JScrollPane();
 		GridBagConstraints gbc_scrollPane = new GridBagConstraints();
 		gbc_scrollPane.fill = GridBagConstraints.BOTH;
 		gbc_scrollPane.gridx = 0;
 		gbc_scrollPane.gridy = 0;
-		panelMainFileTypes.add(scrollPane, gbc_scrollPane);
+		panelMainApplicationLog.add(scrollPane, gbc_scrollPane);
 		
-		txtLog = new JTextArea();
-		txtLog.addMouseListener(new MouseAdapter() {
-			@Override
-			public void mouseClicked(MouseEvent arg0) {
-				if (arg0.getClickCount()> 1){
-					((JTextComponent) arg0.getSource()).setText(EMPTY_STRING);
-				}//if 
-			}//mouseClicked
-		});
+		txtLog = new JTextPane();
 		txtLog.setFont(new Font("Courier New", Font.PLAIN, 15));
 		scrollPane.setViewportView(txtLog);
 		
@@ -929,7 +933,7 @@ public class Identic {
 				// break;
 			case BTN_COPY_MOVE_REMOVE:
 				// break;
-			case BTN_LOG:
+			case BTN_APPLICATION_LOG:
 				doSideMenu((JButton) actionEvent.getSource());
 				break;
 
@@ -940,12 +944,15 @@ public class Identic {
 			case BTN_START:
 				doStart();
 				break;
-
 			case BTN_MANAGE_TYPE_LIST:
 				doManageTypeList();
 				break;
 
 			// Other
+			case BTN_CLEAR_LOG:
+				doClearLog();
+				break;
+				
 			case CBO_TYPES_LIST:
 				loadTargetList();
 				break;
@@ -968,24 +975,25 @@ public class Identic {
 	private static final String MNU_REPORTS_LOG_FILES = "mnuReportsLogFiles";
 	private static final String MNU_REPORTS_XML_DOC = "mnuReportsXMLdoc";
 	private static final String MNU_HELP_ABOUT = "mnuHelpAbout";
-	// Side Find Duplicates Buttons
-	private static final String BTN_SOURCE_FOLDER = "btnSourceFolder";
-	private static final String BTN_START = "btnStart";
-	private static final String BTN_MANAGE_TYPE_LIST = "btnManageTypeList";
 	// Side Menu Buttons
 	private static final String BTN_FIND_DUPS = "btnFindDuplicates";
 	private static final String BTN_FIND_DUPS_BY_NAME = "btnFindDuplicatesByName";
 	private static final String BTN_DISPLAY_RESULTS = "btnDisplayResults";
 	private static final String BTN_COPY_MOVE_REMOVE = "btnCopyMoveRemove";
-	private static final String BTN_LOG = "btnFileTypes";
-	// File Type Buttons
+	private static final String BTN_APPLICATION_LOG = "btnApplicationLog";
+	// Side Find Duplicates Buttons
+	private static final String BTN_SOURCE_FOLDER = "btnSourceFolder";
+	private static final String BTN_START = "btnStart";
+	private static final String BTN_MANAGE_TYPE_LIST = "btnManageTypeList";
+	// ApplicationLogButtons
+	private static final String BTN_CLEAR_LOG = "btnClearLog";
 
 	private static final String CBO_TYPES_LIST = "cboTypeLists";
 	private static final String PNL_FIND_DUPS = "pnlFindDuplicates";
 	private static final String PNL_FIND_DUPS_BY_NAME = "pnlFindDuplicatesByName";
 	private static final String PNL_DISPLAY_RESULTS = "pnlDisplayResults";
 	private static final String PNL_COPY_MOVE_REMOVE = "pnlCopyMoveRemove";
-	private static final String PNL_LOG = "pnlLog";
+	private static final String PNL_APPLICATION_LOG = "pnlApplicationLog";
 
 	private JFrame frmIdentic;
 	private JSplitPane splitPane1;
@@ -994,7 +1002,7 @@ public class Identic {
 	private JButton btnFindDuplicatesByName;
 	private JButton btnDisplayResults;
 	private JButton btnCopyMoveRemove;
-	private JButton btnFileTypes;
+	private JButton btnApplicationLog;
 
 	private JPanel panelSideMenu;
 	private JPanel panelDetails;
@@ -1002,7 +1010,7 @@ public class Identic {
 	private JPanel panelFindDuplicatesByName;
 	private JPanel panelDisplayResults;
 	private JPanel panelCopyMoveRemove;
-	private JPanel panelLog;
+	private JPanel paneApplicationlLog;
 	private JLabel lblStatus;
 	private JPanel panelMain;
 
@@ -1014,6 +1022,6 @@ public class Identic {
 	private JList<String> listFindDuplicatesActive;
 	private JList<String> listExcluded;
 	private JComboBox<String> cboTypeLists;
-	private JTextArea txtLog;
+	private JTextPane txtLog;
 
 }// class GUItemplate
