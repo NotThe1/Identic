@@ -22,8 +22,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.prefs.Preferences;
 
 import javax.swing.Box;
@@ -43,6 +43,7 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
+import javax.swing.JTable;
 import javax.swing.JTextPane;
 import javax.swing.ScrollPaneConstants;
 import javax.swing.SwingConstants;
@@ -63,13 +64,13 @@ public class Identic {
 	private DefaultListModel<String> targetModel = new DefaultListModel<>();
 	
 	private DefaultListModel<String> excludeModel = new DefaultListModel<>();
+	private JTable rejectTable;
 	private ArrayList<String> targetSuffixes = new ArrayList<>();
 	
-	private ArrayDeque<Path> subjects = new ArrayDeque<Path>();
-	private ArrayDeque<FileStatReject> qRejects = new ArrayDeque<FileStatReject>();
+	private LinkedBlockingQueue<Path> qSubjects = new LinkedBlockingQueue<Path>();
+	private LinkedBlockingQueue<FileStatReject> qRejects = new LinkedBlockingQueue<FileStatReject>();
 	
 	private  AppLogger appLogger= AppLogger.getInstance();
-
 
 	private String fileListDirectory;
 	private int sideButtonIndex;
@@ -117,22 +118,25 @@ public class Identic {
 					JOptionPane.DEFAULT_OPTION, JOptionPane.ERROR_MESSAGE);
 			return;
 		} // if
-		subjects.clear();
+		qSubjects.clear();
 		qRejects.clear();
 		
 		fileUp = 0;fileDown=0;folderUp=0;folderDown=0;
 //		reportUpAndDown("Start");
 		appLogger.addTimeStamp("Start :");
+		appLogger.addInfo(lblSourceFolder.getText());
 		
-		IdentifySubjects identifySubjects = new IdentifySubjects(subjects,qRejects,pathStartFolder,targetSuffixes);
+		IdentifySubjects identifySubjects = new IdentifySubjects(qSubjects,qRejects,pathStartFolder,targetSuffixes);
 		Thread threadIdentify = new Thread(identifySubjects);
 		threadIdentify.start();
 		
-		MakeFileKey  makeFileKey= new MakeFileKey(threadIdentify,subjects);
+		MakeFileKey  makeFileKey= new MakeFileKey(threadIdentify,qSubjects);
 		Thread threadShow = new Thread(makeFileKey);
 		threadShow.start();
 		
-		ShowRejects showRejects =new ShowRejects(threadIdentify,qRejects, excludeModel);
+		rejectTable = new JTable();
+		
+		ShowRejects showRejects =new ShowRejects(threadIdentify,qRejects, rejectTable);
 		Thread threadRejects = new Thread(showRejects);
 		threadRejects.start();
 		
@@ -144,7 +148,7 @@ public class Identic {
 			e.printStackTrace();
 		}//try
 		appLogger.addTimeStamp("End :");
-		
+		scrollPane_1.setViewportView(rejectTable);
 	}// doStart
 	
 	// ---------------Find Duplicates--------------------------------
@@ -809,16 +813,24 @@ public class Identic {
 		panelMain.add(panelMainDisplayResults, PNL_DISPLAY_RESULTS);
 		GridBagLayout gbl_panelMainDisplayResults = new GridBagLayout();
 		gbl_panelMainDisplayResults.columnWidths = new int[] { 0, 0 };
-		gbl_panelMainDisplayResults.rowHeights = new int[] { 0, 0 };
-		gbl_panelMainDisplayResults.columnWeights = new double[] { 0.0, Double.MIN_VALUE };
-		gbl_panelMainDisplayResults.rowWeights = new double[] { 0.0, Double.MIN_VALUE };
+		gbl_panelMainDisplayResults.rowHeights = new int[] { 0, 0, 0 };
+		gbl_panelMainDisplayResults.columnWeights = new double[] { 1.0, Double.MIN_VALUE };
+		gbl_panelMainDisplayResults.rowWeights = new double[] { 0.0, 1.0, Double.MIN_VALUE };
 		panelMainDisplayResults.setLayout(gbl_panelMainDisplayResults);
 
 		JLabel lblDisplayResults_1 = new JLabel("Display Results");
 		GridBagConstraints gbc_lblDisplayResults_1 = new GridBagConstraints();
+		gbc_lblDisplayResults_1.insets = new Insets(0, 0, 5, 0);
 		gbc_lblDisplayResults_1.gridx = 0;
 		gbc_lblDisplayResults_1.gridy = 0;
 		panelMainDisplayResults.add(lblDisplayResults_1, gbc_lblDisplayResults_1);
+		
+		scrollPane_1 = new JScrollPane();
+		GridBagConstraints gbc_scrollPane_1 = new GridBagConstraints();
+		gbc_scrollPane_1.fill = GridBagConstraints.BOTH;
+		gbc_scrollPane_1.gridx = 0;
+		gbc_scrollPane_1.gridy = 1;
+		panelMainDisplayResults.add(scrollPane_1, gbc_scrollPane_1);
 
 		JPanel panelMainCopyMoveRemove = new JPanel();
 		panelMain.add(panelMainCopyMoveRemove, PNL_COPY_MOVE_REMOVE);
@@ -1023,5 +1035,6 @@ public class Identic {
 	private JList<String> listExcluded;
 	private JComboBox<String> cboTypeLists;
 	private JTextPane txtLog;
+	private JScrollPane scrollPane_1;
 
 }// class GUItemplate

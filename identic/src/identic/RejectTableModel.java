@@ -64,20 +64,30 @@ public class RejectTableModel extends AbstractTableModel {
 			lookup.put(new Point(rows - 1, i), values[i]);
 		} // for
 	}// addRow
+	
+	public void addRow(FileStatReject reject){
+		rows++;
+		lookup.put(new Point(rows - 1, 0), reject.getFileName());
+		lookup.put(new Point(rows - 1, 1), reject.getDirectory());
+		lookup.put(new Point(rows - 1, 2), reject.getFileSize());
+		lookup.put(new Point(rows - 1, 3), reject.getFileTime());
+		lookup.put(new Point(rows - 1, 4), reject.getReason());
+	}//addRow
 
 	@Override
 	public Class<?> getColumnClass(int columnIndex) {
 
 		switch (columnIndex) {
-		case 0:
+		case 0: //"Name"
 			return super.getColumnClass(columnIndex);
-		case 1:
-			return DateFormat.class;
-//			return Date.class;
-		case 2:
-			return Boolean.class;
-		case 3:
+		case 1://"Directory"
+			return super.getColumnClass(columnIndex);
+		case 2://"Size"
 			return Number.class;
+		case 3://"Modified Date"
+			return DateFormat.class;
+		case 4:// "Reason"
+			return super.getColumnClass(columnIndex);
 		default:
 			return super.getColumnClass(columnIndex);
 		}// switch

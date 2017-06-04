@@ -5,19 +5,19 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.ArrayDeque;
 import java.util.NoSuchElementException;
+import java.util.concurrent.LinkedBlockingQueue;
 
 public class MakeFileKey implements Runnable {
 	private static int bufSize = 1024;
 	String algorithm = "SHA-256";
-	private ArrayDeque<Path> subjects = new ArrayDeque<Path>();
+	private LinkedBlockingQueue<Path> qSubjects = new LinkedBlockingQueue<Path>();
 	private Thread priorThread;
 	private AppLogger appLogger = AppLogger.getInstance();
 
-	public MakeFileKey(Thread priorThread, ArrayDeque<Path> subjects) {
+	public MakeFileKey(Thread priorThread, LinkedBlockingQueue<Path> subjects) {
 		this.priorThread = priorThread;
-		this.subjects = subjects;
+		this.qSubjects = subjects;
 
 	}// Constructor
 
@@ -31,7 +31,7 @@ public class MakeFileKey implements Runnable {
 		String key = null;
 		while (true) {
 			try {
-				path = subjects.remove();
+				path = qSubjects.remove();
 				fileName = path.toString();
 				count++;
 				try {

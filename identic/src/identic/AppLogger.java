@@ -24,7 +24,7 @@ public class AppLogger {
 	public void setDoc(StyledDocument docLog) {
 		this.docLog = docLog;
 	}// setTextPane
-	// ---------------------------------------------------------------------
+		// ---------------------------------------------------------------------
 
 	public void clear() {
 		try {
@@ -34,55 +34,54 @@ public class AppLogger {
 			e.printStackTrace();
 		} // try
 	}// clear
-	
-	public void addNL(int linesToSkip){	
+
+	public void addNL(int linesToSkip) {
 		int lines = Math.max(linesToSkip, 0);
 		lines = Math.min(lines, 15);
 		StringBuilder sb = new StringBuilder();
-		for (int i = 0; i < lines;i++){
+		for (int i = 0; i < lines; i++) {
 			sb.append(NL);
-		}//for
-		insertListing(sb.toString(),null);
-	}//addNL
-	
-	public void addNL(){
-		insertListing(NL,null);
-	}//addNL
-	private void addMeta(SimpleAttributeSet attr,String... message){
+		} // for
+		insertListing(sb.toString(), null);
+	}// addNL
+
+	public void addNL() {
+		insertListing(NL, null);
+	}// addNL
+
+	private void addMeta(SimpleAttributeSet attr, String... message) {
 		StringBuilder sb = new StringBuilder();
-		for ( int i = 0; i<message.length;i++){
+		for (int i = 0; i < message.length; i++) {
 			sb.append(message[i]);
 			sb.append(NL);
-		}//for
+		} // for
 		insertListing(sb.toString(), attr);
-	}//addMeta
-	
-	public void addInfo(String... message){
-		addMeta(attrBlack,message);
-	}//addInfo
+	}// addMeta
 
-	public void addWarning(String... message){
-		addMeta(attrBlue,message);
-	}//addInfo
+	public void addInfo(String... message) {
+		addMeta(attrBlack, message);
+	}// addInfo
 
-	public void addError(String... message){
-		addMeta(attrRed,message);
-	}//addInfo
+	public void addWarning(String... message) {
+		addMeta(attrBlue, message);
+	}// addInfo
 
-	public void addSpecial(String... message){
-		addMeta(attrTeal,message);
-	}//addInfo
-	
-	public void addTimeStamp(){
-		addMeta(attrSilver,LocalDateTime.now().toString());
-	}//addTimeStamp
-	
-	public void addTimeStamp(String... message){
-		addMeta(attrSilver,message);
-		addMeta(attrSilver,LocalDateTime.now().toString());
-	}//addTimeStamp
+	public void addError(String... message) {
+		addMeta(attrRed, message);
+	}// addInfo
 
-	
+	public void addSpecial(String... message) {
+		addMeta(attrTeal, message);
+	}// addInfo
+
+	public void addTimeStamp() {
+		addMeta(attrSilver, LocalDateTime.now().toString());
+	}// addTimeStamp
+
+	public void addTimeStamp(String message) {
+		insertListing(message + " " + LocalDateTime.now().toString() + System.lineSeparator(), attrSilver);
+	}// addTimeStamp
+
 	private void insertListing(String str, SimpleAttributeSet attr) {
 		try {
 			docLog.insertString(docLog.getLength(), str, attr);

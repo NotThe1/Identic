@@ -7,12 +7,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.FileTime;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.concurrent.LinkedBlockingQueue;
 
 public class IdentifySubjects implements Runnable {
-	private ArrayDeque<Path> subjects;
-	private ArrayDeque<FileStatReject> qRejects;
+	private LinkedBlockingQueue<Path> qSubjects;
+//	private ArrayDeque<FileStatReject> qRejects;
+	private LinkedBlockingQueue<FileStatReject> qRejects;
 	private Path startPath;
 	private ArrayList<String> targetSuffixes;
 	private AppLogger appLogger = AppLogger.getInstance();
@@ -40,12 +41,12 @@ public class IdentifySubjects implements Runnable {
 		appLogger.addSpecial("subjectCount = " + subjectCount);
 		appLogger.addSpecial("rejectCount  = " + rejectCount);
 		appLogger.addNL();
-		System.out.printf("myWalker %n");
+//		System.out.printf("myWalker %n");
 	}// run
 
-	public IdentifySubjects(ArrayDeque<Path> subjects, ArrayDeque<FileStatReject> qRejects, Path startPath,
+	public IdentifySubjects(LinkedBlockingQueue<Path> subjects, LinkedBlockingQueue<FileStatReject> qRejects, Path startPath,
 			ArrayList<String> targetSuffixes) {
-		this.subjects = subjects;
+		this.qSubjects = subjects;
 		subjects.clear();
 		this.qRejects = qRejects;
 		qRejects.clear();
@@ -83,12 +84,12 @@ public class IdentifySubjects implements Runnable {
 				part = parts[partsCount - 1].toUpperCase();
 				if (targetSuffixes.contains(part)) {
 					subjectCount++;
-					subjects.add(file);
+					qSubjects.add(file);
 				} else {
 					rejectCount++;
 					qRejects.add(new FileStatReject(file,fileSize,lastModifieTime,FileStat.NOT_ON_LIST));
 				} // if
-			} // if
+			} // if - only process files with suffixes
 			return FileVisitResult.CONTINUE;
 		}// FileVisitResult
 
