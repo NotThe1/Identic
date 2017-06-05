@@ -15,15 +15,23 @@ import java.awt.event.ActionListener;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.net.URISyntaxException;
+import java.nio.file.FileVisitResult;
+import java.nio.file.FileVisitor;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.FileTime;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.prefs.Preferences;
@@ -73,11 +81,23 @@ public class Identic {
 	private LinkedBlockingQueue<FileStatSubject> qSubjects = new LinkedBlockingQueue<FileStatSubject>();
 	
 	private LinkedBlockingQueue<FileStatReject> qRejects = new LinkedBlockingQueue<FileStatReject>();
-	private JTable rejectTable;
+	private RejectTableModel rejectTableModel  = new RejectTableModel();
+	private JTable rejectTable = new JTable(rejectTableModel);
 	
 	private LinkedBlockingQueue<FileStatSubject> qHashes = new LinkedBlockingQueue<FileStatSubject>();
-	private JTable subjectTable;
-	private HashMap<String,Integer> hashCounts;
+	private SubjectTableModel subjectTableModel = new SubjectTableModel();
+	private JTable subjectTable = new JTable(subjectTableModel);
+	private HashMap<String,Integer> hashCounts = new HashMap<String,Integer>();;
+	
+	private HashMap<String, Integer> hashIDs = new HashMap<String, Integer>();
+
+	
+	private Path startPath;
+	private int fileCount;
+	private int folderCount;
+	private int subjectCount;
+	private int rejectCount;
+	
 
 	
 	private  AppLogger appLogger= AppLogger.getInstance();
@@ -121,8 +141,8 @@ public class Identic {
 	}// doManageTypeList
 
 	private void doStart() {
-		Path pathStartFolder = Paths.get(lblSourceFolder.getText());
-		if (!Files.exists(pathStartFolder)) {
+		startPath = Paths.get(lblSourceFolder.getText());
+		if (!Files.exists(startPath)) {
 			JOptionPane.showConfirmDialog(frmIdentic, "Starting Folder NOT Valid!", "Find Duplicates - Start",
 					JOptionPane.DEFAULT_OPTION, JOptionPane.ERROR_MESSAGE);
 			return;
@@ -130,38 +150,45 @@ public class Identic {
 		qSubjects.clear();
 		qRejects.clear();
 		
+		fileCount = 0;
+		folderCount = 0;
+		subjectCount = 0;
+		rejectCount = 0;
+		excludeModel.clear();
+
+		
 		appLogger.addTimeStamp("Start :");
 		appLogger.addInfo(lblSourceFolder.getText());
 		
-		IdentifySubjects identifySubjects = new IdentifySubjects(qSubjects,qRejects,pathStartFolder,targetSuffixes,listExcluded);
+//		IdentifySubjects identifySubjects = new IdentifySubjects(qSubjects,qRejects,pathStartFolder,targetSuffixes);
+		IdentifySubjects identifySubjects = new IdentifySubjects();
 		Thread threadIdentify = new Thread(identifySubjects);
 		threadIdentify.start();
 		
-		MakeFileKey  makeFileKey= new MakeFileKey(threadIdentify,qSubjects,qHashes);
+		MakeFileKey  makeFileKey= new MakeFileKey(threadIdentify);
 		Thread threadMakeFileKey = new Thread(makeFileKey);
 		threadMakeFileKey.start();
 		
-		rejectTable = new JTable(new RejectTableModel());
-		ShowRejects showRejects =new ShowRejects(threadIdentify,qRejects, rejectTable);
+
+		ShowRejects showRejects =new ShowRejects(threadIdentify);
 		Thread threadRejects = new Thread(showRejects);
 		if(cbSaveExcludedFiles.isSelected()){
 			threadRejects.start();
 		}//if
 		
 
-		subjectTable = new JTable(new SubjectTableModel());
-		hashCounts = new HashMap<String,Integer>();
-		IdentifyDuplicates identifyDuplicates = new IdentifyDuplicates(qHashes,threadMakeFileKey,subjectTable,hashCounts);
+//		subjectTable = new JTable(new SubjectTableModel());
+//		hashCounts = new HashMap<String,Integer>();
+		IdentifyDuplicates identifyDuplicates = new IdentifyDuplicates(threadMakeFileKey);
 		Thread threadIdentifyDuplicates = new Thread(identifyDuplicates);
 		threadIdentifyDuplicates.start();
 		
 		try{
-			System.out.println(qHashes.size());
+
 			threadIdentify.join();
 			threadMakeFileKey.join();
 			threadRejects.join();
 			threadIdentifyDuplicates.join();
-			System.out.println("End -->");
 
 		}catch (InterruptedException e){
 			e.printStackTrace();
@@ -246,7 +273,7 @@ public class Identic {
 			e.printStackTrace();
 		}//try
 	}//doClearLog
-
+	
 	private void doFileExit() {
 		appClose();
 		System.exit(0);
@@ -1193,5 +1220,265 @@ public class Identic {
 	private JRadioButton rbDuplicateFiles;
 	private JRadioButton rdFilesNotProcessed;
 	private JRadioButton rdUniqueFiles;
+	
+	////////////////////////////////////////////////////////////////////////////////
+	////////////////////////////////////////////////////////////////////////////////
+	////////////////////////////////////////////////////////////////////////////////
+	public class IdentifySubjects implements Runnable {
+		private AppLogger appLogger = AppLogger.getInstance();
+
+		private HashMap<String, Integer> members = new HashMap<>();
+
+		public IdentifySubjects(){	
+		}//Constructor
+		
+		@Override
+		public void run() {
+			System.out.println("IdentifySubjects -->");
+
+			MyWalker myWalker = new MyWalker();
+			try {
+				Files.walkFileTree(startPath, myWalker);
+			} catch (IOException e) {
+				e.printStackTrace();
+			} // try
+			logSummary();
+		}// run
+
+		private void logSummary() {
+			appLogger.addNL(2);
+			appLogger.addSpecial("folderCount = " + folderCount);
+			appLogger.addSpecial("fileCount  = " + fileCount);
+			appLogger.addSpecial("subjectCount = " + subjectCount);
+			appLogger.addSpecial("rejectCount  = " + rejectCount);
+			appLogger.addNL();
+			appLogger.addInfo(String.format("%,d File Types excluded", members.size()));
+			Set<String> keys = members.keySet();
+			appLogger.addNL();
+			for (String key : keys) {
+				appLogger.addInfo(String.format("%s - %,d occurances", key, members.get(key)));
+			} // for
+		}// logSummary
+
+		class MyWalker implements FileVisitor<Path> {
+
+			@Override
+			public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+				// TODO Auto-generated method stub
+				return FileVisitResult.CONTINUE;
+			}// FileVisitResult
+
+			@Override
+			public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+				folderCount++;
+				return FileVisitResult.CONTINUE;
+			}// FileVisitResult
+
+			@Override
+			public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+				FileTime lastModifieTime;
+				long fileSize;
+				fileCount++;
+				String fileName = file.getFileName().toString();
+				lastModifieTime = Files.getLastModifiedTime(file);
+				fileSize = Files.size(file);
+				int partsCount;
+				String part = null;
+				String[] parts = fileName.split("\\.");
+				partsCount = parts.length;
+				if (partsCount > 1) {
+					part = parts[partsCount - 1].toUpperCase();
+					if (targetSuffixes.contains(part)) {
+						subjectCount++;
+						qSubjects.add(new FileStatSubject(file, fileSize, lastModifieTime));
+					} else {
+						rejectCount++;
+						keepSuffixCount(part);
+						qRejects.add(new FileStatReject(file, fileSize, lastModifieTime, FileStat.NOT_ON_LIST));
+					} // if
+				} // if - only process files with suffixes
+				return FileVisitResult.CONTINUE;
+			}// FileVisitResult
+
+			@Override
+			public FileVisitResult visitFileFailed(Path file, IOException exc) throws IOException {
+				qRejects.add(new FileStatReject(file, 0, null, FileStat.IO_EXCEPTION));
+				return FileVisitResult.CONTINUE;
+			}// FileVisitResult
+
+			private void keepSuffixCount(String suffix) {
+
+				Integer occurances = members.get(suffix);
+				if (occurances == null) {
+					members.put(suffix, 1);
+					 excludeModel.addElement(suffix);
+				} else {
+					members.put(suffix, occurances + 1);
+				} // if unique
+			}// keepSuffixCount
+		}// class MyWalker
+	}// class IdentifySubjects
+	////////////////////////////////////////////////////////////////////////////////
+	////////////////////////////////////////////////////////////////////////////////
+	////////////////////////////////////////////////////////////////////////////////
+	public class ShowRejects implements Runnable {
+
+		private Thread priorThread;
+		private AppLogger appLogger = AppLogger.getInstance();
+
+		public ShowRejects(Thread priorThread) {
+			this.priorThread = priorThread;
+		}// Constructor
+
+		@Override
+		public void run() {
+			System.out.println("ShowRejects -->");
+			String fileName = null;
+			FileStatReject reject;
+			while (true) {
+				try {
+					reject = qRejects.remove();
+					rejectTableModel.addRow(reject);
+					fileName = reject.getFileName();
+				} catch (NoSuchElementException ex) {
+					if (priorThread.getState().equals(Thread.State.TERMINATED)) {
+						appLogger.addSpecial(fileName);
+						return;
+					} // if - done ?
+				} // try
+			} // while
+		}// run
+
+	}// class ShowSubjects
+	////////////////////////////////////////////////////////////////////////////////
+	////////////////////////////////////////////////////////////////////////////////
+	////////////////////////////////////////////////////////////////////////////////
+	public class MakeFileKey implements Runnable {
+		private static final int bufSize = 1024;
+		String algorithm = "SHA-1";		//160 bits
+//		String algorithm = "MD5";		// 128 bits
+//		String algorithm = "SHA-256";	// 256 bits
+		private Thread priorThread;
+		private AppLogger appLogger = AppLogger.getInstance();
+
+		public MakeFileKey(Thread priorThread) {
+			this.priorThread = priorThread;
+		}// Constructor
+
+		@Override
+		public void run() {
+			System.out.println("MakeFileKey -->");
+			FileStatSubject fileStatSubject;
+			
+			int count = 0;
+			String fileName = null;
+			String key = null;
+			while (true) {
+				try {
+					fileStatSubject = qSubjects.remove();
+					fileName = fileStatSubject.getFileName();			
+					count++;
+					try {
+						key = hashFile(fileStatSubject.getFilePathString(), algorithm);
+						fileStatSubject.setHashKey(key);
+						qHashes.add(fileStatSubject);
+						appLogger.addInfo(key + " - " + fileName);
+					} catch (HashGenerationException e) {
+						appLogger.addError("HashGenerationError",fileName);
+						e.printStackTrace();
+					}//
+				} catch (NoSuchElementException ex) {
+					if (priorThread.getState().equals(Thread.State.TERMINATED)) {
+						appLogger.addSpecial("From MakeFileKey count = " + count);
+						return;
+					} // if - done ?
+				} // try
+			} // while
+		}// run
+
+		private  String hashFile(String file, String algorithm) throws HashGenerationException {
+			try (FileInputStream inputStream = new FileInputStream(file)) {
+				MessageDigest digest = MessageDigest.getInstance(algorithm);
+
+				byte[] bytesBuffer = new byte[bufSize];
+				int bytesRead = -1;
+
+				while ((bytesRead = inputStream.read(bytesBuffer)) != -1) {
+					digest.update(bytesBuffer, 0, bytesRead);
+				} // while
+
+				byte[] hashedBytes = digest.digest();
+
+				return convertByteArrayToHexString(hashedBytes);
+			} catch (NoSuchAlgorithmException | IOException ex) {
+				throw new HashGenerationException("Could not generate hash from file", ex);
+			} // try
+		}// hashFile
+
+		private  String convertByteArrayToHexString(byte[] arrayBytes) {
+			StringBuffer stringBuffer = new StringBuffer();
+			for (int i = 0; i < arrayBytes.length; i++) {
+				stringBuffer.append(Integer.toString((arrayBytes[i] & 0xff) + 0x100, 16).substring(1));
+			} // for
+			return stringBuffer.toString();
+		}// convertByteArrayToHexString
+
+	}// class ShowSubjects
+	////////////////////////////////////////////////////////////////////////////////
+	////////////////////////////////////////////////////////////////////////////////
+	////////////////////////////////////////////////////////////////////////////////
+	public class IdentifyDuplicates implements Runnable {
+//		private LinkedBlockingQueue<FileStatSubject> qHashes = new LinkedBlockingQueue<FileStatSubject>();
+		private Thread priorThread;
+		private Integer fileID;
+
+		// private JTable table;
+//		private SubjectTableModel subjectTableModel;
+
+
+		public IdentifyDuplicates( Thread priorThread) {
+			this.priorThread = priorThread;
+		}// Constructor
+
+		@Override
+		public void run() {
+			System.out.println("IdentifyDuplicates -->");
+			fileID = 0;
+			hashIDs.clear();
+			hashCounts.clear();
+			FileStatSubject subject;
+			while (true) {
+				try {
+					subject = qHashes.remove();
+					subjectTableModel.addRow(subject,keepHashKeyCount(subject.getHashKey()));
+				} catch (NoSuchElementException ex) {
+					if (priorThread.getState().equals(Thread.State.TERMINATED)) {
+						return;
+					} // if - done ?
+				} // try
+			} // while
+		}// run
+
+
+
+		private Integer keepHashKeyCount(String hashKey) {
+
+			Integer occurances = hashCounts.get(hashKey);
+			if (occurances == null) {
+				hashCounts.put(hashKey, 1);
+				hashIDs.put(hashKey, fileID++);
+				// excludeModel.addElement(filePart);
+			} else {
+				hashCounts.put(hashKey, occurances + 1);
+			} // if unique
+			
+			return hashIDs.get(hashKey);
+		}// keepSuffixCount
+
+	}// class IdentifyDuplicates
+
+	////////////////////////////////////////////////////////////////////////////////
+	////////////////////////////////////////////////////////////////////////////////
+	////////////////////////////////////////////////////////////////////////////////
 
 }// class GUItemplate
