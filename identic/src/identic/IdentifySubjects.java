@@ -8,20 +8,33 @@ import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Set;
 import java.util.concurrent.LinkedBlockingQueue;
 
 public class IdentifySubjects implements Runnable {
-	private LinkedBlockingQueue<Path> qSubjects;
-//	private ArrayDeque<FileStatReject> qRejects;
+	private LinkedBlockingQueue<FileStatSubject> qSubjects;
 	private LinkedBlockingQueue<FileStatReject> qRejects;
 	private Path startPath;
 	private ArrayList<String> targetSuffixes;
 	private AppLogger appLogger = AppLogger.getInstance();
 
+	private HashMap<String, Integer> members = new HashMap<>();
+
 	private int fileCount;
 	private int folderCount;
 	private int subjectCount;
 	private int rejectCount;
+
+	public IdentifySubjects(LinkedBlockingQueue<FileStatSubject> qSubjects, LinkedBlockingQueue<FileStatReject> qRejects,
+			Path startPath, ArrayList<String> targetSuffixes) {
+		this.qSubjects = qSubjects;
+		qSubjects.clear();
+		this.qRejects = qRejects;
+		qRejects.clear();
+		this.startPath = startPath;
+		this.targetSuffixes = targetSuffixes;
+	}// constructor
 
 	@Override
 	public void run() {
@@ -36,23 +49,23 @@ public class IdentifySubjects implements Runnable {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} // try
+		logSummary();
+	}// run
+
+	private void logSummary() {
+		appLogger.addNL(2);
 		appLogger.addSpecial("folderCount = " + folderCount);
 		appLogger.addSpecial("fileCount  = " + fileCount);
 		appLogger.addSpecial("subjectCount = " + subjectCount);
 		appLogger.addSpecial("rejectCount  = " + rejectCount);
 		appLogger.addNL();
-//		System.out.printf("myWalker %n");
-	}// run
-
-	public IdentifySubjects(LinkedBlockingQueue<Path> subjects, LinkedBlockingQueue<FileStatReject> qRejects, Path startPath,
-			ArrayList<String> targetSuffixes) {
-		this.qSubjects = subjects;
-		subjects.clear();
-		this.qRejects = qRejects;
-		qRejects.clear();
-		this.startPath = startPath;
-		this.targetSuffixes = targetSuffixes;
-	}// constructor
+		appLogger.addInfo(String.format("%,d File Types excluded", members.size()));
+		Set<String> keys = members.keySet();
+		appLogger.addNL();
+		for (String key : keys) {
+			appLogger.addInfo(String.format("%s - %,d occurances", key, members.get(key)));
+		} // for
+	}// logSummary
 
 	class MyWalker implements FileVisitor<Path> {
 
@@ -70,12 +83,12 @@ public class IdentifySubjects implements Runnable {
 
 		@Override
 		public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-			FileTime  lastModifieTime;
+			FileTime lastModifieTime;
 			long fileSize;
 			fileCount++;
 			String fileName = file.getFileName().toString();
-					lastModifieTime = Files.getLastModifiedTime(file);
-					fileSize = Files.size(file);
+			lastModifieTime = Files.getLastModifiedTime(file);
+			fileSize = Files.size(file);
 			int partsCount;
 			String part = null;
 			String[] parts = fileName.split("\\.");
@@ -84,10 +97,11 @@ public class IdentifySubjects implements Runnable {
 				part = parts[partsCount - 1].toUpperCase();
 				if (targetSuffixes.contains(part)) {
 					subjectCount++;
-					qSubjects.add(file);
+					qSubjects.add(new FileStatSubject(file, fileSize, lastModifieTime));
 				} else {
 					rejectCount++;
-					qRejects.add(new FileStatReject(file,fileSize,lastModifieTime,FileStat.NOT_ON_LIST));
+					keepSuffixCount(part);
+					qRejects.add(new FileStatReject(file, fileSize, lastModifieTime, FileStat.NOT_ON_LIST));
 				} // if
 			} // if - only process files with suffixes
 			return FileVisitResult.CONTINUE;
@@ -95,8 +109,19 @@ public class IdentifySubjects implements Runnable {
 
 		@Override
 		public FileVisitResult visitFileFailed(Path file, IOException exc) throws IOException {
-			qRejects.add(new FileStatReject(file,0,null,FileStat.IO_EXCEPTION));
+			qRejects.add(new FileStatReject(file, 0, null, FileStat.IO_EXCEPTION));
 			return FileVisitResult.CONTINUE;
 		}// FileVisitResult
+
+		private void keepSuffixCount(String suffix) {
+
+			Integer occurances = members.get(suffix);
+			if (occurances == null) {
+				members.put(suffix, 1);
+				// excludeModel.addElement(filePart);
+			} else {
+				members.put(suffix, occurances + 1);
+			} // if unique
+		}// keepSuffixCount
 	}// class MyWalker
 }// class IdentifySubjects

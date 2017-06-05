@@ -15,7 +15,7 @@ public class FileStatSubject extends FileStat {
 		super(filePath, fileSize, fileTime);
 	}// Constructor
 	
-	public void setHashKey(){
+	public void setHashKey(String hashKey){
 		this.hashKey = hashKey;
 	}//setHashKey
 

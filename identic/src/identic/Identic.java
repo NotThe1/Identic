@@ -23,6 +23,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Set;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.prefs.Preferences;
 
@@ -31,6 +33,7 @@ import javax.swing.BoxLayout;
 import javax.swing.DefaultComboBoxModel;
 import javax.swing.DefaultListModel;
 import javax.swing.JButton;
+import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
@@ -64,17 +67,23 @@ public class Identic {
 	private DefaultListModel<String> targetModel = new DefaultListModel<>();
 	
 	private DefaultListModel<String> excludeModel = new DefaultListModel<>();
-	private JTable rejectTable;
 	private ArrayList<String> targetSuffixes = new ArrayList<>();
 	
-	private LinkedBlockingQueue<Path> qSubjects = new LinkedBlockingQueue<Path>();
+	private LinkedBlockingQueue<FileStatSubject> qSubjects = new LinkedBlockingQueue<FileStatSubject>();
+	
 	private LinkedBlockingQueue<FileStatReject> qRejects = new LinkedBlockingQueue<FileStatReject>();
+	private JTable rejectTable;
+	
+	private LinkedBlockingQueue<FileStatSubject> qHashes = new LinkedBlockingQueue<FileStatSubject>();
+	private JTable subjectTable;
+//	private SubjectTableModel subjectTableModel;
+	private HashMap<String,Integer> hashCounts;
+
 	
 	private  AppLogger appLogger= AppLogger.getInstance();
 
 	private String fileListDirectory;
 	private int sideButtonIndex;
-	private int fileUp,fileDown,folderUp,folderDown;
 
 	/**
 	 * Launch the application.
@@ -121,8 +130,6 @@ public class Identic {
 		qSubjects.clear();
 		qRejects.clear();
 		
-		fileUp = 0;fileDown=0;folderUp=0;folderDown=0;
-//		reportUpAndDown("Start");
 		appLogger.addTimeStamp("Start :");
 		appLogger.addInfo(lblSourceFolder.getText());
 		
@@ -130,28 +137,59 @@ public class Identic {
 		Thread threadIdentify = new Thread(identifySubjects);
 		threadIdentify.start();
 		
-		MakeFileKey  makeFileKey= new MakeFileKey(threadIdentify,qSubjects);
-		Thread threadShow = new Thread(makeFileKey);
-		threadShow.start();
+		MakeFileKey  makeFileKey= new MakeFileKey(threadIdentify,qSubjects,qHashes);
+		Thread threadMakeFileKey = new Thread(makeFileKey);
+		threadMakeFileKey.start();
 		
-		rejectTable = new JTable();
-		
+		rejectTable = new JTable(new RejectTableModel());
 		ShowRejects showRejects =new ShowRejects(threadIdentify,qRejects, rejectTable);
 		Thread threadRejects = new Thread(showRejects);
-		threadRejects.start();
+		if(cbSaveExcludedFiles.isSelected()){
+			threadRejects.start();
+		}//if
+		
+
+		subjectTable = new JTable(new SubjectTableModel());
+		hashCounts = new HashMap<String,Integer>();
+		IdentifyDuplicates identifyDuplicates = new IdentifyDuplicates(qHashes,threadMakeFileKey,subjectTable,hashCounts);
+		Thread threadIdentifyDuplicates = new Thread(identifyDuplicates);
+		threadIdentifyDuplicates.start();
 		
 		try{
 			threadIdentify.join();
-			threadShow.join();
+			threadMakeFileKey.join();
 			threadRejects.join();
+			threadIdentifyDuplicates.join();
 		}catch (InterruptedException e){
 			e.printStackTrace();
 		}//try
 		appLogger.addTimeStamp("End :");
-		scrollPane_1.setViewportView(rejectTable);
+		if(cbSaveExcludedFiles.isSelected()){
+			scrollPane_1.setViewportView(rejectTable);
+		}//if
+
+		Set<String> keys = hashCounts.keySet();
+		appLogger.addNL();
+		for (String key : keys) {
+			appLogger.addInfo(String.format("%s - %,d occurances", key, hashCounts.get(key)));
+		} // for
+		markTheDuplicates();
+		scrollPane_1.setViewportView(subjectTable);
 	}// doStart
 	
-	// ---------------Find Duplicates--------------------------------
+	// ---------------Find Duplicates--------------------------
+	
+	private void markTheDuplicates(){
+		int rows = subjectTable.getModel().getRowCount();
+		String hashKey;
+		for (int row = 0 ; row < rows;row++){
+			hashKey = (String) subjectTable.getValueAt(row, 4);
+			if (hashCounts.get(hashKey) >1){
+				subjectTable.setValueAt(true, row, 5);
+			}// set dup flag if > 1
+			
+		}//for
+	}//markTheDuplicates
 	// ---------------FileTypes--------------------------------
 	
 
@@ -210,6 +248,10 @@ public class Identic {
 		appClose();
 		System.exit(0);
 	}// doFileExit
+	
+	private void doSaveExcludedFiles(){
+		// set radio button enabled
+	}//doSaveExcludedFiles
 
 	class ListFilter implements FilenameFilter {
 		@Override
@@ -320,6 +362,7 @@ public class Identic {
 		listExcluded.setModel(excludeModel);
 		txtLog.setText(EMPTY_STRING);
 		appLogger.setDoc(txtLog.getStyledDocument());
+		cbSaveExcludedFiles.setSelected(false);
 	}// appInit
 
 	public Identic() {
@@ -421,9 +464,9 @@ public class Identic {
 		panelDetails.add(panelFindDuplicates, PNL_FIND_DUPS);
 		GridBagLayout gbl_panelFindDuplicates = new GridBagLayout();
 		gbl_panelFindDuplicates.columnWidths = new int[] { 150, 0 };
-		gbl_panelFindDuplicates.rowHeights = new int[] { 0, 0, 0, 50, 0, 50, 0, 0, 0, 0, 0, 0, 0, 0 };
+		gbl_panelFindDuplicates.rowHeights = new int[] { 0, 0, 0, 0, 0, 50, 0, 50, 0, 0, 0, 0, 0, 0, 0, 0 };
 		gbl_panelFindDuplicates.columnWeights = new double[] { 1.0, Double.MIN_VALUE };
-		gbl_panelFindDuplicates.rowWeights = new double[] { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+		gbl_panelFindDuplicates.rowWeights = new double[] { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
 				0.0, Double.MIN_VALUE };
 		panelFindDuplicates.setLayout(gbl_panelFindDuplicates);
 
@@ -443,12 +486,21 @@ public class Identic {
 		gbc_btnSourceFolder.gridx = 0;
 		gbc_btnSourceFolder.gridy = 1;
 		panelFindDuplicates.add(btnSourceFolder, gbc_btnSourceFolder);
+		
+		cbSaveExcludedFiles = new JCheckBox("Save Excluded Files");
+		cbSaveExcludedFiles.addActionListener(identicAdapter);
+		cbSaveExcludedFiles.setName(CB_SAVE_EXCLUDED_FILES);
+		GridBagConstraints gbc_cbSaveExcludedFiles = new GridBagConstraints();
+		gbc_cbSaveExcludedFiles.insets = new Insets(0, 0, 5, 0);
+		gbc_cbSaveExcludedFiles.gridx = 0;
+		gbc_cbSaveExcludedFiles.gridy = 3;
+		panelFindDuplicates.add(cbSaveExcludedFiles, gbc_cbSaveExcludedFiles);
 
 		Component verticalStrut_8 = Box.createVerticalStrut(20);
 		GridBagConstraints gbc_verticalStrut_8 = new GridBagConstraints();
 		gbc_verticalStrut_8.insets = new Insets(0, 0, 5, 0);
 		gbc_verticalStrut_8.gridx = 0;
-		gbc_verticalStrut_8.gridy = 2;
+		gbc_verticalStrut_8.gridy = 4;
 		panelFindDuplicates.add(verticalStrut_8, gbc_verticalStrut_8);
 
 		JPanel panelFD1 = new JPanel();
@@ -461,7 +513,7 @@ public class Identic {
 		GridBagConstraints gbc_panelFD1 = new GridBagConstraints();
 		gbc_panelFD1.insets = new Insets(0, 0, 5, 0);
 		gbc_panelFD1.gridx = 0;
-		gbc_panelFD1.gridy = 3;
+		gbc_panelFD1.gridy = 5;
 		panelFindDuplicates.add(panelFD1, gbc_panelFD1);
 		GridBagLayout gbl_panelFD1 = new GridBagLayout();
 		gbl_panelFD1.columnWidths = new int[] { 113, 0 };
@@ -482,7 +534,7 @@ public class Identic {
 		GridBagConstraints gbc_verticalStrut_14 = new GridBagConstraints();
 		gbc_verticalStrut_14.insets = new Insets(0, 0, 5, 0);
 		gbc_verticalStrut_14.gridx = 0;
-		gbc_verticalStrut_14.gridy = 4;
+		gbc_verticalStrut_14.gridy = 6;
 		panelFindDuplicates.add(verticalStrut_14, gbc_verticalStrut_14);
 
 		JPanel panelFD2 = new JPanel();
@@ -496,7 +548,7 @@ public class Identic {
 		gbc_panelFD2.anchor = GridBagConstraints.NORTH;
 		gbc_panelFD2.insets = new Insets(0, 0, 5, 0);
 		gbc_panelFD2.gridx = 0;
-		gbc_panelFD2.gridy = 5;
+		gbc_panelFD2.gridy = 7;
 		panelFindDuplicates.add(panelFD2, gbc_panelFD2);
 		GridBagLayout gbl_panelFD2 = new GridBagLayout();
 		gbl_panelFD2.columnWidths = new int[] { 113, 0 };
@@ -517,7 +569,7 @@ public class Identic {
 		GridBagConstraints gbc_verticalStrut_15 = new GridBagConstraints();
 		gbc_verticalStrut_15.insets = new Insets(0, 0, 5, 0);
 		gbc_verticalStrut_15.gridx = 0;
-		gbc_verticalStrut_15.gridy = 6;
+		gbc_verticalStrut_15.gridy = 8;
 		panelFindDuplicates.add(verticalStrut_15, gbc_verticalStrut_15);
 
 		JButton btnStart = new JButton("Start");
@@ -526,21 +578,21 @@ public class Identic {
 		GridBagConstraints gbc_btnStart = new GridBagConstraints();
 		gbc_btnStart.insets = new Insets(0, 0, 5, 0);
 		gbc_btnStart.gridx = 0;
-		gbc_btnStart.gridy = 7;
+		gbc_btnStart.gridy = 9;
 		panelFindDuplicates.add(btnStart, gbc_btnStart);
 
 		Component verticalStrut_18 = Box.createVerticalStrut(20);
 		GridBagConstraints gbc_verticalStrut_18 = new GridBagConstraints();
 		gbc_verticalStrut_18.insets = new Insets(0, 0, 5, 0);
 		gbc_verticalStrut_18.gridx = 0;
-		gbc_verticalStrut_18.gridy = 8;
+		gbc_verticalStrut_18.gridy = 10;
 		panelFindDuplicates.add(verticalStrut_18, gbc_verticalStrut_18);
 
 		Component verticalStrut_19 = Box.createVerticalStrut(20);
 		GridBagConstraints gbc_verticalStrut_19 = new GridBagConstraints();
 		gbc_verticalStrut_19.insets = new Insets(0, 0, 5, 0);
 		gbc_verticalStrut_19.gridx = 0;
-		gbc_verticalStrut_19.gridy = 9;
+		gbc_verticalStrut_19.gridy = 11;
 		panelFindDuplicates.add(verticalStrut_19, gbc_verticalStrut_19);
 
 		JPanel panel_3 = new JPanel();
@@ -551,7 +603,7 @@ public class Identic {
 		gbc_panel_3.anchor = GridBagConstraints.NORTH;
 		gbc_panel_3.fill = GridBagConstraints.HORIZONTAL;
 		gbc_panel_3.gridx = 0;
-		gbc_panel_3.gridy = 10;
+		gbc_panel_3.gridy = 12;
 		panelFindDuplicates.add(panel_3, gbc_panel_3);
 		GridBagLayout gbl_panel_3 = new GridBagLayout();
 		gbl_panel_3.columnWidths = new int[] { 0, 0 };
@@ -574,7 +626,7 @@ public class Identic {
 		GridBagConstraints gbc_verticalStrut_20 = new GridBagConstraints();
 		gbc_verticalStrut_20.insets = new Insets(0, 0, 5, 0);
 		gbc_verticalStrut_20.gridx = 0;
-		gbc_verticalStrut_20.gridy = 11;
+		gbc_verticalStrut_20.gridy = 13;
 		panelFindDuplicates.add(verticalStrut_20, gbc_verticalStrut_20);
 
 		JButton btnManageTypeList = new JButton("Manage Type Lists");
@@ -582,7 +634,7 @@ public class Identic {
 		btnManageTypeList.setName(BTN_MANAGE_TYPE_LIST);
 		GridBagConstraints gbc_btnManageTypeList = new GridBagConstraints();
 		gbc_btnManageTypeList.gridx = 0;
-		gbc_btnManageTypeList.gridy = 12;
+		gbc_btnManageTypeList.gridy = 14;
 		panelFindDuplicates.add(btnManageTypeList, gbc_btnManageTypeList);
 
 		panelFindDuplicatesByName = new JPanel();
@@ -969,9 +1021,13 @@ public class Identic {
 				loadTargetList();
 				break;
 
+			case CB_SAVE_EXCLUDED_FILES:
+				doSaveExcludedFiles();
+				break;
+
 			default:
 
-			}// switch
+			}// switch 
 
 		}// actionPerformed
 
@@ -999,6 +1055,8 @@ public class Identic {
 	private static final String BTN_MANAGE_TYPE_LIST = "btnManageTypeList";
 	// ApplicationLogButtons
 	private static final String BTN_CLEAR_LOG = "btnClearLog";
+	private static final String CB_SAVE_EXCLUDED_FILES = "cbSaveExcludedFiles";
+
 
 	private static final String CBO_TYPES_LIST = "cboTypeLists";
 	private static final String PNL_FIND_DUPS = "pnlFindDuplicates";
@@ -1036,5 +1094,6 @@ public class Identic {
 	private JComboBox<String> cboTypeLists;
 	private JTextPane txtLog;
 	private JScrollPane scrollPane_1;
+	private JCheckBox cbSaveExcludedFiles;
 
 }// class GUItemplate

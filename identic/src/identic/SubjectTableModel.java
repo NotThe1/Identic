@@ -7,16 +7,14 @@ import java.util.Map;
 
 import javax.swing.table.AbstractTableModel;
 
-public class RejectTableModel extends AbstractTableModel {
-
-	private static final long serialVersionUID = 1L;
+public class SubjectTableModel extends AbstractTableModel {
 	
 	private Map<Point, Object> lookup;
 	private int rows;
 	private final int columns;
 	private final String[] headers;
-
-	public RejectTableModel(int rows, String columnHeaders[]) {
+	
+	public SubjectTableModel(int rows, String columnHeaders[]) {
 		if ((rows < 0) || (columnHeaders == null)) {
 			throw new IllegalArgumentException("Invalid row count/columnHeaders");
 		}
@@ -25,34 +23,36 @@ public class RejectTableModel extends AbstractTableModel {
 		headers = columnHeaders;
 		lookup = new HashMap<Point, Object>();
 	}// Constructor
-
-	public RejectTableModel(String columnHeaders[]) {
+	
+	public SubjectTableModel(String columnHeaders[]) {
 		this(0, columnHeaders);
 	}// Constructor
-	
-	public RejectTableModel(){
-		this(0,new String[] { "Name", "Directory", "Size", "Modified Date", "Reason" });
+
+	public SubjectTableModel(){
+		this(0,new String[] { "Name", "Directory", "Size", "Modified Date", "HashKey","isDup","FileID" });
 	}//Constructor
 
+	
 	@Override
 	public int getColumnCount() {
 		return columns;
-	}// getColumnCount
-
-	@Override
-	public int getRowCount() {
-		return rows;
-	}// getRowCount
-
+	}//getColumnCount
+	
 	public String getColumnName(int column) {
 		return headers[column];
 	}// getColumnName
 
+
+	@Override
+	public int getRowCount() {
+		return rows;
+	}//getRowCount
+
 	@Override
 	public Object getValueAt(int row, int column) {
 		return lookup.get(new Point(row, column));
-	}// getValueAt
-
+	}//getValueAt
+	
 	public void setValueAt(Object value, int row, int column) {
 		if ((row < 0) || (column < 0)) {
 			throw new IllegalArgumentException("Invalid row/column setting");
@@ -69,15 +69,30 @@ public class RejectTableModel extends AbstractTableModel {
 		} // for
 	}// addRow
 	
-	public void addRow(FileStatReject reject){
+	public void addRow(FileStatSubject subject){
 		rows++;
-		lookup.put(new Point(rows - 1, 0), reject.getFileName());
-		lookup.put(new Point(rows - 1, 1), reject.getDirectory());
-		lookup.put(new Point(rows - 1, 2), reject.getFileSize());
-		lookup.put(new Point(rows - 1, 3), reject.getFileTime());
-		lookup.put(new Point(rows - 1, 4), reject.getReason());
+		lookup.put(new Point(rows - 1, 0), subject.getFileName());
+		lookup.put(new Point(rows - 1, 1), subject.getDirectory());
+		lookup.put(new Point(rows - 1, 2), subject.getFileSize());
+		lookup.put(new Point(rows - 1, 3), subject.getFileTime());
+		lookup.put(new Point(rows - 1, 4), subject.getHashKey());
+		lookup.put(new Point(rows - 1, 5), false);					//is dup
+		lookup.put(new Point(rows - 1, 6), -1);				// file ID
 	}//addRow
 
+	public void addRow(FileStatSubject subject,Integer fileID){
+		rows++;
+		lookup.put(new Point(rows - 1, 0), subject.getFileName());
+		lookup.put(new Point(rows - 1, 1), subject.getDirectory());
+		lookup.put(new Point(rows - 1, 2), subject.getFileSize());
+		lookup.put(new Point(rows - 1, 3), subject.getFileTime());
+		lookup.put(new Point(rows - 1, 4), subject.getHashKey());
+		lookup.put(new Point(rows - 1, 5), false);					//is dup
+		lookup.put(new Point(rows - 1, 6), fileID);				
+	}//addRow
+
+
+	
 	@Override
 	public Class<?> getColumnClass(int columnIndex) {
 
@@ -90,11 +105,17 @@ public class RejectTableModel extends AbstractTableModel {
 			return Number.class;
 		case 3://"Modified Date"
 			return DateFormat.class;
-		case 4:// "Reason"
+		case 4:// "HashKey"
 			return super.getColumnClass(columnIndex);
+		case 5:// Duplicate
+			return Boolean.class;
+		case 6:// File ID
+			return Number.class;
 		default:
 			return super.getColumnClass(columnIndex);
 		}// switch
 	}// getColumnClass
 
-}// class MySparseTableModel
+
+
+}//class SubjectTableModel

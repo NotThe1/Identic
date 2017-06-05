@@ -2,7 +2,6 @@ package identic;
 
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.NoSuchElementException;
@@ -10,34 +9,38 @@ import java.util.concurrent.LinkedBlockingQueue;
 
 public class MakeFileKey implements Runnable {
 	private static int bufSize = 1024;
-	String algorithm = "SHA-256";
-	private LinkedBlockingQueue<Path> qSubjects = new LinkedBlockingQueue<Path>();
+	String algorithm = "SHA-1";		//160 bits
+//	String algorithm = "MD5";		// 128 bits
+//	String algorithm = "SHA-256";	// 256 bits
+	private LinkedBlockingQueue<FileStatSubject> qSubjects;
+	private LinkedBlockingQueue<FileStatSubject> qHashes ;
 	private Thread priorThread;
 	private AppLogger appLogger = AppLogger.getInstance();
 
-	public MakeFileKey(Thread priorThread, LinkedBlockingQueue<Path> subjects) {
+	public MakeFileKey(Thread priorThread, LinkedBlockingQueue<FileStatSubject> qSubjects,LinkedBlockingQueue<FileStatSubject> qHashes) {
 		this.priorThread = priorThread;
-		this.qSubjects = subjects;
+		this.qSubjects = qSubjects;
+		this.qHashes = qHashes;
 
 	}// Constructor
 
 	@Override
 	public void run() {
-		PathKey pathKey;
+		FileStatSubject fileStatSubject;
 		
 		int count = 0;
-		Path path = null;
 		String fileName = null;
 		String key = null;
 		while (true) {
 			try {
-				path = qSubjects.remove();
-				fileName = path.toString();
+				fileStatSubject = qSubjects.remove();
+				fileName = fileStatSubject.getFileName();			
 				count++;
 				try {
-					key = hashFile(fileName, algorithm);
-					pathKey = new PathKey(key,fileName);
-					appLogger.addInfo(pathKey.key + " - " + pathKey.filePath);
+					key = hashFile(fileStatSubject.getFilePathString(), algorithm);
+					fileStatSubject.setHashKey(key);
+					qHashes.add(fileStatSubject);
+					appLogger.addInfo(key + " - " + fileName);
 				} catch (HashGenerationException e) {
 					appLogger.addError("HashGenerationError",fileName);
 					e.printStackTrace();

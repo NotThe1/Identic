@@ -19,6 +19,10 @@ public class FileStat {
 		return filePath;
 	}//getFileName
 	
+	public String getFilePathString(){
+		return filePath.toString();
+	}//getFileName
+	
 	public long getFileSize(){
 		return fileSize;
 	}//getFileName
