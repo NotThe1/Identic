@@ -35,11 +35,8 @@ public class IdentifyDuplicates implements Runnable {
 			try {
 				subject = qHashes.remove();
 				subjectTableModel.addRow(subject,keepHashKeyCount(subject.getHashKey()));
-//				fileID = keepHashKeyCount(subject.getHashKey());
 			} catch (NoSuchElementException ex) {
 				if (priorThread.getState().equals(Thread.State.TERMINATED)) {
-					System.err.println(ex.getMessage());
-
 					return;
 				} // if - done ?
 			} // try

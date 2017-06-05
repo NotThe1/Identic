@@ -32,7 +32,6 @@ public class ShowRejects implements Runnable {
 				fileName = reject.getFileName();
 			} catch (NoSuchElementException ex) {
 				if (priorThread.getState().equals(Thread.State.TERMINATED)) {
-					System.err.println(ex.getMessage());
 					appLogger.addSpecial(fileName);
 					return;
 				} // if - done ?

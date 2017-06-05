@@ -12,6 +12,9 @@ import java.util.HashMap;
 import java.util.Set;
 import java.util.concurrent.LinkedBlockingQueue;
 
+import javax.swing.DefaultListModel;
+import javax.swing.JList;
+
 public class IdentifySubjects implements Runnable {
 	private LinkedBlockingQueue<FileStatSubject> qSubjects;
 	private LinkedBlockingQueue<FileStatReject> qRejects;
@@ -20,7 +23,7 @@ public class IdentifySubjects implements Runnable {
 	private AppLogger appLogger = AppLogger.getInstance();
 
 	private HashMap<String, Integer> members = new HashMap<>();
-
+	private DefaultListModel<String> excludeModel;
 	private int fileCount;
 	private int folderCount;
 	private int subjectCount;
@@ -36,17 +39,28 @@ public class IdentifySubjects implements Runnable {
 		this.targetSuffixes = targetSuffixes;
 	}// constructor
 
+	public IdentifySubjects(LinkedBlockingQueue<FileStatSubject> qSubjects, LinkedBlockingQueue<FileStatReject> qRejects,
+			Path startPath, ArrayList<String> targetSuffixes,JList<String> listExcluded) {
+		this.qSubjects = qSubjects;
+		qSubjects.clear();
+		this.qRejects = qRejects;
+		qRejects.clear();
+		this.startPath = startPath;
+		this.targetSuffixes = targetSuffixes;
+		this.excludeModel = (DefaultListModel<String>) listExcluded.getModel();
+	}// constructor
+
 	@Override
 	public void run() {
 		fileCount = 0;
 		folderCount = 0;
 		subjectCount = 0;
 		rejectCount = 0;
+		this.excludeModel.clear();
 		MyWalker myWalker = new MyWalker();
 		try {
 			Files.walkFileTree(startPath, myWalker);
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} // try
 		logSummary();
@@ -118,7 +132,7 @@ public class IdentifySubjects implements Runnable {
 			Integer occurances = members.get(suffix);
 			if (occurances == null) {
 				members.put(suffix, 1);
-				// excludeModel.addElement(filePart);
+				 excludeModel.addElement(suffix);
 			} else {
 				members.put(suffix, occurances + 1);
 			} // if unique
