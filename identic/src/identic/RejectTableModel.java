@@ -30,6 +30,11 @@ public class RejectTableModel extends AbstractTableModel {
 		this(0, columnHeaders);
 	}// Constructor
 	
+	public void clear(){
+		lookup.clear();
+		rows = 0;
+	}//clear()
+	
 	public RejectTableModel(){
 		this(0,new String[] { "Name", "Directory", "Size", "Modified Date", "Reason" });
 	}//Constructor

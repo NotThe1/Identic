@@ -31,6 +31,13 @@ public class SubjectTableModel extends AbstractTableModel {
 	public SubjectTableModel(){
 		this(0,new String[] { "Name", "Directory", "Size", "Modified Date", "HashKey","isDup","FileID" });
 	}//Constructor
+	
+	public void clear(){
+		lookup.clear();
+		rows = 0;
+	}//clear()
+
+
 
 	
 	@Override
@@ -61,7 +68,7 @@ public class SubjectTableModel extends AbstractTableModel {
 			lookup.put(new Point(row, column), value);
 		} //
 	}// setValueAt
-
+	
 	public void addRow(Object[] values) {
 		rows++;
 		for (int i = 0; i < columns; i++) {
