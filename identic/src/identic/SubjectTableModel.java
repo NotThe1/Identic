@@ -1,12 +1,17 @@
 package identic;
 
+
 import java.awt.Point;
-import java.text.DateFormat;
+import java.nio.file.attribute.FileTime;
 import java.util.HashMap;
 import java.util.Map;
 
 import javax.swing.table.AbstractTableModel;
-
+/**
+ *  modified getColumnCount to return 1 less than actual, to hide last field in the tables
+ * @author admin
+ *
+ */
 public class SubjectTableModel extends AbstractTableModel {
 	
 	private Map<Point, Object> lookup;
@@ -29,7 +34,7 @@ public class SubjectTableModel extends AbstractTableModel {
 	}// Constructor
 
 	public SubjectTableModel(){
-		this(0,new String[] { "Name", "Directory", "Size", "Modified Date", "HashKey","isDup","FileID" });
+		this(0,new String[] { NAME, DIRECTORY, SIZE, DATE,DUP,ID , HASH_KEY});
 	}//Constructor
 	
 	public void clear(){
@@ -42,7 +47,7 @@ public class SubjectTableModel extends AbstractTableModel {
 	
 	@Override
 	public int getColumnCount() {
-		return columns;
+		return columns-1;
 	}//getColumnCount
 	
 	public String getColumnName(int column) {
@@ -82,9 +87,9 @@ public class SubjectTableModel extends AbstractTableModel {
 		lookup.put(new Point(rows - 1, 1), subject.getDirectory());
 		lookup.put(new Point(rows - 1, 2), subject.getFileSize());
 		lookup.put(new Point(rows - 1, 3), subject.getFileTime());
-		lookup.put(new Point(rows - 1, 4), subject.getHashKey());
-		lookup.put(new Point(rows - 1, 5), false);					//is dup
-		lookup.put(new Point(rows - 1, 6), -1);				// file ID
+		lookup.put(new Point(rows - 1, 4), false);					//is duplicate
+		lookup.put(new Point(rows - 1, 5), -1);				// file ID
+		lookup.put(new Point(rows - 1, 6), subject.getHashKey());
 	}//addRow
 
 	public void addRow(FileStatSubject subject,Integer fileID){
@@ -93,9 +98,9 @@ public class SubjectTableModel extends AbstractTableModel {
 		lookup.put(new Point(rows - 1, 1), subject.getDirectory());
 		lookup.put(new Point(rows - 1, 2), subject.getFileSize());
 		lookup.put(new Point(rows - 1, 3), subject.getFileTime());
-		lookup.put(new Point(rows - 1, 4), subject.getHashKey());
-		lookup.put(new Point(rows - 1, 5), false);					//is dup
-		lookup.put(new Point(rows - 1, 6), fileID);				
+		lookup.put(new Point(rows - 1, 4), false);					//is dup
+		lookup.put(new Point(rows - 1, 5), fileID);				
+		lookup.put(new Point(rows - 1, 6), subject.getHashKey());
 	}//addRow
 
 
@@ -109,19 +114,28 @@ public class SubjectTableModel extends AbstractTableModel {
 		case 1://"Directory"
 			return super.getColumnClass(columnIndex);
 		case 2://"Size"
-			return Number.class;
+			return Long.class;
 		case 3://"Modified Date"
-			return DateFormat.class;
-		case 4:// "HashKey"
-			return super.getColumnClass(columnIndex);
-		case 5:// Duplicate
+			return FileTime.class;
+		case 4:// Duplicate
 			return Boolean.class;
-		case 6:// File ID
-			return Number.class;
+		case 5:// File ID
+			return Integer.class;
 		default:
+			return super.getColumnClass(columnIndex);
+		case 6:// "HashKey"
 			return super.getColumnClass(columnIndex);
 		}// switch
 	}// getColumnClass
+	
+	public static final String NAME = "Name";
+	public static final String DIRECTORY ="Directory";
+	public static final String SIZE ="Size";
+	public static final String DATE = "ModifiedDate"; 
+	public static final String DUP ="isDup"; 
+	public static final String ID = "FileID"; 
+	public static final String HASH_KEY = "HashKey";
+	
 
 
 

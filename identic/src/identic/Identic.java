@@ -59,6 +59,7 @@ import javax.swing.JSplitPane;
 import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.JTextPane;
+import javax.swing.RowFilter;
 import javax.swing.ScrollPaneConstants;
 import javax.swing.SwingConstants;
 import javax.swing.UIManager;
@@ -66,9 +67,8 @@ import javax.swing.border.BevelBorder;
 import javax.swing.border.CompoundBorder;
 import javax.swing.border.LineBorder;
 import javax.swing.border.TitledBorder;
+import javax.swing.table.TableRowSorter;
 import javax.swing.text.BadLocationException;
-
-
 
 public class Identic {
 
@@ -77,35 +77,31 @@ public class Identic {
 	private String[] sideMenuPanelNames; // SortedComboBoxModel
 	private DefaultComboBoxModel<String> typeListModel = new DefaultComboBoxModel<>();
 	private DefaultListModel<String> targetModel = new DefaultListModel<>();
-	
+
 	private DefaultListModel<String> excludeModel = new DefaultListModel<>();
 	private ArrayList<String> targetSuffixes = new ArrayList<>();
-	
+
 	private LinkedBlockingQueue<FileStatSubject> qSubjects = new LinkedBlockingQueue<FileStatSubject>();
-	
+
 	private LinkedBlockingQueue<FileStatReject> qRejects = new LinkedBlockingQueue<FileStatReject>();
-	private RejectTableModel rejectTableModel  = new RejectTableModel();
-	private JTable rejectTable = new JTable(rejectTableModel);
-	
+	private RejectTableModel rejectTableModel = new RejectTableModel();
+
 	private LinkedBlockingQueue<FileStatSubject> qHashes = new LinkedBlockingQueue<FileStatSubject>();
 	private SubjectTableModel subjectTableModel = new SubjectTableModel();
-	private JTable subjectTable = new JTable(subjectTableModel);
-	private HashMap<String,Integer> hashCounts = new HashMap<String,Integer>();;
-	
-	private HashMap<String, Integer> hashIDs = new HashMap<String, Integer>();
-	
-	private ButtonGroup bgShowResults = new ButtonGroup();; 
 
-	
+	private HashMap<String, Integer> hashCounts = new HashMap<String, Integer>();;
+
+	private HashMap<String, Integer> hashIDs = new HashMap<String, Integer>();
+
+	private ButtonGroup bgShowResults = new ButtonGroup();;
+
 	private Path startPath;
 	private int fileCount;
 	private int folderCount;
 	private int subjectCount;
 	private int rejectCount;
-	
 
-	
-	private  AppLogger appLogger= AppLogger.getInstance();
+	private AppLogger appLogger = AppLogger.getInstance();
 
 	private String fileListDirectory;
 	private int sideButtonIndex;
@@ -154,7 +150,7 @@ public class Identic {
 		} // if
 		qSubjects.clear();
 		qRejects.clear();
-		
+
 		fileCount = 0;
 		folderCount = 0;
 		subjectCount = 0;
@@ -163,74 +159,67 @@ public class Identic {
 		hashCounts.clear();
 		subjectTableModel.clear();
 		rejectTableModel.clear();
-		lblFilesNotProcessed.setText(String.format("%,d",0));
+		lblFilesNotProcessed.setText(String.format("%,d", 0));
 
-		
 		appLogger.addTimeStamp("Start :");
 		appLogger.addInfo(lblSourceFolder.getText());
-		
-//--------------------------
+
+		// --------------------------
 		IdentifySubjects identifySubjects = new IdentifySubjects();
 		Thread threadIdentify = new Thread(identifySubjects);
 		threadIdentify.start();
-		
-		MakeFileKey  makeFileKey= new MakeFileKey(threadIdentify);
+
+		MakeFileKey makeFileKey = new MakeFileKey(threadIdentify);
 		Thread threadMakeFileKey = new Thread(makeFileKey);
 		threadMakeFileKey.start();
-		
 
-		ShowRejects showRejects =new ShowRejects(threadIdentify);
+		ShowRejects showRejects = new ShowRejects(threadIdentify);
 		Thread threadRejects = new Thread(showRejects);
-		if(cbSaveExcludedFiles.isSelected()){
+		if (cbSaveExcludedFiles.isSelected()) {
 			threadRejects.start();
-		}//if
-		
+		} // if
+
 		IdentifyDuplicates identifyDuplicates = new IdentifyDuplicates(threadMakeFileKey);
 		Thread threadIdentifyDuplicates = new Thread(identifyDuplicates);
 		threadIdentifyDuplicates.start();
-		
-		try{
+
+		try {
 			threadIdentify.join();
 			threadMakeFileKey.join();
 			threadRejects.join();
 			threadIdentifyDuplicates.join();
-		}catch (InterruptedException e){
+		} catch (InterruptedException e) {
 			e.printStackTrace();
-		}//try
+		} // try
 		appLogger.addTimeStamp("End :");
-//		if(cbSaveExcludedFiles.isSelected()){
-//			scrollPaneResults.setViewportView(rejectTable);
-//		}//if
 
-		Set<String> keys = hashCounts.keySet();
-		appLogger.addNL();
-		for (String key : keys) {
-			appLogger.addInfo(String.format("%s - %,d occurances", key, hashCounts.get(key)));
-		} // for
+		// Set<String> keys = hashCounts.keySet();
+		// appLogger.addNL();
+		// for (String key : keys) {
+		// appLogger.addInfo(String.format("%s - %,d occurances", key, hashCounts.get(key)));
+		// } // for
 		markTheDuplicates();
-//		scrollPaneResults.setViewportView(subjectTable);
 	}// doStart
-	
+
 	// ---------------Find Duplicates--------------------------
-	
-	private void markTheDuplicates(){
+
+	private void markTheDuplicates() {
 		int rows = subjectTableModel.getRowCount();
 		String hashKey;
-		for (int row = 0 ; row < rows;row++){
-			hashKey = (String) subjectTableModel.getValueAt(row, 4);
-			try{
-			if (hashCounts.get(hashKey) >1){
-				subjectTableModel.setValueAt(true, row, 5);
-			}// set dup flag if > 1
-				
-			}catch (Exception e){
+		for (int row = 0; row < rows; row++) {
+			hashKey = (String) subjectTableModel.getValueAt(row, 6);
+			try {
+				if (hashCounts.get(hashKey) > 1) {
+					subjectTableModel.setValueAt(true, row, 4);
+				} // set dup flag if > 1
+
+			} catch (Exception e) {
 				System.out.println("HashKey = " + hashKey);
 			}
-			
-		}//for
-	}//markTheDuplicates
-	// ---------------FileTypes--------------------------------
-	
+
+		} // for
+	}// markTheDuplicates
+		// ---------------FileTypes--------------------------------
 
 	private void loadTargetList() {
 		if (cboTypeLists.getSelectedIndex() == -1) {// Nothing selected
@@ -241,7 +230,7 @@ public class Identic {
 		String listFile = fileListDirectory + listName + LIST_SUFFIX_DOT;
 		lblStatus.setText(listFile);
 
-		Path pathTypeList	 = Paths.get(listFile);
+		Path pathTypeList = Paths.get(listFile);
 		try {
 			targetSuffixes = (ArrayList<String>) Files.readAllLines(pathTypeList);
 		} catch (IOException e) {
@@ -251,7 +240,7 @@ public class Identic {
 		for (String line : targetSuffixes) {
 			targetModel.addElement(line);
 		} // for
-		
+
 	}// loadTargetList
 
 	private void doSideMenu(JButton button) {
@@ -273,47 +262,68 @@ public class Identic {
 
 		panelSideMenu.validate();
 	}// doSideMenu
-	
-	private void doClearLog(){
+
+	private void doClearLog() {
 		try {
 			txtLog.getDocument().remove(0, txtLog.getDocument().getLength());
 		} catch (BadLocationException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
-		}//try
-	}//doClearLog
-	
-	private void doShowResults(){
-		switch(bgShowResults.getSelection().getActionCommand()){
+		} // try
+	}// doClearLog
+
+	private void doShowResults() {
+		switch (bgShowResults.getSelection().getActionCommand()) {
 		case RB_ALL_THE_FILES:
-			if (subjectTableModel.getRowCount()>0){
+			if (subjectTableModel.getRowCount() > 0) {
 				tableResults.setModel(subjectTableModel);
-			}//
+				tableResults.setRowSorter(new TableRowSorter(subjectTableModel));
+			} //
 			break;
 		case RB_DUPLICATE_FILES:
-			if (false){
+			if (subjectTableModel.getRowCount() > 0) {
+				// -----------------------------------------
+				RowFilter<Object, Object> dupFilter = new RowFilter<Object, Object>() {
+					public boolean include(Entry<? extends Object, ? extends Object> entry) {
+						return (boolean) entry.getValue(4);
+					}// include
+				};
+				// -------------------------------------------
+				TableRowSorter tableRowSorter = new TableRowSorter(subjectTableModel);
+				tableRowSorter.setRowFilter(dupFilter);
 				tableResults.setModel(subjectTableModel);
-			}//
+				tableResults.setRowSorter(tableRowSorter);
+			} //
 			break;
 		case RB_UNIQUE_FILES:
-			if (false){
+			if (subjectTableModel.getRowCount() > 0) {
+				// -----------------------------------------
+				RowFilter<Object, Object> dupFilter = new RowFilter<Object, Object>() {
+					public boolean include(Entry<? extends Object, ? extends Object> entry) {
+						return !((boolean) entry.getValue(4));
+					}// include
+				};
+				// -------------------------------------------
+				TableRowSorter tableRowSorter = new TableRowSorter(subjectTableModel);
+				tableRowSorter.setRowFilter(dupFilter);
 				tableResults.setModel(subjectTableModel);
-			}//
+				tableResults.setRowSorter(tableRowSorter);
+			} //
 			break;
 		case RB_FILES_NOT_PROCESSED:
 			tableResults.setModel(rejectTableModel);
 			break;
-		}//switch
-	}//doShowResults
-	
+		}// switch
+	}// doShowResults
+
 	private void doFileExit() {
 		appClose();
 		System.exit(0);
 	}// doFileExit
-	
-	private void doSaveExcludedFiles(){
+
+	private void doSaveExcludedFiles() {
 		rbFilesNotProcessed.setEnabled(cbSaveExcludedFiles.isSelected());
-	}//doSaveExcludedFiles
+	}// doSaveExcludedFiles
 
 	class ListFilter implements FilenameFilter {
 		@Override
@@ -409,7 +419,7 @@ public class Identic {
 		// cboTypeLists.setSelectedItem(myPrefs.get("ActiveList", "Pictures"));
 		sideButtonIndex = myPrefs.getInt("SideButtonIndex", 0);
 		lblSourceFolder.setText(myPrefs.get("SourceDirectory", NOT_SET));
-		
+
 		myPrefs = null;
 
 		// These two arrays are synchronized to control the button positions and the selection of the correct panels.
@@ -417,7 +427,7 @@ public class Identic {
 				btnCopyMoveRemove, btnApplicationLog };
 		sideMenuPanelNames = new String[] { panelFindDuplicates.getName(), panelFindDuplicatesByName.getName(),
 				panelDisplayResults.getName(), panelCopyMoveRemove.getName(), paneApplicationlLog.getName() };
-		
+
 		cboTypeLists.setModel(typeListModel);
 
 		listFindDuplicatesActive.setModel(targetModel);
@@ -425,7 +435,7 @@ public class Identic {
 		txtLog.setText(EMPTY_STRING);
 		appLogger.setDoc(txtLog.getStyledDocument());
 		cbSaveExcludedFiles.setSelected(false);
-		
+
 		bgShowResults.add(rbAllTheFiles);
 		bgShowResults.add(rbDuplicateFiles);
 		bgShowResults.add(rbUniqueFiles);
@@ -534,8 +544,8 @@ public class Identic {
 		gbl_panelFindDuplicates.columnWidths = new int[] { 150, 0 };
 		gbl_panelFindDuplicates.rowHeights = new int[] { 0, 0, 0, 0, 0, 0, 50, 0, 50, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 		gbl_panelFindDuplicates.columnWeights = new double[] { 1.0, Double.MIN_VALUE };
-		gbl_panelFindDuplicates.rowWeights = new double[] { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-				0.0, 1.0, Double.MIN_VALUE };
+		gbl_panelFindDuplicates.rowWeights = new double[] { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+				0.0, 0.0, 0.0, 0.0, 1.0, Double.MIN_VALUE };
 		panelFindDuplicates.setLayout(gbl_panelFindDuplicates);
 
 		Component verticalStrut = Box.createVerticalStrut(20);
@@ -544,15 +554,15 @@ public class Identic {
 		gbc_verticalStrut.gridx = 0;
 		gbc_verticalStrut.gridy = 0;
 		panelFindDuplicates.add(verticalStrut, gbc_verticalStrut);
-		
-				JButton btnStart = new JButton("Start");
-				btnStart.addActionListener(identicAdapter);
-				btnStart.setName(BTN_START);
-				GridBagConstraints gbc_btnStart = new GridBagConstraints();
-				gbc_btnStart.insets = new Insets(0, 0, 5, 0);
-				gbc_btnStart.gridx = 0;
-				gbc_btnStart.gridy = 2;
-				panelFindDuplicates.add(btnStart, gbc_btnStart);
+
+		JButton btnStart = new JButton("Start");
+		btnStart.addActionListener(identicAdapter);
+		btnStart.setName(BTN_START);
+		GridBagConstraints gbc_btnStart = new GridBagConstraints();
+		gbc_btnStart.insets = new Insets(0, 0, 5, 0);
+		gbc_btnStart.gridx = 0;
+		gbc_btnStart.gridy = 2;
+		panelFindDuplicates.add(btnStart, gbc_btnStart);
 
 		Component verticalStrut_8 = Box.createVerticalStrut(20);
 		GridBagConstraints gbc_verticalStrut_8 = new GridBagConstraints();
@@ -629,16 +639,16 @@ public class Identic {
 		gbc_verticalStrut_15.gridx = 0;
 		gbc_verticalStrut_15.gridy = 9;
 		panelFindDuplicates.add(verticalStrut_15, gbc_verticalStrut_15);
-		
-				JButton btnSourceFolder = new JButton("Source Folder");
-				btnSourceFolder.addActionListener(identicAdapter);
-				btnSourceFolder.setName(BTN_SOURCE_FOLDER);
-				GridBagConstraints gbc_btnSourceFolder = new GridBagConstraints();
-				gbc_btnSourceFolder.fill = GridBagConstraints.VERTICAL;
-				gbc_btnSourceFolder.insets = new Insets(0, 0, 5, 0);
-				gbc_btnSourceFolder.gridx = 0;
-				gbc_btnSourceFolder.gridy = 10;
-				panelFindDuplicates.add(btnSourceFolder, gbc_btnSourceFolder);
+
+		JButton btnSourceFolder = new JButton("Source Folder");
+		btnSourceFolder.addActionListener(identicAdapter);
+		btnSourceFolder.setName(BTN_SOURCE_FOLDER);
+		GridBagConstraints gbc_btnSourceFolder = new GridBagConstraints();
+		gbc_btnSourceFolder.fill = GridBagConstraints.VERTICAL;
+		gbc_btnSourceFolder.insets = new Insets(0, 0, 5, 0);
+		gbc_btnSourceFolder.gridx = 0;
+		gbc_btnSourceFolder.gridy = 10;
+		panelFindDuplicates.add(btnSourceFolder, gbc_btnSourceFolder);
 
 		Component verticalStrut_18 = Box.createVerticalStrut(20);
 		GridBagConstraints gbc_verticalStrut_18 = new GridBagConstraints();
@@ -696,7 +706,7 @@ public class Identic {
 		gbc_btnManageTypeList.gridx = 0;
 		gbc_btnManageTypeList.gridy = 15;
 		panelFindDuplicates.add(btnManageTypeList, gbc_btnManageTypeList);
-		
+
 		cbSaveExcludedFiles = new JCheckBox("Save Excluded Files");
 		cbSaveExcludedFiles.addActionListener(identicAdapter);
 		cbSaveExcludedFiles.setName(CB_SAVE_EXCLUDED_FILES);
@@ -731,7 +741,7 @@ public class Identic {
 		gbl_panelDisplayResults.columnWeights = new double[] { 1.0, Double.MIN_VALUE };
 		gbl_panelDisplayResults.rowWeights = new double[] { 0.0, 0.0, 0.0, Double.MIN_VALUE };
 		panelDisplayResults.setLayout(gbl_panelDisplayResults);
-		
+
 		Component verticalStrut_2 = Box.createVerticalStrut(20);
 		verticalStrut_2.setPreferredSize(new Dimension(0, 50));
 		GridBagConstraints gbc_verticalStrut_2 = new GridBagConstraints();
@@ -739,28 +749,29 @@ public class Identic {
 		gbc_verticalStrut_2.gridx = 0;
 		gbc_verticalStrut_2.gridy = 1;
 		panelDisplayResults.add(verticalStrut_2, gbc_verticalStrut_2);
-		
+
 		JPanel panel = new JPanel();
-		panel.setBorder(new TitledBorder(new LineBorder(new Color(0, 0, 0), 1, true), "Show Results", TitledBorder.CENTER, TitledBorder.ABOVE_TOP, null, null));
+		panel.setBorder(new TitledBorder(new LineBorder(new Color(0, 0, 0), 1, true), "Show Results",
+				TitledBorder.CENTER, TitledBorder.ABOVE_TOP, null, null));
 		GridBagConstraints gbc_panel = new GridBagConstraints();
 		gbc_panel.fill = GridBagConstraints.BOTH;
 		gbc_panel.gridx = 0;
 		gbc_panel.gridy = 2;
 		panelDisplayResults.add(panel, gbc_panel);
 		GridBagLayout gbl_panel = new GridBagLayout();
-		gbl_panel.columnWidths = new int[]{0, 0};
-		gbl_panel.rowHeights = new int[]{0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-		gbl_panel.columnWeights = new double[]{1.0, Double.MIN_VALUE};
-		gbl_panel.rowWeights = new double[]{0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, Double.MIN_VALUE};
+		gbl_panel.columnWidths = new int[] { 0, 0 };
+		gbl_panel.rowHeights = new int[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+		gbl_panel.columnWeights = new double[] { 1.0, Double.MIN_VALUE };
+		gbl_panel.rowWeights = new double[] { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, Double.MIN_VALUE };
 		panel.setLayout(gbl_panel);
-		
+
 		Component verticalStrut_3 = Box.createVerticalStrut(20);
 		GridBagConstraints gbc_verticalStrut_3 = new GridBagConstraints();
 		gbc_verticalStrut_3.insets = new Insets(0, 0, 5, 0);
 		gbc_verticalStrut_3.gridx = 0;
 		gbc_verticalStrut_3.gridy = 0;
 		panel.add(verticalStrut_3, gbc_verticalStrut_3);
-		
+
 		rbAllTheFiles = new JRadioButton("All The Files");
 		rbAllTheFiles.addActionListener(identicAdapter);
 		rbAllTheFiles.setName(RB_ALL_THE_FILES);
@@ -772,14 +783,14 @@ public class Identic {
 		gbc_rbAllTheFiles.gridx = 0;
 		gbc_rbAllTheFiles.gridy = 1;
 		panel.add(rbAllTheFiles, gbc_rbAllTheFiles);
-		
+
 		Component verticalStrut_4 = Box.createVerticalStrut(20);
 		GridBagConstraints gbc_verticalStrut_4 = new GridBagConstraints();
 		gbc_verticalStrut_4.insets = new Insets(0, 0, 5, 0);
 		gbc_verticalStrut_4.gridx = 0;
 		gbc_verticalStrut_4.gridy = 2;
 		panel.add(verticalStrut_4, gbc_verticalStrut_4);
-		
+
 		rbDuplicateFiles = new JRadioButton("Duplicate Files");
 		rbDuplicateFiles.addActionListener(identicAdapter);
 		rbDuplicateFiles.setName(RB_DUPLICATE_FILES);
@@ -790,14 +801,14 @@ public class Identic {
 		gbc_rbDuplicateFiles.gridx = 0;
 		gbc_rbDuplicateFiles.gridy = 3;
 		panel.add(rbDuplicateFiles, gbc_rbDuplicateFiles);
-		
+
 		Component verticalStrut_5 = Box.createVerticalStrut(20);
 		GridBagConstraints gbc_verticalStrut_5 = new GridBagConstraints();
 		gbc_verticalStrut_5.insets = new Insets(0, 0, 5, 0);
 		gbc_verticalStrut_5.gridx = 0;
 		gbc_verticalStrut_5.gridy = 4;
 		panel.add(verticalStrut_5, gbc_verticalStrut_5);
-		
+
 		rbUniqueFiles = new JRadioButton("Unique Files");
 		rbUniqueFiles.addActionListener(identicAdapter);
 		rbUniqueFiles.setName(RB_UNIQUE_FILES);
@@ -808,14 +819,14 @@ public class Identic {
 		gbc_rbUniqueFiles.gridx = 0;
 		gbc_rbUniqueFiles.gridy = 5;
 		panel.add(rbUniqueFiles, gbc_rbUniqueFiles);
-		
+
 		Component verticalStrut_6 = Box.createVerticalStrut(20);
 		GridBagConstraints gbc_verticalStrut_6 = new GridBagConstraints();
 		gbc_verticalStrut_6.insets = new Insets(0, 0, 5, 0);
 		gbc_verticalStrut_6.gridx = 0;
 		gbc_verticalStrut_6.gridy = 6;
 		panel.add(verticalStrut_6, gbc_verticalStrut_6);
-		
+
 		rbFilesNotProcessed = new JRadioButton("Files Not Processed");
 		rbFilesNotProcessed.addActionListener(identicAdapter);
 		rbFilesNotProcessed.setName(RB_FILES_NOT_PROCESSED);
@@ -827,7 +838,7 @@ public class Identic {
 		gbc_rbFilesNotProcessed.gridx = 0;
 		gbc_rbFilesNotProcessed.gridy = 7;
 		panel.add(rbFilesNotProcessed, gbc_rbFilesNotProcessed);
-		
+
 		Component verticalStrut_7 = Box.createVerticalStrut(20);
 		GridBagConstraints gbc_verticalStrut_7 = new GridBagConstraints();
 		gbc_verticalStrut_7.gridx = 0;
@@ -858,10 +869,10 @@ public class Identic {
 		JLabel lblNewLabel = new JLabel("Application Log");
 		lblNewLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
 		paneApplicationlLog.add(lblNewLabel);
-		
+
 		Component verticalStrut_1 = Box.createVerticalStrut(20);
 		paneApplicationlLog.add(verticalStrut_1);
-		
+
 		JButton btnClearLog = new JButton("Clear Log");
 		btnClearLog.addActionListener(identicAdapter);
 		btnClearLog.setName(BTN_CLEAR_LOG);
@@ -955,21 +966,21 @@ public class Identic {
 		gbl_panelSummary.columnWeights = new double[] { 1.0, Double.MIN_VALUE };
 		gbl_panelSummary.rowWeights = new double[] { 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, Double.MIN_VALUE };
 		panelSummary.setLayout(gbl_panelSummary);
-		
+
 		lblComplete = new JLabel("New label");
 		GridBagConstraints gbc_lblComplete = new GridBagConstraints();
 		gbc_lblComplete.insets = new Insets(0, 0, 5, 0);
 		gbc_lblComplete.gridx = 0;
 		gbc_lblComplete.gridy = 1;
 		panelSummary.add(lblComplete, gbc_lblComplete);
-		
+
 		Component verticalStrut_9 = Box.createVerticalStrut(20);
 		GridBagConstraints gbc_verticalStrut_9 = new GridBagConstraints();
 		gbc_verticalStrut_9.insets = new Insets(0, 0, 5, 0);
 		gbc_verticalStrut_9.gridx = 0;
 		gbc_verticalStrut_9.gridy = 2;
 		panelSummary.add(verticalStrut_9, gbc_verticalStrut_9);
-		
+
 		JPanel panelSummary1 = new JPanel();
 		panelSummary1.setBorder(new LineBorder(new Color(0, 0, 0), 1, true));
 		GridBagConstraints gbc_panelSummary1 = new GridBagConstraints();
@@ -979,19 +990,19 @@ public class Identic {
 		gbc_panelSummary1.gridy = 3;
 		panelSummary.add(panelSummary1, gbc_panelSummary1);
 		GridBagLayout gbl_panelSummary1 = new GridBagLayout();
-		gbl_panelSummary1.columnWidths = new int[]{0, 0};
-		gbl_panelSummary1.rowHeights = new int[]{0, 0, 0, 0, 0, 0, 0};
-		gbl_panelSummary1.columnWeights = new double[]{1.0, Double.MIN_VALUE};
-		gbl_panelSummary1.rowWeights = new double[]{0.0, 0.0, 0.0, 0.0, 0.0, 0.0, Double.MIN_VALUE};
+		gbl_panelSummary1.columnWidths = new int[] { 0, 0 };
+		gbl_panelSummary1.rowHeights = new int[] { 0, 0, 0, 0, 0, 0, 0 };
+		gbl_panelSummary1.columnWeights = new double[] { 1.0, Double.MIN_VALUE };
+		gbl_panelSummary1.rowWeights = new double[] { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, Double.MIN_VALUE };
 		panelSummary1.setLayout(gbl_panelSummary1);
-		
+
 		Component verticalStrut_11 = Box.createVerticalStrut(20);
 		GridBagConstraints gbc_verticalStrut_11 = new GridBagConstraints();
 		gbc_verticalStrut_11.insets = new Insets(0, 0, 5, 0);
 		gbc_verticalStrut_11.gridx = 0;
 		gbc_verticalStrut_11.gridy = 0;
 		panelSummary1.add(verticalStrut_11, gbc_verticalStrut_11);
-		
+
 		JPanel panelPanelSummary1A = new JPanel();
 		GridBagConstraints gbc_panelPanelSummary1A = new GridBagConstraints();
 		gbc_panelPanelSummary1A.anchor = GridBagConstraints.NORTH;
@@ -1000,12 +1011,12 @@ public class Identic {
 		gbc_panelPanelSummary1A.gridy = 1;
 		panelSummary1.add(panelPanelSummary1A, gbc_panelPanelSummary1A);
 		GridBagLayout gbl_panelPanelSummary1A = new GridBagLayout();
-		gbl_panelPanelSummary1A.columnWidths = new int[]{0, 0, 0};
-		gbl_panelPanelSummary1A.rowHeights = new int[]{0, 0};
-		gbl_panelPanelSummary1A.columnWeights = new double[]{0.0, 0.0, Double.MIN_VALUE};
-		gbl_panelPanelSummary1A.rowWeights = new double[]{0.0, Double.MIN_VALUE};
+		gbl_panelPanelSummary1A.columnWidths = new int[] { 0, 0, 0 };
+		gbl_panelPanelSummary1A.rowHeights = new int[] { 0, 0 };
+		gbl_panelPanelSummary1A.columnWeights = new double[] { 0.0, 0.0, Double.MIN_VALUE };
+		gbl_panelPanelSummary1A.rowWeights = new double[] { 0.0, Double.MIN_VALUE };
 		panelPanelSummary1A.setLayout(gbl_panelPanelSummary1A);
-		
+
 		txtTotalFilesProcessed = new JTextField();
 		txtTotalFilesProcessed.setMaximumSize(new Dimension(80, 20));
 		txtTotalFilesProcessed.setPreferredSize(new Dimension(80, 20));
@@ -1017,22 +1028,23 @@ public class Identic {
 		gbc_txtTotalFilesProcessed.gridy = 0;
 		panelPanelSummary1A.add(txtTotalFilesProcessed, gbc_txtTotalFilesProcessed);
 		txtTotalFilesProcessed.setColumns(10);
-		
+
 		JLabel lblNewLabel_3 = new JLabel("Total Files Processed");
 		GridBagConstraints gbc_lblNewLabel_3 = new GridBagConstraints();
 		gbc_lblNewLabel_3.gridx = 1;
 		gbc_lblNewLabel_3.gridy = 0;
 		panelPanelSummary1A.add(lblNewLabel_3, gbc_lblNewLabel_3);
-		
+
 		Component verticalStrut_12 = Box.createVerticalStrut(20);
 		GridBagConstraints gbc_verticalStrut_12 = new GridBagConstraints();
 		gbc_verticalStrut_12.insets = new Insets(0, 0, 5, 0);
 		gbc_verticalStrut_12.gridx = 0;
 		gbc_verticalStrut_12.gridy = 2;
 		panelSummary1.add(verticalStrut_12, gbc_verticalStrut_12);
-		
+
 		JPanel panelUniqueFiles = new JPanel();
-		panelUniqueFiles.setBorder(new TitledBorder(null, "Unique Files", TitledBorder.LEADING, TitledBorder.TOP, null, null));
+		panelUniqueFiles
+				.setBorder(new TitledBorder(null, "Unique Files", TitledBorder.LEADING, TitledBorder.TOP, null, null));
 		GridBagConstraints gbc_panelUniqueFiles = new GridBagConstraints();
 		gbc_panelUniqueFiles.insets = new Insets(0, 0, 5, 0);
 		gbc_panelUniqueFiles.fill = GridBagConstraints.BOTH;
@@ -1040,19 +1052,19 @@ public class Identic {
 		gbc_panelUniqueFiles.gridy = 3;
 		panelSummary1.add(panelUniqueFiles, gbc_panelUniqueFiles);
 		GridBagLayout gbl_panelUniqueFiles = new GridBagLayout();
-		gbl_panelUniqueFiles.columnWidths = new int[]{0, 0, 0};
-		gbl_panelUniqueFiles.rowHeights = new int[]{0, 0, 0, 0, 0, 0, 0};
-		gbl_panelUniqueFiles.columnWeights = new double[]{1.0, 0.0, Double.MIN_VALUE};
-		gbl_panelUniqueFiles.rowWeights = new double[]{0.0, 0.0, 0.0, 0.0, 0.0, 0.0, Double.MIN_VALUE};
+		gbl_panelUniqueFiles.columnWidths = new int[] { 0, 0, 0 };
+		gbl_panelUniqueFiles.rowHeights = new int[] { 0, 0, 0, 0, 0, 0, 0 };
+		gbl_panelUniqueFiles.columnWeights = new double[] { 1.0, 0.0, Double.MIN_VALUE };
+		gbl_panelUniqueFiles.rowWeights = new double[] { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, Double.MIN_VALUE };
 		panelUniqueFiles.setLayout(gbl_panelUniqueFiles);
-		
+
 		Component verticalStrut_13 = Box.createVerticalStrut(20);
 		GridBagConstraints gbc_verticalStrut_13 = new GridBagConstraints();
 		gbc_verticalStrut_13.insets = new Insets(0, 0, 5, 5);
 		gbc_verticalStrut_13.gridx = 0;
 		gbc_verticalStrut_13.gridy = 0;
 		panelUniqueFiles.add(verticalStrut_13, gbc_verticalStrut_13);
-		
+
 		txtFilesWithNoDuplicates = new JTextField();
 		txtFilesWithNoDuplicates.setMaximumSize(new Dimension(80, 20));
 		txtFilesWithNoDuplicates.setPreferredSize(new Dimension(80, 20));
@@ -1064,7 +1076,7 @@ public class Identic {
 		gbc_txtFilesWithNoDuplicates.gridy = 1;
 		panelUniqueFiles.add(txtFilesWithNoDuplicates, gbc_txtFilesWithNoDuplicates);
 		txtFilesWithNoDuplicates.setColumns(10);
-		
+
 		JLabel lblNewLabel_4 = new JLabel("Files with No Duplicates");
 		GridBagConstraints gbc_lblNewLabel_4 = new GridBagConstraints();
 		gbc_lblNewLabel_4.anchor = GridBagConstraints.WEST;
@@ -1072,14 +1084,14 @@ public class Identic {
 		gbc_lblNewLabel_4.gridx = 1;
 		gbc_lblNewLabel_4.gridy = 1;
 		panelUniqueFiles.add(lblNewLabel_4, gbc_lblNewLabel_4);
-		
+
 		Component verticalStrut_16 = Box.createVerticalStrut(20);
 		GridBagConstraints gbc_verticalStrut_16 = new GridBagConstraints();
 		gbc_verticalStrut_16.insets = new Insets(0, 0, 5, 5);
 		gbc_verticalStrut_16.gridx = 0;
 		gbc_verticalStrut_16.gridy = 2;
 		panelUniqueFiles.add(verticalStrut_16, gbc_verticalStrut_16);
-		
+
 		txtUniqueFilesWithDuplicates = new JTextField();
 		txtUniqueFilesWithDuplicates.setMaximumSize(new Dimension(80, 20));
 		txtUniqueFilesWithDuplicates.setPreferredSize(new Dimension(80, 20));
@@ -1091,7 +1103,7 @@ public class Identic {
 		gbc_txtUniqueFilesWithDuplicates.gridx = 0;
 		gbc_txtUniqueFilesWithDuplicates.gridy = 3;
 		panelUniqueFiles.add(txtUniqueFilesWithDuplicates, gbc_txtUniqueFilesWithDuplicates);
-		
+
 		JLabel lblUniqueFilesWith = new JLabel("Unique Files with Duplicates");
 		GridBagConstraints gbc_lblUniqueFilesWith = new GridBagConstraints();
 		gbc_lblUniqueFilesWith.anchor = GridBagConstraints.WEST;
@@ -1099,14 +1111,14 @@ public class Identic {
 		gbc_lblUniqueFilesWith.gridx = 1;
 		gbc_lblUniqueFilesWith.gridy = 3;
 		panelUniqueFiles.add(lblUniqueFilesWith, gbc_lblUniqueFilesWith);
-		
+
 		Component verticalStrut_17 = Box.createVerticalStrut(20);
 		GridBagConstraints gbc_verticalStrut_17 = new GridBagConstraints();
 		gbc_verticalStrut_17.insets = new Insets(0, 0, 5, 5);
 		gbc_verticalStrut_17.gridx = 0;
 		gbc_verticalStrut_17.gridy = 4;
 		panelUniqueFiles.add(verticalStrut_17, gbc_verticalStrut_17);
-		
+
 		txtTotalNumberOfUniqueFiles = new JTextField();
 		txtTotalNumberOfUniqueFiles.setMaximumSize(new Dimension(80, 20));
 		txtTotalNumberOfUniqueFiles.setPreferredSize(new Dimension(80, 20));
@@ -1118,14 +1130,14 @@ public class Identic {
 		gbc_txtTotalNumberOfUniqueFiles.gridx = 0;
 		gbc_txtTotalNumberOfUniqueFiles.gridy = 5;
 		panelUniqueFiles.add(txtTotalNumberOfUniqueFiles, gbc_txtTotalNumberOfUniqueFiles);
-		
+
 		JLabel lblTotalNumberOf = new JLabel("Total Number of Unique Files");
 		GridBagConstraints gbc_lblTotalNumberOf = new GridBagConstraints();
 		gbc_lblTotalNumberOf.anchor = GridBagConstraints.WEST;
 		gbc_lblTotalNumberOf.gridx = 1;
 		gbc_lblTotalNumberOf.gridy = 5;
 		panelUniqueFiles.add(lblTotalNumberOf, gbc_lblTotalNumberOf);
-		
+
 		Component verticalStrut_24 = Box.createVerticalStrut(20);
 		verticalStrut_24.setMinimumSize(new Dimension(0, 80));
 		GridBagConstraints gbc_verticalStrut_24 = new GridBagConstraints();
@@ -1133,28 +1145,29 @@ public class Identic {
 		gbc_verticalStrut_24.gridx = 0;
 		gbc_verticalStrut_24.gridy = 4;
 		panelSummary1.add(verticalStrut_24, gbc_verticalStrut_24);
-		
+
 		JPanel panel_2 = new JPanel();
-		panel_2.setBorder(new TitledBorder(UIManager.getBorder("TitledBorder.border"), "Duplicate Files", TitledBorder.LEADING, TitledBorder.TOP, null, new Color(0, 0, 0)));
+		panel_2.setBorder(new TitledBorder(UIManager.getBorder("TitledBorder.border"), "Duplicate Files",
+				TitledBorder.LEADING, TitledBorder.TOP, null, new Color(0, 0, 0)));
 		GridBagConstraints gbc_panel_2 = new GridBagConstraints();
 		gbc_panel_2.fill = GridBagConstraints.BOTH;
 		gbc_panel_2.gridx = 0;
 		gbc_panel_2.gridy = 5;
 		panelSummary1.add(panel_2, gbc_panel_2);
 		GridBagLayout gbl_panel_2 = new GridBagLayout();
-		gbl_panel_2.columnWidths = new int[]{0, 0, 0};
-		gbl_panel_2.rowHeights = new int[]{0, 0, 0, 0, 0, 0, 0};
-		gbl_panel_2.columnWeights = new double[]{1.0, 0.0, Double.MIN_VALUE};
-		gbl_panel_2.rowWeights = new double[]{0.0, 0.0, 0.0, 0.0, 0.0, 0.0, Double.MIN_VALUE};
+		gbl_panel_2.columnWidths = new int[] { 0, 0, 0 };
+		gbl_panel_2.rowHeights = new int[] { 0, 0, 0, 0, 0, 0, 0 };
+		gbl_panel_2.columnWeights = new double[] { 1.0, 0.0, Double.MIN_VALUE };
+		gbl_panel_2.rowWeights = new double[] { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, Double.MIN_VALUE };
 		panel_2.setLayout(gbl_panel_2);
-		
+
 		Component verticalStrut_21 = Box.createVerticalStrut(20);
 		GridBagConstraints gbc_verticalStrut_21 = new GridBagConstraints();
 		gbc_verticalStrut_21.insets = new Insets(0, 0, 5, 5);
 		gbc_verticalStrut_21.gridx = 0;
 		gbc_verticalStrut_21.gridy = 0;
 		panel_2.add(verticalStrut_21, gbc_verticalStrut_21);
-		
+
 		txtFilesWithDuplicates = new JTextField();
 		txtFilesWithDuplicates.setMaximumSize(new Dimension(80, 20));
 		txtFilesWithDuplicates.setPreferredSize(new Dimension(80, 20));
@@ -1166,7 +1179,7 @@ public class Identic {
 		gbc_txtFilesWithDuplicates.gridx = 0;
 		gbc_txtFilesWithDuplicates.gridy = 1;
 		panel_2.add(txtFilesWithDuplicates, gbc_txtFilesWithDuplicates);
-		
+
 		JLabel lblFilesWithDuplicates = new JLabel("Files with Duplicates");
 		GridBagConstraints gbc_lblFilesWithDuplicates = new GridBagConstraints();
 		gbc_lblFilesWithDuplicates.anchor = GridBagConstraints.WEST;
@@ -1174,14 +1187,14 @@ public class Identic {
 		gbc_lblFilesWithDuplicates.gridx = 1;
 		gbc_lblFilesWithDuplicates.gridy = 1;
 		panel_2.add(lblFilesWithDuplicates, gbc_lblFilesWithDuplicates);
-		
+
 		Component verticalStrut_22 = Box.createVerticalStrut(20);
 		GridBagConstraints gbc_verticalStrut_22 = new GridBagConstraints();
 		gbc_verticalStrut_22.insets = new Insets(0, 0, 5, 5);
 		gbc_verticalStrut_22.gridx = 0;
 		gbc_verticalStrut_22.gridy = 2;
 		panel_2.add(verticalStrut_22, gbc_verticalStrut_22);
-		
+
 		txtRedundantFiles = new JTextField();
 		txtRedundantFiles.setMaximumSize(new Dimension(80, 20));
 		txtRedundantFiles.setPreferredSize(new Dimension(80, 20));
@@ -1193,7 +1206,7 @@ public class Identic {
 		gbc_txtRedundantFiles.gridx = 0;
 		gbc_txtRedundantFiles.gridy = 3;
 		panel_2.add(txtRedundantFiles, gbc_txtRedundantFiles);
-		
+
 		JLabel lblRedundantFiles = new JLabel("Redundant Files");
 		GridBagConstraints gbc_lblRedundantFiles = new GridBagConstraints();
 		gbc_lblRedundantFiles.anchor = GridBagConstraints.WEST;
@@ -1201,14 +1214,14 @@ public class Identic {
 		gbc_lblRedundantFiles.gridx = 1;
 		gbc_lblRedundantFiles.gridy = 3;
 		panel_2.add(lblRedundantFiles, gbc_lblRedundantFiles);
-		
+
 		Component verticalStrut_23 = Box.createVerticalStrut(20);
 		GridBagConstraints gbc_verticalStrut_23 = new GridBagConstraints();
 		gbc_verticalStrut_23.insets = new Insets(0, 0, 5, 5);
 		gbc_verticalStrut_23.gridx = 0;
 		gbc_verticalStrut_23.gridy = 4;
 		panel_2.add(verticalStrut_23, gbc_verticalStrut_23);
-		
+
 		txtExcessStorage = new JTextField();
 		txtExcessStorage.setMaximumSize(new Dimension(80, 20));
 		txtExcessStorage.setPreferredSize(new Dimension(80, 20));
@@ -1220,14 +1233,14 @@ public class Identic {
 		gbc_txtExcessStorage.gridx = 0;
 		gbc_txtExcessStorage.gridy = 5;
 		panel_2.add(txtExcessStorage, gbc_txtExcessStorage);
-		
+
 		JLabel lblTotalExcessStorage = new JLabel("Total Excess Storage");
 		GridBagConstraints gbc_lblTotalExcessStorage = new GridBagConstraints();
 		gbc_lblTotalExcessStorage.anchor = GridBagConstraints.WEST;
 		gbc_lblTotalExcessStorage.gridx = 1;
 		gbc_lblTotalExcessStorage.gridy = 5;
 		panel_2.add(lblTotalExcessStorage, gbc_lblTotalExcessStorage);
-		
+
 		Component verticalStrut_10 = Box.createVerticalStrut(20);
 		GridBagConstraints gbc_verticalStrut_10 = new GridBagConstraints();
 		gbc_verticalStrut_10.gridx = 0;
@@ -1235,7 +1248,8 @@ public class Identic {
 		panelSummary.add(verticalStrut_10, gbc_verticalStrut_10);
 
 		JPanel panelExclusions = new JPanel();
-		panelExclusions.setBorder(new TitledBorder(new BevelBorder(BevelBorder.LOWERED, null, null, null, null), "Excluded File Types", TitledBorder.LEADING, TitledBorder.TOP, null, new Color(0, 0, 0)));
+		panelExclusions.setBorder(new TitledBorder(new BevelBorder(BevelBorder.LOWERED, null, null, null, null),
+				"Excluded File Types", TitledBorder.LEADING, TitledBorder.TOP, null, new Color(0, 0, 0)));
 		GridBagConstraints gbc_panelExclusions = new GridBagConstraints();
 		gbc_panelExclusions.insets = new Insets(0, 0, 0, 5);
 		gbc_panelExclusions.fill = GridBagConstraints.VERTICAL;
@@ -1319,14 +1333,14 @@ public class Identic {
 		gbc_lblDisplayResults.gridx = 0;
 		gbc_lblDisplayResults.gridy = 0;
 		panelMainDisplayResults.add(lblDisplayResults, gbc_lblDisplayResults);
-		
+
 		scrollPaneResults = new JScrollPane();
 		GridBagConstraints gbc_scrollPaneResults = new GridBagConstraints();
 		gbc_scrollPaneResults.fill = GridBagConstraints.BOTH;
 		gbc_scrollPaneResults.gridx = 0;
 		gbc_scrollPaneResults.gridy = 1;
 		panelMainDisplayResults.add(scrollPaneResults, gbc_scrollPaneResults);
-		
+
 		tableResults = new JTable();
 		scrollPaneResults.setViewportView(tableResults);
 
@@ -1356,18 +1370,18 @@ public class Identic {
 		gbl_panelMainApplicationLog.columnWeights = new double[] { 1.0, Double.MIN_VALUE };
 		gbl_panelMainApplicationLog.rowWeights = new double[] { 1.0, Double.MIN_VALUE };
 		panelMainApplicationLog.setLayout(gbl_panelMainApplicationLog);
-		
+
 		JScrollPane scrollPane = new JScrollPane();
 		GridBagConstraints gbc_scrollPane = new GridBagConstraints();
 		gbc_scrollPane.fill = GridBagConstraints.BOTH;
 		gbc_scrollPane.gridx = 0;
 		gbc_scrollPane.gridy = 0;
 		panelMainApplicationLog.add(scrollPane, gbc_scrollPane);
-		
+
 		txtLog = new JTextPane();
 		txtLog.setFont(new Font("Courier New", Font.PLAIN, 15));
 		scrollPane.setViewportView(txtLog);
-		
+
 		JLabel lblNewLabel_2 = new JLabel("Application Log");
 		lblNewLabel_2.setHorizontalAlignment(SwingConstants.CENTER);
 		lblNewLabel_2.setForeground(new Color(139, 69, 19));
@@ -1458,20 +1472,19 @@ public class Identic {
 				doManageTypeList();
 				break;
 
-				// Find Show Results
-				case RB_ALL_THE_FILES:
-				case RB_DUPLICATE_FILES:
-				case RB_UNIQUE_FILES:
-				case RB_FILES_NOT_PROCESSED:
-					doShowResults();
-					break;
-					
+			// Find Show Results
+			case RB_ALL_THE_FILES:
+			case RB_DUPLICATE_FILES:
+			case RB_UNIQUE_FILES:
+			case RB_FILES_NOT_PROCESSED:
+				doShowResults();
+				break;
 
 			// Other
 			case BTN_CLEAR_LOG:
 				doClearLog();
 				break;
-				
+
 			case CBO_TYPES_LIST:
 				loadTargetList();
 				break;
@@ -1482,7 +1495,7 @@ public class Identic {
 
 			default:
 
-			}// switch 
+			}// switch
 
 		}// actionPerformed
 
@@ -1516,7 +1529,6 @@ public class Identic {
 	private static final String RB_DUPLICATE_FILES = "rbDuplicateFiles";
 	private static final String RB_UNIQUE_FILES = "rbUniqueFiles";
 	private static final String RB_FILES_NOT_PROCESSED = "rbFilesNotProcessed";
-
 
 	private static final String CBO_TYPES_LIST = "cboTypeLists";
 	private static final String PNL_FIND_DUPS = "pnlFindDuplicates";
@@ -1570,18 +1582,18 @@ public class Identic {
 	private JTextField txtExcessStorage;
 	private JLabel lblDisplayResults;
 	private JTable tableResults;
-	
+
 	////////////////////////////////////////////////////////////////////////////////
 	////////////////////////////////////////////////////////////////////////////////
 	////////////////////////////////////////////////////////////////////////////////
 	public class IdentifySubjects implements Runnable {
-//		private AppLogger appLogger = AppLogger.getInstance();
+		// private AppLogger appLogger = AppLogger.getInstance();
 
 		private HashMap<String, Integer> members = new HashMap<>();
 
-		public IdentifySubjects(){	
-		}//Constructor
-		
+		public IdentifySubjects() {
+		}// Constructor
+
 		@Override
 		public void run() {
 			members.clear();
@@ -1641,7 +1653,7 @@ public class Identic {
 						qSubjects.add(new FileStatSubject(file, fileSize, lastModifieTime));
 					} else {
 						rejectCount++;
-						lblFilesNotProcessed.setText(String.format("%,d",rejectCount));
+						lblFilesNotProcessed.setText(String.format("%,d", rejectCount));
 						keepSuffixCount(part);
 						qRejects.add(new FileStatReject(file, fileSize, lastModifieTime, FileStat.NOT_ON_LIST));
 					} // if
@@ -1660,20 +1672,21 @@ public class Identic {
 				Integer occurances = members.get(suffix);
 				if (occurances == null) {
 					members.put(suffix, 1);
-					 excludeModel.addElement(suffix);
+					excludeModel.addElement(suffix);
 				} else {
 					members.put(suffix, occurances + 1);
 				} // if unique
 			}// keepSuffixCount
 		}// class MyWalker
 	}// class IdentifySubjects
-	////////////////////////////////////////////////////////////////////////////////
-	////////////////////////////////////////////////////////////////////////////////
-	////////////////////////////////////////////////////////////////////////////////
+		////////////////////////////////////////////////////////////////////////////////
+		////////////////////////////////////////////////////////////////////////////////
+		////////////////////////////////////////////////////////////////////////////////
+
 	public class ShowRejects implements Runnable {
 
 		private Thread priorThread;
-//		private AppLogger appLogger = AppLogger.getInstance();
+		// private AppLogger appLogger = AppLogger.getInstance();
 
 		public ShowRejects(Thread priorThread) {
 			this.priorThread = priorThread;
@@ -1698,16 +1711,17 @@ public class Identic {
 		}// run
 
 	}// class ShowSubjects
-	////////////////////////////////////////////////////////////////////////////////
-	////////////////////////////////////////////////////////////////////////////////
-	////////////////////////////////////////////////////////////////////////////////
+		////////////////////////////////////////////////////////////////////////////////
+		////////////////////////////////////////////////////////////////////////////////
+		////////////////////////////////////////////////////////////////////////////////
+
 	public class MakeFileKey implements Runnable {
 		private static final int bufSize = 1024;
-		String algorithm = "SHA-1";		//160 bits
-//		String algorithm = "MD5";		// 128 bits
-//		String algorithm = "SHA-256";	// 256 bits
+		String algorithm = "SHA-1"; // 160 bits
+		// String algorithm = "MD5"; // 128 bits
+		// String algorithm = "SHA-256"; // 256 bits
 		private Thread priorThread;
-//		private AppLogger appLogger = AppLogger.getInstance();
+		// private AppLogger appLogger = AppLogger.getInstance();
 
 		public MakeFileKey(Thread priorThread) {
 			this.priorThread = priorThread;
@@ -1716,24 +1730,24 @@ public class Identic {
 		@Override
 		public void run() {
 			FileStatSubject fileStatSubject;
-			
+
 			int count = 0;
 			String fileName = null;
 			String key = null;
 			while (true) {
 				try {
 					fileStatSubject = qSubjects.remove();
-					fileName = fileStatSubject.getFileName();			
+					fileName = fileStatSubject.getFileName();
 					count++;
 					try {
 						key = hashFile(fileStatSubject.getFilePathString(), algorithm);
 						fileStatSubject.setHashKey(key);
 						qHashes.add(fileStatSubject);
-						appLogger.addInfo(key + " - " + fileName);
+//						appLogger.addInfo(key + " - " + fileName);
 					} catch (HashGenerationException e) {
-						appLogger.addError("HashGenerationError",fileName);
+						appLogger.addError("HashGenerationError", fileName);
 						e.printStackTrace();
-					}//
+					} //
 				} catch (NoSuchElementException ex) {
 					if (priorThread.getState().equals(Thread.State.TERMINATED)) {
 						appLogger.addSpecial("From MakeFileKey count = " + count);
@@ -1743,7 +1757,7 @@ public class Identic {
 			} // while
 		}// run
 
-		private  String hashFile(String file, String algorithm) throws HashGenerationException {
+		private String hashFile(String file, String algorithm) throws HashGenerationException {
 			try (FileInputStream inputStream = new FileInputStream(file)) {
 				MessageDigest digest = MessageDigest.getInstance(algorithm);
 
@@ -1762,7 +1776,7 @@ public class Identic {
 			} // try
 		}// hashFile
 
-		private  String convertByteArrayToHexString(byte[] arrayBytes) {
+		private String convertByteArrayToHexString(byte[] arrayBytes) {
 			StringBuffer stringBuffer = new StringBuffer();
 			for (int i = 0; i < arrayBytes.length; i++) {
 				stringBuffer.append(Integer.toString((arrayBytes[i] & 0xff) + 0x100, 16).substring(1));
@@ -1771,14 +1785,15 @@ public class Identic {
 		}// convertByteArrayToHexString
 
 	}// class ShowSubjects
-	////////////////////////////////////////////////////////////////////////////////
-	////////////////////////////////////////////////////////////////////////////////
-	////////////////////////////////////////////////////////////////////////////////
+		////////////////////////////////////////////////////////////////////////////////
+		////////////////////////////////////////////////////////////////////////////////
+		////////////////////////////////////////////////////////////////////////////////
+
 	public class IdentifyDuplicates implements Runnable {
 		private Thread priorThread;
 		private Integer fileID;
 
-		public IdentifyDuplicates( Thread priorThread) {
+		public IdentifyDuplicates(Thread priorThread) {
 			this.priorThread = priorThread;
 		}// Constructor
 
@@ -1791,7 +1806,7 @@ public class Identic {
 			while (true) {
 				try {
 					subject = qHashes.remove();
-					subjectTableModel.addRow(subject,keepHashKeyCount(subject.getHashKey()));
+					subjectTableModel.addRow(subject, keepHashKeyCount(subject.getHashKey()));
 				} catch (NoSuchElementException ex) {
 					if (priorThread.getState().equals(Thread.State.TERMINATED)) {
 						return;
@@ -1799,7 +1814,7 @@ public class Identic {
 				} // try
 			} // while
 		}// run
-		
+
 		private Integer keepHashKeyCount(String hashKey) {
 
 			Integer occurances = hashCounts.get(hashKey);
@@ -1810,7 +1825,7 @@ public class Identic {
 			} else {
 				hashCounts.put(hashKey, occurances + 1);
 			} // if unique
-			
+
 			return hashIDs.get(hashKey);
 		}// keepSuffixCount
 
