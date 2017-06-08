@@ -199,6 +199,8 @@ public class Identic {
 		// appLogger.addInfo(String.format("%s - %,d occurances", key, hashCounts.get(key)));
 		// } // for
 		markTheDuplicates();
+		lblFolderCount.setText(String.format("%,d", folderCount));
+		lblFileCount.setText(String.format("%,d", fileCount));
 	}// doStart
 
 	// ---------------Find Duplicates--------------------------
@@ -1630,7 +1632,7 @@ public class Identic {
 
 			@Override
 			public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
-				folderCount++;
+				folderCount++;		
 				return FileVisitResult.CONTINUE;
 			}// FileVisitResult
 

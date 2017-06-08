@@ -51,7 +51,7 @@ import javax.swing.event.ListSelectionListener;
 public class ManageLists extends JDialog {
 
 	private final JPanel contentPanel = new JPanel();
-//	private int dialogResultValue;
+	// private int dialogResultValue;
 	private String fileListDirectory;
 
 	private DefaultListModel<String> availableListsModel = new DefaultListModel<>();
@@ -73,14 +73,15 @@ public class ManageLists extends JDialog {
 	}// main
 
 	public int showDialog() {
-//		dialogResultValue = JOptionPane.CANCEL_OPTION;
+		// dialogResultValue = JOptionPane.CANCEL_OPTION;
 		this.setLocationRelativeTo(this.getOwner());
 
 		this.setVisible(true);
 		this.dispose();
 		return JOptionPane.OK_OPTION;
 	}// showDialog
-	//----------------------------------------------------------
+		// ----------------------------------------------------------
+
 	private void loadTargetEdit() {
 		if (listAvailable.isSelectionEmpty()) {
 			listAvailable.setSelectedIndex(0);
@@ -89,7 +90,7 @@ public class ManageLists extends JDialog {
 		lblEdit.setText(editName);
 		txtActive.setText(editName);
 		txtEdit.setText(EMPTY_STRING);
-//		lblStatus.setText((String) listFileTypes.getSelectedValue());
+		// lblStatus.setText((String) listFileTypes.getSelectedValue());
 
 		String editFile = fileListDirectory + editName + LIST_SUFFIX_DOT;
 		Path p = Paths.get(editFile);
@@ -104,8 +105,9 @@ public class ManageLists extends JDialog {
 		} // try
 
 		manageEditButtons("Load");
-		//validate();
+		// validate();
 	}// loadTargetEdit
+
 	private void loadNewTargetEdit() {
 		String editName = NEW_LIST;
 		txtActive.setText(editName);
@@ -114,7 +116,7 @@ public class ManageLists extends JDialog {
 		editListModel.removeAllElements();
 		manageEditButtons("New");
 	}// loadNewTargetEdit
-	
+
 	private void doNameChanged() {
 		String newName = txtActive.getText().trim();
 		if (!lblEdit.getText().equals(newName)) {
@@ -128,20 +130,30 @@ public class ManageLists extends JDialog {
 		String listFile = fileListDirectory + txtActive.getText().toUpperCase() + LIST_SUFFIX_DOT;
 		Path listPath = Paths.get(listFile);
 		if (Files.exists(listPath)) {
+
 			int ans = JOptionPane.showConfirmDialog(this, "List Exits, Do you want to overwrite?",
 					"Save File Suffix List", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
 			if (ans == JOptionPane.NO_OPTION) {
 				return;
-			} // if
+			}//inner if
+		}// if file exists
+		
+		try {
+			Files.deleteIfExists(listPath);
+			Files.createFile(listPath);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
 
-		} // if file exists
+		} //try
+
 		ArrayList<String> lines = new ArrayList<>();
 		for (int i = 0; i < editListModel.getSize(); i++) {
 			lines.add(editListModel.getElementAt(i));
 		} // for
 
 		try {
-			Files.write(listPath, lines, StandardOpenOption.CREATE);
+			Files.write(listPath, lines, StandardOpenOption.TRUNCATE_EXISTING);
 		} catch (IOException e) {
 			e.printStackTrace();
 		} // try
@@ -168,7 +180,7 @@ public class ManageLists extends JDialog {
 		initFileTypes();
 		loadNewTargetEdit();
 	}// doDeleteList
-	
+
 	private void doEditListMember() {
 		if (!txtEdit.getText().equals(EMPTY_STRING)) {
 			listEdit.clearSelection();
@@ -189,7 +201,6 @@ public class ManageLists extends JDialog {
 		btnAddRemove.setText(EDIT_ADD_REMOVE);
 	}// doAddRemove
 
-	
 	private void manageEditButtons(String action) {
 		switch (action) {
 		case "Load":
@@ -219,7 +230,7 @@ public class ManageLists extends JDialog {
 		}// switch
 
 	}// manageEditButtons
-	
+
 	private void initFileTypes() {
 
 		// see if the directory has been set up already
@@ -229,8 +240,8 @@ public class ManageLists extends JDialog {
 
 			Path p = Paths.get(fileListDirectory);
 			if (!Files.exists(p)) {
-				JOptionPane.showMessageDialog(this, "Initializing File Type lists in " + p.toString(),
-						"Initialization", JOptionPane.INFORMATION_MESSAGE);
+				JOptionPane.showMessageDialog(this, "Initializing File Type lists in " + p.toString(), "Initialization",
+						JOptionPane.INFORMATION_MESSAGE);
 				System.err.println("Making new directory");
 				try {
 					Files.createDirectories(p);
@@ -274,12 +285,12 @@ public class ManageLists extends JDialog {
 			availableListsModel.addElement(f.getName().replace(LIST_SUFFIX_DOT, EMPTY_STRING));
 		} // for
 
-	//	cboTypeLists.setModel(typeListModel);
+		// cboTypeLists.setModel(typeListModel);
 
-//		Preferences myPrefs = Preferences.userNodeForPackage(Identic.class).node(this.getClass().getSimpleName());
-//		cboTypeLists.setSelectedItem(myPrefs.get("ActiveList", "Pictures"));
-//		listFileTypes.setModel(typeListModel);
-//		myPrefs = null;
+		// Preferences myPrefs = Preferences.userNodeForPackage(Identic.class).node(this.getClass().getSimpleName());
+		// cboTypeLists.setSelectedItem(myPrefs.get("ActiveList", "Pictures"));
+		// listFileTypes.setModel(typeListModel);
+		// myPrefs = null;
 
 		// cboTypeLists.
 
@@ -295,7 +306,7 @@ public class ManageLists extends JDialog {
 		Point point = this.getLocation();
 		myPrefs.putInt("LocX", point.x);
 		myPrefs.putInt("LocY", point.y);
-		
+
 		myPrefs.put("ListDirectory", fileListDirectory);
 		myPrefs = null;
 		dispose();
@@ -305,7 +316,7 @@ public class ManageLists extends JDialog {
 		Preferences myPrefs = Preferences.userNodeForPackage(ManageLists.class).node(this.getClass().getSimpleName());
 		this.setSize(myPrefs.getInt("Width", 600), myPrefs.getInt("Height", 600));
 		this.setLocation(myPrefs.getInt("LocX", 100), myPrefs.getInt("LocY", 100));
-		
+
 		fileListDirectory = myPrefs.get("ListDirectory", EMPTY_STRING);
 		myPrefs = null;
 		listAvailable.setModel(availableListsModel);
@@ -326,22 +337,22 @@ public class ManageLists extends JDialog {
 		});
 		initialize();
 		appInit();
-	}//Constructor
+	}// Constructor
 
 	private void initialize() {
-		 setModalityType(JDialog.DEFAULT_MODALITY_TYPE);
-		 setTitle("File Suffix Lists Manager");
-		//setBounds(100, 100, 450, 300);
+		setModalityType(JDialog.DEFAULT_MODALITY_TYPE);
+		setTitle("File Suffix Lists Manager");
+		// setBounds(100, 100, 450, 300);
 		getContentPane().setLayout(new BorderLayout());
 		contentPanel.setBorder(new EmptyBorder(5, 5, 5, 5));
 		getContentPane().add(contentPanel, BorderLayout.CENTER);
 		GridBagLayout gbl_contentPanel = new GridBagLayout();
-		gbl_contentPanel.columnWidths = new int[]{0, 0, 0, 0};
-		gbl_contentPanel.rowHeights = new int[]{0, 0};
-		gbl_contentPanel.columnWeights = new double[]{0.0, 0.0, 1.0, Double.MIN_VALUE};
-		gbl_contentPanel.rowWeights = new double[]{1.0, Double.MIN_VALUE};
+		gbl_contentPanel.columnWidths = new int[] { 0, 0, 0, 0 };
+		gbl_contentPanel.rowHeights = new int[] { 0, 0 };
+		gbl_contentPanel.columnWeights = new double[] { 0.0, 0.0, 1.0, Double.MIN_VALUE };
+		gbl_contentPanel.rowWeights = new double[] { 1.0, Double.MIN_VALUE };
 		contentPanel.setLayout(gbl_contentPanel);
-		
+
 		JPanel panelAvailable = new JPanel();
 		panelAvailable.setPreferredSize(new Dimension(150, 0));
 		panelAvailable.setMinimumSize(new Dimension(150, 0));
@@ -354,30 +365,30 @@ public class ManageLists extends JDialog {
 		gbc_panelAvailable.gridy = 0;
 		contentPanel.add(panelAvailable, gbc_panelAvailable);
 		GridBagLayout gbl_panelAvailable = new GridBagLayout();
-		gbl_panelAvailable.columnWidths = new int[]{0, 0};
-		gbl_panelAvailable.rowHeights = new int[]{0, 0};
-		gbl_panelAvailable.columnWeights = new double[]{1.0, Double.MIN_VALUE};
-		gbl_panelAvailable.rowWeights = new double[]{1.0, Double.MIN_VALUE};
+		gbl_panelAvailable.columnWidths = new int[] { 0, 0 };
+		gbl_panelAvailable.rowHeights = new int[] { 0, 0 };
+		gbl_panelAvailable.columnWeights = new double[] { 1.0, Double.MIN_VALUE };
+		gbl_panelAvailable.rowWeights = new double[] { 1.0, Double.MIN_VALUE };
 		panelAvailable.setLayout(gbl_panelAvailable);
-		
+
 		JScrollPane scrollPane = new JScrollPane();
 		GridBagConstraints gbc_scrollPane = new GridBagConstraints();
 		gbc_scrollPane.fill = GridBagConstraints.BOTH;
 		gbc_scrollPane.gridx = 0;
 		gbc_scrollPane.gridy = 0;
 		panelAvailable.add(scrollPane, gbc_scrollPane);
-		
+
 		listAvailable = new JList();
 		listAvailable.addMouseListener(mla);
 		listAvailable.setName(LIST_AVAILABLE);
 		scrollPane.setViewportView(listAvailable);
-		
+
 		JLabel lblNewLabel = new JLabel("Available Lists");
 		lblNewLabel.setHorizontalAlignment(SwingConstants.CENTER);
 		lblNewLabel.setForeground(new Color(139, 69, 19));
 		lblNewLabel.setFont(new Font("Arial", Font.BOLD, 14));
 		scrollPane.setColumnHeaderView(lblNewLabel);
-		
+
 		JPanel panelSelection = new JPanel();
 		panelSelection.setPreferredSize(new Dimension(140, 0));
 		panelSelection.setMinimumSize(new Dimension(140, 0));
@@ -389,19 +400,19 @@ public class ManageLists extends JDialog {
 		gbc_panelSelection.gridy = 0;
 		contentPanel.add(panelSelection, gbc_panelSelection);
 		GridBagLayout gbl_panelSelection = new GridBagLayout();
-		gbl_panelSelection.columnWidths = new int[]{0, 0};
-		gbl_panelSelection.rowHeights = new int[]{0, 0, 0};
-		gbl_panelSelection.columnWeights = new double[]{1.0, Double.MIN_VALUE};
-		gbl_panelSelection.rowWeights = new double[]{0.0, 1.0, Double.MIN_VALUE};
+		gbl_panelSelection.columnWidths = new int[] { 0, 0 };
+		gbl_panelSelection.rowHeights = new int[] { 0, 0, 0 };
+		gbl_panelSelection.columnWeights = new double[] { 1.0, Double.MIN_VALUE };
+		gbl_panelSelection.rowWeights = new double[] { 0.0, 1.0, Double.MIN_VALUE };
 		panelSelection.setLayout(gbl_panelSelection);
-		
+
 		Component verticalStrut = Box.createVerticalStrut(20);
 		GridBagConstraints gbc_verticalStrut = new GridBagConstraints();
 		gbc_verticalStrut.insets = new Insets(0, 0, 5, 0);
 		gbc_verticalStrut.gridx = 0;
 		gbc_verticalStrut.gridy = 0;
 		panelSelection.add(verticalStrut, gbc_verticalStrut);
-		
+
 		JPanel panelSelection1 = new JPanel();
 		GridBagConstraints gbc_panelSelection1 = new GridBagConstraints();
 		gbc_panelSelection1.fill = GridBagConstraints.BOTH;
@@ -409,12 +420,13 @@ public class ManageLists extends JDialog {
 		gbc_panelSelection1.gridy = 1;
 		panelSelection.add(panelSelection1, gbc_panelSelection1);
 		GridBagLayout gbl_panelSelection1 = new GridBagLayout();
-		gbl_panelSelection1.columnWidths = new int[]{0, 0};
-		gbl_panelSelection1.rowHeights = new int[]{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-		gbl_panelSelection1.columnWeights = new double[]{1.0, Double.MIN_VALUE};
-		gbl_panelSelection1.rowWeights = new double[]{0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, Double.MIN_VALUE};
+		gbl_panelSelection1.columnWidths = new int[] { 0, 0 };
+		gbl_panelSelection1.rowHeights = new int[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+		gbl_panelSelection1.columnWeights = new double[] { 1.0, Double.MIN_VALUE };
+		gbl_panelSelection1.rowWeights = new double[] { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+				Double.MIN_VALUE };
 		panelSelection1.setLayout(gbl_panelSelection1);
-		
+
 		txtActive = new JTextField();
 		txtActive.setHorizontalAlignment(SwingConstants.CENTER);
 		txtActive.addFocusListener(mla);
@@ -426,14 +438,14 @@ public class ManageLists extends JDialog {
 		gbc_txtActive.gridy = 1;
 		panelSelection1.add(txtActive, gbc_txtActive);
 		txtActive.setColumns(10);
-		
+
 		Component verticalStrut_1 = Box.createVerticalStrut(20);
 		GridBagConstraints gbc_verticalStrut_1 = new GridBagConstraints();
 		gbc_verticalStrut_1.insets = new Insets(0, 0, 5, 0);
 		gbc_verticalStrut_1.gridx = 0;
 		gbc_verticalStrut_1.gridy = 2;
 		panelSelection1.add(verticalStrut_1, gbc_verticalStrut_1);
-		
+
 		btnLoad = new JButton("Load");
 		btnLoad.addActionListener(mla);
 		btnLoad.setName(BTN_LOAD);
@@ -445,14 +457,14 @@ public class ManageLists extends JDialog {
 		gbc_btnLoad.gridx = 0;
 		gbc_btnLoad.gridy = 3;
 		panelSelection1.add(btnLoad, gbc_btnLoad);
-		
+
 		Component verticalStrut_2 = Box.createVerticalStrut(20);
 		GridBagConstraints gbc_verticalStrut_2 = new GridBagConstraints();
 		gbc_verticalStrut_2.insets = new Insets(0, 0, 5, 0);
 		gbc_verticalStrut_2.gridx = 0;
 		gbc_verticalStrut_2.gridy = 4;
 		panelSelection1.add(verticalStrut_2, gbc_verticalStrut_2);
-		
+
 		btnNew = new JButton("New");
 		btnNew.addActionListener(mla);
 		btnNew.setName(BTN_NEW);
@@ -464,14 +476,14 @@ public class ManageLists extends JDialog {
 		gbc_btnNew.gridx = 0;
 		gbc_btnNew.gridy = 5;
 		panelSelection1.add(btnNew, gbc_btnNew);
-		
+
 		Component verticalStrut_3 = Box.createVerticalStrut(20);
 		GridBagConstraints gbc_verticalStrut_3 = new GridBagConstraints();
 		gbc_verticalStrut_3.insets = new Insets(0, 0, 5, 0);
 		gbc_verticalStrut_3.gridx = 0;
 		gbc_verticalStrut_3.gridy = 6;
 		panelSelection1.add(verticalStrut_3, gbc_verticalStrut_3);
-		
+
 		btnSave = new JButton("Save");
 		btnSave.addActionListener(mla);
 		btnSave.setName(BTN_SAVE);
@@ -483,14 +495,14 @@ public class ManageLists extends JDialog {
 		gbc_btnSave.gridx = 0;
 		gbc_btnSave.gridy = 7;
 		panelSelection1.add(btnSave, gbc_btnSave);
-		
+
 		Component verticalStrut_4 = Box.createVerticalStrut(20);
 		GridBagConstraints gbc_verticalStrut_4 = new GridBagConstraints();
 		gbc_verticalStrut_4.insets = new Insets(0, 0, 5, 0);
 		gbc_verticalStrut_4.gridx = 0;
 		gbc_verticalStrut_4.gridy = 8;
 		panelSelection1.add(verticalStrut_4, gbc_verticalStrut_4);
-		
+
 		btnDelete = new JButton("Delete");
 		btnDelete.addActionListener(mla);
 		btnDelete.setName(BTN_DELETE);
@@ -498,7 +510,7 @@ public class ManageLists extends JDialog {
 		gbc_btnDelete.gridx = 0;
 		gbc_btnDelete.gridy = 9;
 		panelSelection1.add(btnDelete, gbc_btnDelete);
-		
+
 		JPanel panelEdit = new JPanel();
 		GridBagConstraints gbc_panelEdit = new GridBagConstraints();
 		gbc_panelEdit.fill = GridBagConstraints.BOTH;
@@ -506,12 +518,12 @@ public class ManageLists extends JDialog {
 		gbc_panelEdit.gridy = 0;
 		contentPanel.add(panelEdit, gbc_panelEdit);
 		GridBagLayout gbl_panelEdit = new GridBagLayout();
-		gbl_panelEdit.columnWidths = new int[]{0, 0};
-		gbl_panelEdit.rowHeights = new int[]{0, 0, 0};
-		gbl_panelEdit.columnWeights = new double[]{1.0, Double.MIN_VALUE};
-		gbl_panelEdit.rowWeights = new double[]{1.0, 0.0, Double.MIN_VALUE};
+		gbl_panelEdit.columnWidths = new int[] { 0, 0 };
+		gbl_panelEdit.rowHeights = new int[] { 0, 0, 0 };
+		gbl_panelEdit.columnWeights = new double[] { 1.0, Double.MIN_VALUE };
+		gbl_panelEdit.rowWeights = new double[] { 1.0, 0.0, Double.MIN_VALUE };
 		panelEdit.setLayout(gbl_panelEdit);
-		
+
 		JScrollPane scrollPane_1 = new JScrollPane();
 		GridBagConstraints gbc_scrollPane_1 = new GridBagConstraints();
 		gbc_scrollPane_1.insets = new Insets(0, 0, 5, 0);
@@ -519,32 +531,33 @@ public class ManageLists extends JDialog {
 		gbc_scrollPane_1.gridx = 0;
 		gbc_scrollPane_1.gridy = 0;
 		panelEdit.add(scrollPane_1, gbc_scrollPane_1);
-		
+
 		lblEdit = new JLabel("<none>");
 		lblEdit.setHorizontalAlignment(SwingConstants.CENTER);
 		lblEdit.setForeground(new Color(139, 69, 19));
 		lblEdit.setFont(new Font("Arial", Font.BOLD, 14));
 		scrollPane_1.setColumnHeaderView(lblEdit);
-		
+
 		listEdit = new JList();
 		listEdit.addListSelectionListener(mla);
 		listEdit.setName(LIST_EDIT);
 		scrollPane_1.setViewportView(listEdit);
-		
+
 		JPanel panel = new JPanel();
-		panel.setBorder(new TitledBorder(UIManager.getBorder("TitledBorder.border"), "Edit", TitledBorder.CENTER, TitledBorder.ABOVE_TOP, null, new Color(0, 0, 0)));
+		panel.setBorder(new TitledBorder(UIManager.getBorder("TitledBorder.border"), "Edit", TitledBorder.CENTER,
+				TitledBorder.ABOVE_TOP, null, new Color(0, 0, 0)));
 		GridBagConstraints gbc_panel = new GridBagConstraints();
 		gbc_panel.fill = GridBagConstraints.BOTH;
 		gbc_panel.gridx = 0;
 		gbc_panel.gridy = 1;
 		panelEdit.add(panel, gbc_panel);
 		GridBagLayout gbl_panel = new GridBagLayout();
-		gbl_panel.columnWidths = new int[]{0, 0};
-		gbl_panel.rowHeights = new int[]{0, 0, 0};
-		gbl_panel.columnWeights = new double[]{1.0, Double.MIN_VALUE};
-		gbl_panel.rowWeights = new double[]{0.0, 0.0, Double.MIN_VALUE};
+		gbl_panel.columnWidths = new int[] { 0, 0 };
+		gbl_panel.rowHeights = new int[] { 0, 0, 0 };
+		gbl_panel.columnWeights = new double[] { 1.0, Double.MIN_VALUE };
+		gbl_panel.rowWeights = new double[] { 0.0, 0.0, Double.MIN_VALUE };
 		panel.setLayout(gbl_panel);
-		
+
 		btnAddRemove = new JButton("Add/Remove");
 		GridBagConstraints gbc_btnAddRemove = new GridBagConstraints();
 		gbc_btnAddRemove.insets = new Insets(0, 0, 5, 0);
@@ -553,7 +566,7 @@ public class ManageLists extends JDialog {
 		panel.add(btnAddRemove, gbc_btnAddRemove);
 		btnAddRemove.addActionListener(mla);
 		btnAddRemove.setName(BTN_ADD_REMOVE);
-		
+
 		txtEdit = new JTextField();
 		txtEdit.addFocusListener(mla);
 		txtEdit.setName(TXT_EDIT);
@@ -576,8 +589,8 @@ public class ManageLists extends JDialog {
 		buttonPane.add(btnOK);
 		getRootPane().setDefaultButton(btnOK);
 
-	}//initialize
-	
+	}// initialize
+
 	// ---------------------------------------------------------
 
 	class ListFilter implements FilenameFilter {
@@ -590,16 +603,15 @@ public class ManageLists extends JDialog {
 			return false;
 		}// accept
 	}// ListFilter
-	
-	
-	//-------------------------------------------------------------------
+
+	// -------------------------------------------------------------------
 	class ManageListsAdapter implements ActionListener, MouseListener, FocusListener, ListSelectionListener {
 
 		@Override
 		public void actionPerformed(ActionEvent actionEvent) {
 			String name = ((Component) actionEvent.getSource()).getName();
 			switch (name) {
-				case BTN_LOAD:
+			case BTN_LOAD:
 				loadTargetEdit();
 				break;
 			case BTN_NEW:
@@ -679,19 +691,18 @@ public class ManageLists extends JDialog {
 		}// valueChanged
 
 	}// class ManageListsAdapter
-	//--------------------------------------------------------------------
+		// --------------------------------------------------------------------
+
 	private static final String NEW_LIST = "<NEW>";
 	private static final String NOT_SET = "<Not Set>";
 	private static final String EMPTY_STRING = "";
 	private static final String LIST_SUFFIX = "typeList";
 	private static final String LIST_SUFFIX_DOT = ".typeList";
 
-	
 	private static final String EDIT_ADD = "Add";
 	private static final String EDIT_REMOVE = "Remove";
 	private static final String EDIT_ADD_REMOVE = "Add/Remove";
 	private static final String BTN_ADD_REMOVE = "btnAddRemove";
-
 
 	private static final String BTN_LOAD = "btnLoad";
 	private static final String BTN_NEW = "btnNew";
@@ -701,10 +712,9 @@ public class ManageLists extends JDialog {
 	private static final String BTN_OK = "btnOK";
 
 	private static final String LIST_EDIT = "listEdit";
-	private static final String LIST_AVAILABLE= "listAvailable";
+	private static final String LIST_AVAILABLE = "listAvailable";
 	private static final String TXT_ACTIVE = "txtActive";
 	private static final String TXT_EDIT = "txtEdit";
-	
 
 	private JTextField txtActive;
 	private JTextField txtEdit;
@@ -716,6 +726,5 @@ public class ManageLists extends JDialog {
 	private JButton btnNew;
 	private JButton btnSave;
 	private JButton btnDelete;
-
 
 }// class ManageLists
