@@ -42,7 +42,13 @@ public class SubjectTableModel extends AbstractTableModel {
 		rows = 0;
 	}//clear()
 
-
+	public Long getStorageSum(){
+		Long ans = 0l;
+			for (int i = 0; i < this.getRowCount(); i++){
+				ans =ans + (Long) getValueAt(i,2);
+			}//for
+		return ans;
+	}//sun
 
 	
 	@Override
@@ -53,7 +59,6 @@ public class SubjectTableModel extends AbstractTableModel {
 	public String getColumnName(int column) {
 		return headers[column];
 	}// getColumnName
-
 
 	@Override
 	public int getRowCount() {
