@@ -9,11 +9,11 @@ import java.util.Map;
 import javax.swing.table.AbstractTableModel;
 /**
  *  modified getColumnCount to return 1 less than actual, to hide last field in the tables
- * @author admin
+ * 
  *
  */
 public class SubjectTableModel extends AbstractTableModel {
-	
+	private static final long serialVersionUID = 1L;
 	private Map<Point, Object> lookup;
 	private int rows;
 	private final int columns;

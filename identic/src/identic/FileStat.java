@@ -36,11 +36,11 @@ public class FileStat {
 	}//getFileName
 	
 	public String getFileName(){
-		return filePath.getFileName().toString();
+		return filePath== null?"":filePath.getFileName().toString();
 	}//getFileName
 	
 	public String getDirectory(){
-		return filePath.getParent().toString();
+		return filePath== null?"":filePath.getParent().toString();
 	}//getDirectory
 	
 	public Path getParent(){

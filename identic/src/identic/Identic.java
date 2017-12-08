@@ -55,6 +55,7 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JRadioButton;
 import javax.swing.JScrollPane;
+import javax.swing.JSeparator;
 import javax.swing.JSplitPane;
 import javax.swing.JTable;
 import javax.swing.JTextField;
@@ -105,6 +106,7 @@ public class Identic {
 
 	private String fileListDirectory;
 	private int sideButtonIndex;
+	private int catalogPanelIndex;
 
 	/**
 	 * Launch the application.
@@ -140,6 +142,20 @@ public class Identic {
 		ml.showDialog();
 		ml = null;
 	}// doManageTypeList
+	/*
+	 * Start button initiates the scanning of the directories,identifying candidate and reject files, and buils a model
+	 * that contains the results for later display or saving.
+	 * 
+	 * It uses 3 queues: qRejects, qSubject (candidates) & qHashes. It produces 2 Models: rejectTableModel &
+	 * subjectTableModel
+	 * 
+	 * the work is done by multiple threads: 1) first thread - identifySubjects generates two queues qRejects &
+	 * qSubjects 2) two threads are then run: showRejects( reads qRejects) produces RejectTableModel. & MakeFileKey
+	 * (reads qSubjects) to produce the qHashes queue 3) then identifySubjects is started ( reads qHashes) to product
+	 * the subjectTableModel, which is used by the rest of the application
+	 * 
+	 * 
+	 */
 
 	private void doStart() {
 		startPath = Paths.get(lblSourceFolder.getText());
@@ -286,6 +302,9 @@ public class Identic {
 
 		cl = (CardLayout) (panelMain.getLayout());
 		cl.show(panelMain, targetPanelName);
+		
+		boolean catalogState = sideButtonIndex ==catalogPanelIndex?true:false;
+		mnuCatalog.setEnabled(catalogState);
 
 		panelSideMenu.validate();
 	}// doSideMenu
@@ -353,6 +372,14 @@ public class Identic {
 	private void doSaveExcludedFiles() {
 		rbFilesNotProcessed.setEnabled(cbSaveExcludedFiles.isSelected());
 	}// doSaveExcludedFiles
+	
+	private void doCatalogNew() {
+		
+	}//doCatalogNew
+	
+	//////////////////////////////////////////////////////////////
+	//////////////////////////////////////////////////////////////
+	//////////////////////////////////////////////////////////////
 
 	class ListFilter implements FilenameFilter {
 		@Override
@@ -452,9 +479,10 @@ public class Identic {
 		myPrefs = null;
 
 		// These two arrays are synchronized to control the button positions and the selection of the correct panels.
-		sideMenuButtons = new JButton[] { btnFindDuplicates, btnFindDuplicatesByName, btnDisplayResults,
+		catalogPanelIndex = 1; // index of btnFindDuplicatesWithCatalogs
+		sideMenuButtons = new JButton[] { btnFindDuplicates, btnFindDuplicatesWithCatalogs, btnDisplayResults,
 				btnCopyMoveRemove, btnApplicationLog };
-		sideMenuPanelNames = new String[] { panelFindDuplicates.getName(), panelFindDuplicatesByName.getName(),
+		sideMenuPanelNames = new String[] { panelFindDuplicates.getName(), panelFindDuplicatesWithCatalogs.getName(),
 				panelDisplayResults.getName(), panelCopyMoveRemove.getName(), paneApplicationlLog.getName() };
 
 		cboTypeLists.setModel(typeListModel);
@@ -470,6 +498,7 @@ public class Identic {
 		bgShowResults.add(rbUniqueFiles);
 		bgShowResults.add(rbFilesNotProcessed);
 		bgShowResults.clearSelection();
+		
 
 	}// appInit
 
@@ -528,19 +557,19 @@ public class Identic {
 		splitPane1.setLeftComponent(panelSideMenu);
 		panelSideMenu.setLayout(new BoxLayout(panelSideMenu, BoxLayout.Y_AXIS));
 
-		btnFindDuplicates = new JButton("Find Duplicates");
+		btnFindDuplicates = new JButton("Find");
 		btnFindDuplicates.setAlignmentX(Component.CENTER_ALIGNMENT);
 		btnFindDuplicates.addActionListener(identicAdapter);
 		btnFindDuplicates.setName(BTN_FIND_DUPS);
 		btnFindDuplicates.setMaximumSize(new Dimension(1000, 23));
 		panelSideMenu.add(btnFindDuplicates);
 
-		btnFindDuplicatesByName = new JButton("Find Duplicates By Name");
-		btnFindDuplicatesByName.setAlignmentX(Component.CENTER_ALIGNMENT);
-		btnFindDuplicatesByName.addActionListener(identicAdapter);
-		btnFindDuplicatesByName.setName(BTN_FIND_DUPS_BY_NAME);
-		btnFindDuplicatesByName.setMaximumSize(new Dimension(1000, 23));
-		panelSideMenu.add(btnFindDuplicatesByName);
+		btnFindDuplicatesWithCatalogs = new JButton("Find with Catalogs");
+		btnFindDuplicatesWithCatalogs.setAlignmentX(Component.CENTER_ALIGNMENT);
+		btnFindDuplicatesWithCatalogs.addActionListener(identicAdapter);
+		btnFindDuplicatesWithCatalogs.setName(BTN_FIND_DUPS_WITH_CATALOGS);
+		btnFindDuplicatesWithCatalogs.setMaximumSize(new Dimension(1000, 23));
+		panelSideMenu.add(btnFindDuplicatesWithCatalogs);
 
 		btnDisplayResults = new JButton("Display Results");
 		btnDisplayResults.setAlignmentX(Component.CENTER_ALIGNMENT);
@@ -746,21 +775,21 @@ public class Identic {
 		gbc_cbSaveExcludedFiles.gridy = 16;
 		panelFindDuplicates.add(cbSaveExcludedFiles, gbc_cbSaveExcludedFiles);
 
-		panelFindDuplicatesByName = new JPanel();
-		panelFindDuplicatesByName.setName(PNL_FIND_DUPS_BY_NAME);
-		panelDetails.add(panelFindDuplicatesByName, PNL_FIND_DUPS_BY_NAME);// "name_669979253199403"
+		panelFindDuplicatesWithCatalogs = new JPanel();
+		panelFindDuplicatesWithCatalogs.setName(PNL_FIND_DUPS_WITH_CATALOGS);
+		panelDetails.add(panelFindDuplicatesWithCatalogs, PNL_FIND_DUPS_WITH_CATALOGS);// "name_669979253199403"
 		GridBagLayout gbl_panelFindDuplicatesByName = new GridBagLayout();
 		gbl_panelFindDuplicatesByName.columnWidths = new int[] { 0, 0 };
 		gbl_panelFindDuplicatesByName.rowHeights = new int[] { 0, 0 };
 		gbl_panelFindDuplicatesByName.columnWeights = new double[] { 0.0, Double.MIN_VALUE };
 		gbl_panelFindDuplicatesByName.rowWeights = new double[] { 0.0, Double.MIN_VALUE };
-		panelFindDuplicatesByName.setLayout(gbl_panelFindDuplicatesByName);
+		panelFindDuplicatesWithCatalogs.setLayout(gbl_panelFindDuplicatesByName);
 
 		JLabel lblFindDuplicatesBy = new JLabel("Find Duplicates By Name");
 		GridBagConstraints gbc_lblFindDuplicatesBy = new GridBagConstraints();
 		gbc_lblFindDuplicatesBy.gridx = 0;
 		gbc_lblFindDuplicatesBy.gridy = 0;
-		panelFindDuplicatesByName.add(lblFindDuplicatesBy, gbc_lblFindDuplicatesBy);
+		panelFindDuplicatesWithCatalogs.add(lblFindDuplicatesBy, gbc_lblFindDuplicatesBy);
 
 		panelDisplayResults = new JPanel();
 		panelDisplayResults.setName(PNL_DISPLAY_RESULTS);
@@ -1355,7 +1384,7 @@ public class Identic {
 		panel_1.add(lblFilesNotProcessed, gbc_lblFilesNotProcessed);
 
 		JPanel panelMainFIndDuplicatesByName = new JPanel();
-		panelMain.add(panelMainFIndDuplicatesByName, PNL_FIND_DUPS_BY_NAME);
+		panelMain.add(panelMainFIndDuplicatesByName, PNL_FIND_DUPS_WITH_CATALOGS);
 		GridBagLayout gbl_panelMainFIndDuplicatesByName = new GridBagLayout();
 		gbl_panelMainFIndDuplicatesByName.columnWidths = new int[] { 0, 0 };
 		gbl_panelMainFIndDuplicatesByName.rowHeights = new int[] { 0, 0 };
@@ -1461,6 +1490,64 @@ public class Identic {
 		mnuFileExit.addActionListener(identicAdapter);
 		mnuFile.add(mnuFileExit);
 
+		mnuCatalog = new JMenu("Catalog");
+		menuBar.add(mnuCatalog);
+
+		mnuCatalogNew = new JMenuItem("New");
+		mnuCatalogNew.addActionListener(identicAdapter);
+		mnuCatalogNew.setName(MNU_CATALOG_NEW);
+		mnuCatalog.add(mnuCatalogNew);
+
+		mnuCatalogAdd = new JMenuItem("Add");
+		mnuCatalogAdd.addActionListener(identicAdapter);
+		mnuCatalogAdd.setName(MNU_CATALOG_ADD);
+		mnuCatalog.add(mnuCatalogAdd);
+
+		mnuCatalogLoad = new JMenuItem("Load");
+		mnuCatalogLoad.addActionListener(identicAdapter);
+		mnuCatalogLoad.setName(MNU_CATALOG_LOAD);
+		mnuCatalogLoad.addActionListener(identicAdapter);
+		mnuCatalog.add(mnuCatalogLoad);
+
+		JSeparator separator = new JSeparator();
+		mnuCatalog.add(separator);
+
+		mnuCatalogClose = new JMenuItem("Close");
+		mnuCatalogClose.addActionListener(identicAdapter);
+		mnuCatalogClose.setName(MNU_CATALOG_CLOSE);
+		mnuCatalog.add(mnuCatalogClose);
+
+		JSeparator separator_2 = new JSeparator();
+		mnuCatalog.add(separator_2);
+
+		mnuCatalogSave = new JMenuItem("Save");
+		mnuCatalogSave.addActionListener(identicAdapter);
+		mnuCatalogSave.setName(MNU_CATALOG_SAVE);
+		mnuCatalog.add(mnuCatalogSave);
+
+		mnuCatalogSaveAs = new JMenuItem("Save As");
+		mnuCatalogSaveAs.addActionListener(identicAdapter);
+		mnuCatalogSaveAs.setName(MNU_CATALOG_SAVE_AS);
+		mnuCatalog.add(mnuCatalogSaveAs);
+
+		JSeparator separator_1 = new JSeparator();
+		mnuCatalog.add(separator_1);
+
+		mnuCatalogClear = new JMenuItem("Clear");
+		mnuCatalogClear.addActionListener(identicAdapter);
+		mnuCatalogClear.setName(MNU_CATALOG_CLEAR);
+		mnuCatalog.add(mnuCatalogClear);
+
+		mnuCatalogReplace = new JMenuItem("Replace");
+		mnuCatalogReplace.addActionListener(identicAdapter);
+		mnuCatalogReplace.setName(MNU_CATALOG_REPLACE);
+		mnuCatalog.add(mnuCatalogReplace);
+
+		mnuCatalogRemove = new JMenuItem("Remove");
+		mnuCatalogRemove.addActionListener(identicAdapter);
+		mnuCatalogRemove.setName(MNU_CATALOG_REMOVE);
+		mnuCatalog.add(mnuCatalogRemove);
+
 		JMenu mnuReports = new JMenu("Reports");
 		menuBar.add(mnuReports);
 
@@ -1498,11 +1585,39 @@ public class Identic {
 			case MNU_HELP_ABOUT:
 				break;
 
+			case MNU_CATALOG_NEW:
+				doCatalogNew();
+				break;
+			case MNU_CATALOG_ADD:
+				//doCatalogAdd();
+				break;
+			case MNU_CATALOG_LOAD:
+				//doCatalogOpen();
+				break;
+			case MNU_CATALOG_CLOSE:
+				//doCatalogClose();
+				break;
+			case MNU_CATALOG_SAVE:
+				//doCatalogSave();
+				break;
+			case MNU_CATALOG_SAVE_AS:
+				//doCatalogSaveAs();
+				break;
+			case MNU_CATALOG_CLEAR:
+				//doCatalogClear();
+				break;
+			case MNU_CATALOG_REPLACE:
+				//doCatalogReplace();
+				break;
+			case MNU_CATALOG_REMOVE:
+				//doCatalogRemove();
+				break;
+
 			// Buttons---------------------------------------------
 			// Side Menu Buttons
 			case BTN_FIND_DUPS:
 				// break;
-			case BTN_FIND_DUPS_BY_NAME:
+			case BTN_FIND_DUPS_WITH_CATALOGS:
 				// break;
 			case BTN_DISPLAY_RESULTS:
 				// break;
@@ -1562,9 +1677,20 @@ public class Identic {
 	private static final String MNU_REPORTS_LOG_FILES = "mnuReportsLogFiles";
 	private static final String MNU_REPORTS_XML_DOC = "mnuReportsXMLdoc";
 	private static final String MNU_HELP_ABOUT = "mnuHelpAbout";
+
+	private static final String MNU_CATALOG_NEW = "mnuCatalogNew";
+	private static final String MNU_CATALOG_ADD = "mnuCatalogAdd";
+	private static final String MNU_CATALOG_LOAD = "mnuCatalogLoad";
+	private static final String MNU_CATALOG_CLOSE = "mnuCatalogClose";
+	private static final String MNU_CATALOG_SAVE = "mnuCatalogSave";
+	private static final String MNU_CATALOG_SAVE_AS = "mnuCatalogSaveAs";
+	private static final String MNU_CATALOG_CLEAR = "mnuCatalogClear";
+	private static final String MNU_CATALOG_REPLACE = "mnuCatalogReplace";
+	private static final String MNU_CATALOG_REMOVE = "mnuCatalogRemove";
+
 	// Side Menu Buttons
 	private static final String BTN_FIND_DUPS = "btnFindDuplicates";
-	private static final String BTN_FIND_DUPS_BY_NAME = "btnFindDuplicatesByName";
+	private static final String BTN_FIND_DUPS_WITH_CATALOGS = "btnFindDuplicatesWithCatalogs";
 	private static final String BTN_DISPLAY_RESULTS = "btnDisplayResults";
 	private static final String BTN_COPY_MOVE_REMOVE = "btnCopyMoveRemove";
 	private static final String BTN_APPLICATION_LOG = "btnApplicationLog";
@@ -1583,7 +1709,7 @@ public class Identic {
 
 	private static final String CBO_TYPES_LIST = "cboTypeLists";
 	private static final String PNL_FIND_DUPS = "pnlFindDuplicates";
-	private static final String PNL_FIND_DUPS_BY_NAME = "pnlFindDuplicatesByName";
+	private static final String PNL_FIND_DUPS_WITH_CATALOGS= "pnlFindDuplicatesWithCatalogs";
 	private static final String PNL_DISPLAY_RESULTS = "pnlDisplayResults";
 	private static final String PNL_COPY_MOVE_REMOVE = "pnlCopyMoveRemove";
 	private static final String PNL_APPLICATION_LOG = "pnlApplicationLog";
@@ -1592,7 +1718,7 @@ public class Identic {
 	private JSplitPane splitPane1;
 
 	private JButton btnFindDuplicates;
-	private JButton btnFindDuplicatesByName;
+	private JButton btnFindDuplicatesWithCatalogs;
 	private JButton btnDisplayResults;
 	private JButton btnCopyMoveRemove;
 	private JButton btnApplicationLog;
@@ -1600,7 +1726,7 @@ public class Identic {
 	private JPanel panelSideMenu;
 	private JPanel panelDetails;
 	private JPanel panelFindDuplicates;
-	private JPanel panelFindDuplicatesByName;
+	private JPanel panelFindDuplicatesWithCatalogs;
 	private JPanel panelDisplayResults;
 	private JPanel panelCopyMoveRemove;
 	private JPanel paneApplicationlLog;
@@ -1633,10 +1759,28 @@ public class Identic {
 	private JTextField txtExcessStorage;
 	private JLabel lblDisplayResults;
 	private JTable tableResults;
+	private JMenu mnuCatalog;
+	private JMenuItem mnuCatalogNew;
+	private JMenuItem mnuCatalogAdd;
+	private JMenuItem mnuCatalogLoad;
+	private JMenuItem mnuCatalogClose;
+	private JMenuItem mnuCatalogSave;
+	private JMenuItem mnuCatalogSaveAs;
+	private JMenuItem mnuCatalogClear;
+	private JMenuItem mnuCatalogReplace;
+	private JMenuItem mnuCatalogRemove;
 
 	////////////////////////////////////////////////////////////////////////////////
 	////////////////////////////////////////////////////////////////////////////////
 	////////////////////////////////////////////////////////////////////////////////
+
+	/*
+	 * Class Identify Subjects - is the first pass at the targeted file. It populates two LinkedBlockingQueues. The
+	 * first queue,qSubjects contains FileStatSubject which captures file full name, file size, and last date Modified
+	 * for those files that are to be processed by this pass. The second queue, qRejects, contains FileStatSubject,
+	 * which extends FileStatSubject with 'reason' for reject. it also tracks the number of occurrences of each file
+	 * suffix
+	 */
 	public class IdentifySubjects implements Runnable {
 		// private AppLogger appLogger = AppLogger.getInstance();
 
@@ -1765,6 +1909,13 @@ public class Identic {
 		////////////////////////////////////////////////////////////////////////////////
 		////////////////////////////////////////////////////////////////////////////////
 		////////////////////////////////////////////////////////////////////////////////
+
+	/*
+	 * 
+	 * MakeFileKey - takes as input qSubjects and adds the hashKey to each FileStatSubject and loads the FileStatSubject
+	 * into qHashes queue.
+	 *
+	 */
 
 	public class MakeFileKey implements Runnable {
 		private static final int bufSize = 1024;

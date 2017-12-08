@@ -3,7 +3,7 @@ package identic;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
 
-public class FileStatReject extends FileStat {
+public class FileStatReject extends FileStat{
 
 	String reason;
 
@@ -17,4 +17,4 @@ public class FileStatReject extends FileStat {
 		return this.reason;
 	}//getHashKey
 
-}
+}//class FileStatReject 
