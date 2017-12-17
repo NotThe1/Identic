@@ -49,9 +49,9 @@ import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 
 public class ManageLists extends JDialog {
-
+	private static final long serialVersionUID = 1L;
 	private final JPanel contentPanel = new JPanel();
-	// private int dialogResultValue;
+	
 	private String fileListDirectory;
 
 	private DefaultListModel<String> availableListsModel = new DefaultListModel<>();
@@ -255,7 +255,7 @@ public class ManageLists extends JDialog {
 		// we have the directory, do we have lists ?
 
 		File targetDirectory = new File(fileListDirectory);
-		File[] files = targetDirectory.listFiles(new ListFilter());
+		File[] files = targetDirectory.listFiles(new ListFilter(LIST_SUFFIX_DOT));
 
 		// if files empty - initialize the directory
 		if (files.length == 0) {
@@ -274,7 +274,7 @@ public class ManageLists extends JDialog {
 					e.printStackTrace();
 				} // try
 			} // for
-			files = targetDirectory.listFiles(new ListFilter());
+			files = targetDirectory.listFiles(new ListFilter(LIST_SUFFIX_DOT));
 		} // if no type list files in target directory
 
 		// set up cbo model
@@ -594,10 +594,15 @@ public class ManageLists extends JDialog {
 	// ---------------------------------------------------------
 
 	class ListFilter implements FilenameFilter {
+		String suffix;
+		
+		public ListFilter(String suffix) {
+			this.suffix=suffix;
+		}//Constructor
 
 		@Override
 		public boolean accept(File arg0, String arg1) {
-			if (arg1.endsWith(LIST_SUFFIX)) {
+			if (arg1.endsWith(this.suffix)) {
 				return true;
 			} // if
 			return false;

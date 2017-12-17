@@ -10,14 +10,21 @@ import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
 import java.awt.Point;
+import java.awt.datatransfer.DataFlavor;
+import java.awt.datatransfer.Transferable;
+import java.awt.datatransfer.UnsupportedFlavorException;
+import java.awt.dnd.DnDConstants;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.FilenameFilter;
 import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.net.URISyntaxException;
 import java.nio.file.FileVisitResult;
 import java.nio.file.FileVisitor;
@@ -41,9 +48,11 @@ import javax.swing.BoxLayout;
 import javax.swing.ButtonGroup;
 import javax.swing.DefaultComboBoxModel;
 import javax.swing.DefaultListModel;
+import javax.swing.DropMode;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
+import javax.swing.JComponent;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
@@ -63,6 +72,7 @@ import javax.swing.JTextPane;
 import javax.swing.RowFilter;
 import javax.swing.ScrollPaneConstants;
 import javax.swing.SwingConstants;
+import javax.swing.TransferHandler;
 import javax.swing.UIManager;
 import javax.swing.border.BevelBorder;
 import javax.swing.border.CompoundBorder;
@@ -102,11 +112,16 @@ public class Identic {
 	private int subjectCount;
 	private int rejectCount;
 
-	private AppLogger appLogger = AppLogger.getInstance();
+	private AppLogger log = AppLogger.getInstance();
 
 	private String fileListDirectory;
 	private int sideButtonIndex;
 	private int catalogPanelIndex;
+
+	private CatalogItemModel availableCatalogItemModel = new CatalogItemModel();
+	private JList<CatalogItem> lstCatAvailable = new JList<CatalogItem>(availableCatalogItemModel);
+	private CatalogItemModel inUseCatalogItemModel = new CatalogItemModel();
+	private JList<CatalogItem> lstInUse = new JList<CatalogItem>(inUseCatalogItemModel);
 
 	/**
 	 * Launch the application.
@@ -177,8 +192,8 @@ public class Identic {
 		rejectTableModel.clear();
 		lblFilesNotProcessed.setText(String.format("%,d", 0));
 
-		appLogger.addTimeStamp("Start :");
-		appLogger.addInfo(lblSourceFolder.getText());
+		log.addTimeStamp("Start :");
+		log.addInfo(lblSourceFolder.getText());
 
 		// --------------------------
 		IdentifySubjects identifySubjects = new IdentifySubjects();
@@ -207,7 +222,7 @@ public class Identic {
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		} // try
-		appLogger.addTimeStamp("End :");
+		log.addTimeStamp("End :");
 
 		// Set<String> keys = hashCounts.keySet();
 		// appLogger.addNL();
@@ -286,6 +301,55 @@ public class Identic {
 
 	}// loadTargetList
 
+	private void loadCatalogList() {
+		// see if the directory has been set up already
+		if (fileListDirectory.equals(EMPTY_STRING)) {
+			fileListDirectory = System.getProperty("java.io.tmpdir");
+			fileListDirectory = fileListDirectory.replace("Temp", "Identic");
+
+			Path p = Paths.get(fileListDirectory);
+			if (!Files.exists(p)) {
+				JOptionPane.showMessageDialog(frmIdentic, "Initializing Catalog lists in " + p.toString(),
+						"Initialization", JOptionPane.INFORMATION_MESSAGE);
+				System.err.println("Making new directory");
+				log.addInfo("Making new Catalog directory");
+				try {
+					Files.createDirectories(p);
+				} catch (IOException e) {
+					e.printStackTrace();
+				} // try
+			} // if exits
+
+		} // if not there
+		availableCatalogItemModel.clear();
+		
+		File targetDirectory = new File(fileListDirectory);
+		File[] files = targetDirectory.listFiles(new ListFilter(LIST_CATALOG));
+		
+		// we have the directory, do we have lists ?
+		
+		if (files.length==0) {
+			return;
+		}//if done if no catalog
+		CatalogItem catalogItem;
+		for (File file:files) {
+			try {
+				FileInputStream fis = new FileInputStream(file);
+				ObjectInputStream ois = new ObjectInputStream(fis);
+				catalogItem = (CatalogItem) ois.readObject();
+				availableCatalogItemModel.add(catalogItem);
+				ois.close();
+				fis.close();
+//				System.out.printf("Name: %s, Desc: %s%n",catalogItem.getEntryName(),catalogItem.getEntryDescription());
+//				System.out.printf("Directory %s, %n",catalogItem.getEntryStartDirectory());
+//				System.out.printf("RowCount %s, %n",catalogItem.getSubjectTableModel().getRowCount());
+			} catch (Exception e) {
+				// TODO: handle exception
+			}//try
+		}//for file
+
+	}// loadCatalogList
+
 	private void doSideMenu(JButton button) {
 		String targetPanelName = null;
 		panelSideMenu.removeAll();
@@ -302,8 +366,10 @@ public class Identic {
 
 		cl = (CardLayout) (panelMain.getLayout());
 		cl.show(panelMain, targetPanelName);
-		
-		boolean catalogState = sideButtonIndex ==catalogPanelIndex?true:false;
+
+		// per panel logic
+		// Catalog panel
+		boolean catalogState = sideButtonIndex == catalogPanelIndex ? true : false;
 		mnuCatalog.setEnabled(catalogState);
 
 		panelSideMenu.validate();
@@ -372,25 +438,91 @@ public class Identic {
 	private void doSaveExcludedFiles() {
 		rbFilesNotProcessed.setEnabled(cbSaveExcludedFiles.isSelected());
 	}// doSaveExcludedFiles
-	
+
 	private void doCatalogNew() {
-		
-	}//doCatalogNew
-	
+		if (subjectTableModel.getRowCount() == 0) {
+			JOptionPane.showMessageDialog(null, "No Catalog has been created, by FIND");
+			return;
+		} // if
+
+		CatalogDialog catalogDialog = CatalogDialog.makeNewCatalogDialog();
+		if (catalogDialog.showDialog() == JOptionPane.OK_OPTION) {
+			System.out.printf("state: JOptionPane.OK_OPTION%n");
+			log.addInfo(String.format("Name: %s", catalogDialog.getName()));
+			log.addInfo(String.format("Description: %s", catalogDialog.getDescription()));
+			CatalogItem ci = new CatalogItem(catalogDialog.getName(),catalogDialog.getDescription(),
+					lblSourceFolder.getText(),subjectTableModel);
+			CatalogItem testOut = new CatalogItem(catalogDialog.getName(),catalogDialog.getDescription(),
+					lblSourceFolder.getText(),subjectTableModel);
+			try {
+				FileOutputStream fos = new FileOutputStream(fileListDirectory + catalogDialog.getName()+ ".ser");
+				ObjectOutputStream oos = new ObjectOutputStream(fos);
+				oos.writeObject(testOut);
+				oos.close();
+				fos.close();
+			} catch ( IOException e) {
+				String message = String.format("[Identic] doCatalogNew() failed writing catalog object%n"
+						+ "Name: %s%n Description : %n", catalogDialog.getName(),catalogDialog.getDescription());
+				log.addError(message);
+				e.printStackTrace();
+			}//try
+			
+			
+			try {
+				FileInputStream fis = new FileInputStream(fileListDirectory + catalogDialog.getName()+ ".ser");
+				ObjectInputStream ois = new ObjectInputStream(fis);
+				CatalogItem testIn = (CatalogItem) ois.readObject();
+				ois.close();
+				fis.close();
+				System.out.printf("Name: %s, Desc: %s%n",testIn.getEntryName(),testIn.getEntryDescription());
+				System.out.printf("Directory %s, %n",testIn.getEntryStartDirectory());
+				System.out.printf("RowCount %s, %n",testIn.getSubjectTableModel().getRowCount());
+			} catch (Exception e) {
+				// TODO: handle exception
+			}//try
+			
+			
+//			for (Path pf : pd.getFileName()) {
+//				try {
+//					fis = (FileInputStream) Files.newInputStream(pf, null);
+//					ois = new ObjectInputStream(fis);
+//					cim.add((CatalogItem) ois.readObject());
+//				} catch (IOException e) {
+//					// TODO Auto-generated catch block
+//					e.printStackTrace();
+//				} catch (ClassNotFoundException e) {
+//					// TODO Auto-generated catch block
+//					e.printStackTrace();
+//				}
+//			}
+
+		} else {
+			// if valid
+			System.out.printf("state: NOT OK_OPTION%n");
+		} // if
+		catalogDialog = null;
+
+	}// doCatalogNew
+
 	//////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////
 
 	class ListFilter implements FilenameFilter {
-		@Override
-		public boolean accept(File arg0, String arg1) {
-			if (arg1.endsWith(LIST_SUFFIX)) {
-				return true;
-			} // if
-			return false;
-		}// accept
-	}// ListFilter
+	String suffix;
+	
+	public ListFilter(String suffix) {
+		this.suffix=suffix;
+	}//Constructor
 
+	@Override
+	public boolean accept(File arg0, String arg1) {
+		if (arg1.endsWith(this.suffix)) {
+			return true;
+		} // if
+		return false;
+	}// accept
+}// ListFilter
 	private void initPanels() {
 		doSideMenu(sideMenuButtons[sideButtonIndex]);
 	}// initPanels
@@ -415,7 +547,7 @@ public class Identic {
 		} // if not there
 			// we have the directory, do we have lists ?
 		File targetDirectory = new File(fileListDirectory);
-		File[] files = targetDirectory.listFiles(new ListFilter());
+		File[] files = targetDirectory.listFiles(new ListFilter(LIST_SUFFIX_DOT));
 
 		// if files empty - initialize the directory
 		if (files.length == 0) {
@@ -434,8 +566,10 @@ public class Identic {
 					e.printStackTrace();
 				} // try
 			} // for
-			files = targetDirectory.listFiles(new ListFilter());
+			files = targetDirectory.listFiles(new ListFilter(LIST_SUFFIX_DOT));
 		} // if no type list files in target directory
+		
+//		cim.r
 
 		// set up cbo model
 
@@ -490,7 +624,7 @@ public class Identic {
 		listFindDuplicatesActive.setModel(targetModel);
 		listExcluded.setModel(excludeModel);
 		txtLog.setText(EMPTY_STRING);
-		appLogger.setDoc(txtLog.getStyledDocument());
+		log.setDoc(txtLog.getStyledDocument());
 		cbSaveExcludedFiles.setSelected(false);
 
 		bgShowResults.add(rbAllTheFiles);
@@ -498,8 +632,22 @@ public class Identic {
 		bgShowResults.add(rbUniqueFiles);
 		bgShowResults.add(rbFilesNotProcessed);
 		bgShowResults.clearSelection();
-		
 
+		availableCatalogItemModel.clear();
+		availableCatalogItemModel.add(new CatalogItem());
+		loadCatalogList();
+		// lstCatAvailable.validate();
+		
+		lstCatAvailable.setDragEnabled(true);
+		lstCatAvailable.setDropMode(DropMode.INSERT);
+		lstCatAvailable.setTransferHandler(new ListTransferHandler());
+
+		lstInUse.setDragEnabled(true);
+		lstInUse.setDropMode(DropMode.INSERT);
+		lstInUse.setTransferHandler(new ListTransferHandler());
+
+
+		int a = 1;
 	}// appInit
 
 	public Identic() {
@@ -785,7 +933,7 @@ public class Identic {
 		gbl_panelFindDuplicatesByName.rowWeights = new double[] { 0.0, Double.MIN_VALUE };
 		panelFindDuplicatesWithCatalogs.setLayout(gbl_panelFindDuplicatesByName);
 
-		JLabel lblFindDuplicatesBy = new JLabel("Find Duplicates By Name");
+		JLabel lblFindDuplicatesBy = new JLabel("Find Duplicates With Catalogs");
 		GridBagConstraints gbc_lblFindDuplicatesBy = new GridBagConstraints();
 		gbc_lblFindDuplicatesBy.gridx = 0;
 		gbc_lblFindDuplicatesBy.gridy = 0;
@@ -1383,20 +1531,153 @@ public class Identic {
 		gbc_lblFilesNotProcessed.gridy = 0;
 		panel_1.add(lblFilesNotProcessed, gbc_lblFilesNotProcessed);
 
-		JPanel panelMainFIndDuplicatesByName = new JPanel();
-		panelMain.add(panelMainFIndDuplicatesByName, PNL_FIND_DUPS_WITH_CATALOGS);
+		JPanel panelMainFindWithCatalogs = new JPanel();
+		panelMain.add(panelMainFindWithCatalogs, PNL_FIND_DUPS_WITH_CATALOGS);
 		GridBagLayout gbl_panelMainFIndDuplicatesByName = new GridBagLayout();
-		gbl_panelMainFIndDuplicatesByName.columnWidths = new int[] { 0, 0 };
-		gbl_panelMainFIndDuplicatesByName.rowHeights = new int[] { 0, 0 };
-		gbl_panelMainFIndDuplicatesByName.columnWeights = new double[] { 0.0, Double.MIN_VALUE };
-		gbl_panelMainFIndDuplicatesByName.rowWeights = new double[] { 0.0, Double.MIN_VALUE };
-		panelMainFIndDuplicatesByName.setLayout(gbl_panelMainFIndDuplicatesByName);
+		gbl_panelMainFIndDuplicatesByName.columnWidths = new int[] { 200, 0 };
+		gbl_panelMainFIndDuplicatesByName.rowHeights = new int[] { 0, 0, 0, 0 };
+		gbl_panelMainFIndDuplicatesByName.columnWeights = new double[] { 1.0, Double.MIN_VALUE };
+		gbl_panelMainFIndDuplicatesByName.rowWeights = new double[] { 0.0, 1.0, 1.0, Double.MIN_VALUE };
+		panelMainFindWithCatalogs.setLayout(gbl_panelMainFIndDuplicatesByName);
 
-		JLabel lblFindDuplicatesBy_1 = new JLabel("Find Duplicates by Name");
+		JLabel lblFindDuplicatesBy_1 = new JLabel("Find Duplicates With Catalogs");
+		lblFindDuplicatesBy_1.setHorizontalAlignment(SwingConstants.CENTER);
 		GridBagConstraints gbc_lblFindDuplicatesBy_1 = new GridBagConstraints();
+		gbc_lblFindDuplicatesBy_1.insets = new Insets(0, 0, 5, 0);
 		gbc_lblFindDuplicatesBy_1.gridx = 0;
 		gbc_lblFindDuplicatesBy_1.gridy = 0;
-		panelMainFIndDuplicatesByName.add(lblFindDuplicatesBy_1, gbc_lblFindDuplicatesBy_1);
+		panelMainFindWithCatalogs.add(lblFindDuplicatesBy_1, gbc_lblFindDuplicatesBy_1);
+		
+		JPanel panel_8 = new JPanel();
+		GridBagConstraints gbc_panel_8 = new GridBagConstraints();
+		gbc_panel_8.fill = GridBagConstraints.BOTH;
+		gbc_panel_8.insets = new Insets(0, 0, 5, 0);
+		gbc_panel_8.gridx = 0;
+		gbc_panel_8.gridy = 1;
+		panelMainFindWithCatalogs.add(panel_8, gbc_panel_8);
+		GridBagLayout gbl_panel_8 = new GridBagLayout();
+		gbl_panel_8.columnWidths = new int[]{200, 50, 200, 0};
+		gbl_panel_8.rowHeights = new int[]{0, 0};
+		gbl_panel_8.columnWeights = new double[]{1.0, 0.0, 1.0, Double.MIN_VALUE};
+		gbl_panel_8.rowWeights = new double[]{1.0, Double.MIN_VALUE};
+		panel_8.setLayout(gbl_panel_8);
+
+		JPanel panel_4 = new JPanel();
+		GridBagConstraints gbc_panel_4 = new GridBagConstraints();
+		gbc_panel_4.fill = GridBagConstraints.BOTH;
+		gbc_panel_4.insets = new Insets(0, 0, 0, 5);
+		gbc_panel_4.gridx = 0;
+		gbc_panel_4.gridy = 0;
+		panel_8.add(panel_4, gbc_panel_4);
+		GridBagLayout gbl_panel_4 = new GridBagLayout();
+		gbl_panel_4.columnWidths = new int[] { 0, 0 };
+		gbl_panel_4.rowHeights = new int[] { 0, 0 };
+		gbl_panel_4.columnWeights = new double[] { 1.0, Double.MIN_VALUE };
+		gbl_panel_4.rowWeights = new double[] { 1.0, Double.MIN_VALUE };
+		panel_4.setLayout(gbl_panel_4);
+
+		JScrollPane scrollCatsAvailable = new JScrollPane();
+		GridBagConstraints gbc_scrollCatsAvailable = new GridBagConstraints();
+		gbc_scrollCatsAvailable.fill = GridBagConstraints.BOTH;
+		gbc_scrollCatsAvailable.gridx = 0;
+		gbc_scrollCatsAvailable.gridy = 0;
+		panel_4.add(scrollCatsAvailable, gbc_scrollCatsAvailable);
+
+		JLabel lbl1 = new JLabel("Available");
+		lbl1.setHorizontalAlignment(SwingConstants.CENTER);
+		lbl1.setForeground(Color.BLUE);
+		lbl1.setFont(new Font("Tahoma", Font.BOLD, 14));
+		scrollCatsAvailable.setColumnHeaderView(lbl1);
+
+		lstCatAvailable = new JList<CatalogItem>(availableCatalogItemModel);
+		lstCatAvailable.setDragEnabled(true);
+		scrollCatsAvailable.setViewportView(lstCatAvailable);
+		
+		JPanel panel_6 = new JPanel();
+		GridBagConstraints gbc_panel_6 = new GridBagConstraints();
+		gbc_panel_6.fill = GridBagConstraints.BOTH;
+		gbc_panel_6.insets = new Insets(0, 0, 0, 5);
+		gbc_panel_6.gridx = 1;
+		gbc_panel_6.gridy = 0;
+		panel_8.add(panel_6, gbc_panel_6);
+		GridBagLayout gbl_panel_6 = new GridBagLayout();
+		gbl_panel_6.columnWidths = new int[]{0};
+		gbl_panel_6.rowHeights = new int[]{0};
+		gbl_panel_6.columnWeights = new double[]{Double.MIN_VALUE};
+		gbl_panel_6.rowWeights = new double[]{Double.MIN_VALUE};
+		panel_6.setLayout(gbl_panel_6);
+		
+		JPanel panel_5 = new JPanel();
+		GridBagConstraints gbc_panel_5 = new GridBagConstraints();
+		gbc_panel_5.fill = GridBagConstraints.BOTH;
+		gbc_panel_5.gridx = 2;
+		gbc_panel_5.gridy = 0;
+		panel_8.add(panel_5, gbc_panel_5);
+		GridBagLayout gbl_panel_5 = new GridBagLayout();
+		gbl_panel_5.columnWidths = new int[]{0, 0};
+		gbl_panel_5.rowHeights = new int[]{0, 0};
+		gbl_panel_5.columnWeights = new double[]{1.0, Double.MIN_VALUE};
+		gbl_panel_5.rowWeights = new double[]{1.0, Double.MIN_VALUE};
+		panel_5.setLayout(gbl_panel_5);
+		
+		JScrollPane scrollUsing = new JScrollPane();
+		GridBagConstraints gbc_scrollUsing = new GridBagConstraints();
+		gbc_scrollUsing.fill = GridBagConstraints.BOTH;
+		gbc_scrollUsing.gridx = 0;
+		gbc_scrollUsing.gridy = 0;
+		panel_5.add(scrollUsing, gbc_scrollUsing);
+		
+		JLabel lblNewLabel_5 = new JLabel("In Use");
+		lblNewLabel_5.setHorizontalAlignment(SwingConstants.CENTER);
+		lblNewLabel_5.setForeground(Color.BLUE);
+		lblNewLabel_5.setFont(new Font("Tahoma", Font.BOLD, 14));
+		scrollUsing.setColumnHeaderView(lblNewLabel_5);
+		
+		lstInUse = new JList<CatalogItem>(inUseCatalogItemModel);
+		lstInUse.setDragEnabled(true);
+		lstInUse.setDropMode(DropMode.ON);
+		scrollUsing.setViewportView(lstInUse);
+		
+		JPanel panel_7 = new JPanel();
+		GridBagConstraints gbc_panel_7 = new GridBagConstraints();
+		gbc_panel_7.fill = GridBagConstraints.BOTH;
+		gbc_panel_7.gridx = 0;
+		gbc_panel_7.gridy = 2;
+		panelMainFindWithCatalogs.add(panel_7, gbc_panel_7);
+		GridBagLayout gbl_panel_7 = new GridBagLayout();
+		gbl_panel_7.columnWidths = new int[] {0, 0};
+		gbl_panel_7.rowHeights = new int[]{0, 0, 0, 0, 0};
+		gbl_panel_7.columnWeights = new double[]{0.0, Double.MIN_VALUE};
+		gbl_panel_7.rowWeights = new double[]{0.0, 0.0, 0.0, 0.0, Double.MIN_VALUE};
+		panel_7.setLayout(gbl_panel_7);
+		
+		lblSelectedCatalogName = new JLabel("Name");
+		GridBagConstraints gbc_lblSelectedCatalogName = new GridBagConstraints();
+		gbc_lblSelectedCatalogName.insets = new Insets(0, 0, 5, 0);
+		gbc_lblSelectedCatalogName.anchor = GridBagConstraints.SOUTHWEST;
+		gbc_lblSelectedCatalogName.gridx = 0;
+		gbc_lblSelectedCatalogName.gridy = 0;
+		panel_7.add(lblSelectedCatalogName, gbc_lblSelectedCatalogName);
+		
+		lblSelectedCatalogDescription = new JLabel("Description");
+		GridBagConstraints gbc_lblSelectedCatalogDescription = new GridBagConstraints();
+		gbc_lblSelectedCatalogDescription.insets = new Insets(0, 0, 5, 0);
+		gbc_lblSelectedCatalogDescription.gridx = 0;
+		gbc_lblSelectedCatalogDescription.gridy = 1;
+		panel_7.add(lblSelectedCatalogDescription, gbc_lblSelectedCatalogDescription);
+		
+		JLabel lblSelectedCatalogDirectory = new JLabel("Directory");
+		GridBagConstraints gbc_lblSelectedCatalogDirectory = new GridBagConstraints();
+		gbc_lblSelectedCatalogDirectory.insets = new Insets(0, 0, 5, 0);
+		gbc_lblSelectedCatalogDirectory.gridx = 0;
+		gbc_lblSelectedCatalogDirectory.gridy = 2;
+		panel_7.add(lblSelectedCatalogDirectory, gbc_lblSelectedCatalogDirectory);
+		
+		lblSelectedCatalogCount = new JLabel("Count");
+		GridBagConstraints gbc_lblSelectedCatalogCount = new GridBagConstraints();
+		gbc_lblSelectedCatalogCount.gridx = 0;
+		gbc_lblSelectedCatalogCount.gridy = 3;
+		panel_7.add(lblSelectedCatalogCount, gbc_lblSelectedCatalogCount);
 
 		JPanel panelMainDisplayResults = new JPanel();
 		panelMain.add(panelMainDisplayResults, PNL_DISPLAY_RESULTS);
@@ -1589,28 +1870,28 @@ public class Identic {
 				doCatalogNew();
 				break;
 			case MNU_CATALOG_ADD:
-				//doCatalogAdd();
+				// doCatalogAdd();
 				break;
 			case MNU_CATALOG_LOAD:
-				//doCatalogOpen();
+				// doCatalogOpen();
 				break;
 			case MNU_CATALOG_CLOSE:
-				//doCatalogClose();
+				// doCatalogClose();
 				break;
 			case MNU_CATALOG_SAVE:
-				//doCatalogSave();
+				// doCatalogSave();
 				break;
 			case MNU_CATALOG_SAVE_AS:
-				//doCatalogSaveAs();
+				// doCatalogSaveAs();
 				break;
 			case MNU_CATALOG_CLEAR:
-				//doCatalogClear();
+				// doCatalogClear();
 				break;
 			case MNU_CATALOG_REPLACE:
-				//doCatalogReplace();
+				// doCatalogReplace();
 				break;
 			case MNU_CATALOG_REMOVE:
-				//doCatalogRemove();
+				// doCatalogRemove();
 				break;
 
 			// Buttons---------------------------------------------
@@ -1672,6 +1953,8 @@ public class Identic {
 	private static final String EMPTY_STRING = "";
 	private static final String LIST_SUFFIX = "typeList";
 	private static final String LIST_SUFFIX_DOT = ".typeList";
+	private static final String LIST_CATALOG = "ser";
+	private static final String LIST_CATALOG_DOT = ".ser";
 
 	private static final String MNU_FILE_EXIT = "mnuFileExit";
 	private static final String MNU_REPORTS_LOG_FILES = "mnuReportsLogFiles";
@@ -1709,7 +1992,7 @@ public class Identic {
 
 	private static final String CBO_TYPES_LIST = "cboTypeLists";
 	private static final String PNL_FIND_DUPS = "pnlFindDuplicates";
-	private static final String PNL_FIND_DUPS_WITH_CATALOGS= "pnlFindDuplicatesWithCatalogs";
+	private static final String PNL_FIND_DUPS_WITH_CATALOGS = "pnlFindDuplicatesWithCatalogs";
 	private static final String PNL_DISPLAY_RESULTS = "pnlDisplayResults";
 	private static final String PNL_COPY_MOVE_REMOVE = "pnlCopyMoveRemove";
 	private static final String PNL_APPLICATION_LOG = "pnlApplicationLog";
@@ -1769,6 +2052,11 @@ public class Identic {
 	private JMenuItem mnuCatalogClear;
 	private JMenuItem mnuCatalogReplace;
 	private JMenuItem mnuCatalogRemove;
+	private JLabel lblSelectedCatalogName;
+	private JLabel lblSelectedCatalogDescription;
+	private JLabel lblSelectedCatalogCount;
+	// ListModel<CatalogItemModel> cim;
+	// ListModel<CatalogItem> cim1;
 
 	////////////////////////////////////////////////////////////////////////////////
 	////////////////////////////////////////////////////////////////////////////////
@@ -1802,17 +2090,17 @@ public class Identic {
 		}// run
 
 		private void logSummary() {
-			appLogger.addNL(2);
-			appLogger.addSpecial("folderCount = " + folderCount);
-			appLogger.addSpecial("fileCount  = " + fileCount);
-			appLogger.addSpecial("subjectCount = " + subjectCount);
-			appLogger.addSpecial("rejectCount  = " + rejectCount);
-			appLogger.addNL();
-			appLogger.addInfo(String.format("%,d File Types excluded", members.size()));
+			log.addNL(2);
+			log.addSpecial("folderCount = " + folderCount);
+			log.addSpecial("fileCount  = " + fileCount);
+			log.addSpecial("subjectCount = " + subjectCount);
+			log.addSpecial("rejectCount  = " + rejectCount);
+			log.addNL();
+			log.addInfo(String.format("%,d File Types excluded", members.size()));
 			Set<String> keys = members.keySet();
-			appLogger.addNL();
+			log.addNL();
 			for (String key : keys) {
-				appLogger.addInfo(String.format("%s - %,d occurances", key, members.get(key)));
+				log.addInfo(String.format("%s - %,d occurances", key, members.get(key)));
 			} // for
 		}// logSummary
 
@@ -1836,6 +2124,8 @@ public class Identic {
 				fileCount++;
 				String fileName = file.getFileName().toString();
 				lastModifieTime = Files.getLastModifiedTime(file);
+//				System.out.println(Files.getLastModifiedTime(file).to(TimeUnit.SECONDS));
+//				System.out.println(Files.getLastModifiedTime(file).toString());
 				fileSize = Files.size(file);
 				int partsCount;
 				String part = null;
@@ -1898,7 +2188,7 @@ public class Identic {
 					fileName = reject.getFileName();
 				} catch (NoSuchElementException ex) {
 					if (priorThread.getState().equals(Thread.State.TERMINATED)) {
-						appLogger.addSpecial(fileName);
+						log.addSpecial(fileName);
 						return;
 					} // if - done ?
 				} // try
@@ -1947,12 +2237,12 @@ public class Identic {
 						qHashes.add(fileStatSubject);
 						// appLogger.addInfo(key + " - " + fileName);
 					} catch (HashGenerationException e) {
-						appLogger.addError("HashGenerationError", fileName);
+						log.addError("HashGenerationError", fileName);
 						e.printStackTrace();
 					} //
 				} catch (NoSuchElementException ex) {
 					if (priorThread.getState().equals(Thread.State.TERMINATED)) {
-						appLogger.addSpecial("From MakeFileKey count = " + count);
+						log.addSpecial("From MakeFileKey count = " + count);
 						return;
 					} // if - done ?
 				} // try
@@ -2032,6 +2322,108 @@ public class Identic {
 		}// keepSuffixCount
 
 	}// class IdentifyDuplicates
+	
+	
+	/////////////////////////////////////////
+
+	////////////////////////////[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[
+
+	@SuppressWarnings("serial")
+	public class ListTransferHandler extends TransferHandler {
+
+		@Override
+		public boolean canImport(TransferSupport support) {
+			return (support.getComponent() instanceof JList
+					&& support.isDataFlavorSupported(ListItemTransferable.LIST_ITEM_DATA_FLAVOR));
+		}// canImport
+
+		@Override
+		public boolean importData(TransferSupport support) {// support is target
+			if (!canImport(support)) {
+				return false;
+			} // if support
+
+			Transferable t = support.getTransferable();
+			CatalogItem value = null;
+
+			try {
+				value = (CatalogItem) t.getTransferData(ListItemTransferable.LIST_ITEM_DATA_FLAVOR);
+			} catch (Exception e) {
+				// TODO: handle exception
+			} // try
+			
+			JList<CatalogItem> targetList = (JList<CatalogItem>) support.getComponent();
+			CatalogItemModel model = (CatalogItemModel) targetList.getModel();
+			int index = targetList.getDropLocation().getIndex();
+			model.add(index,value);
+			targetList.updateUI();
+
+			return true;
+		}// inportData
+
+		@Override
+		public int getSourceActions(JComponent component) {
+			return DnDConstants.ACTION_COPY_OR_MOVE;
+		}// getSourceActions
+
+		@Override
+		protected Transferable createTransferable(JComponent component) {
+			Transferable t = null;
+
+			if (component instanceof JList) {
+				@SuppressWarnings("unchecked")
+				JList<CatalogItem> list = (JList<CatalogItem>) component;
+				Object value = list.getSelectedValue();
+				if (value instanceof CatalogItem) {
+					CatalogItem catalogItem = (CatalogItem) value;
+					t = new ListItemTransferable(catalogItem);
+				} // inner if value
+			} // outer if - JList
+
+			return t;
+		}// createTransferable
+
+		@Override
+		protected void exportDone(JComponent source, Transferable data, int action) {
+			int index = ((JList<CatalogItem>)source).getSelectedIndex();
+			CatalogItemModel model = (CatalogItemModel) ((JList<CatalogItem>) source).getModel();
+			model.removeElementAt(index);
+			source.updateUI();
+			System.out.println(" My ExportDone");
+
+		}// exportDone
+
+	}// class ListTransferHandler
+	
+//////////////////////////////////////////////////////////////////////////
+	
+	public static class ListItemTransferable implements Transferable {
+		public static final DataFlavor LIST_ITEM_DATA_FLAVOR = new DataFlavor(CatalogItem.class, "identic/CatalogItem");
+		private CatalogItem catalogItem;
+
+		public ListItemTransferable(CatalogItem catalogItem) {
+			this.catalogItem = catalogItem;
+		}// Constructor
+
+		@Override
+		public DataFlavor[] getTransferDataFlavors() {
+			return new DataFlavor[] { LIST_ITEM_DATA_FLAVOR };
+		}// getTransferDataFlavors
+
+		@Override
+		public boolean isDataFlavorSupported(DataFlavor flavor) {
+			return flavor.equals(LIST_ITEM_DATA_FLAVOR);
+		}// isDataFlavorSupported
+
+		@Override
+		public Object getTransferData(DataFlavor arg0) throws UnsupportedFlavorException, IOException {
+			return catalogItem;
+		}// getTransferData
+
+	}// class ListItemTransferable
+//////////////////////////////////////////]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]
+
+
 
 	////////////////////////////////////////////////////////////////////////////////
 	////////////////////////////////////////////////////////////////////////////////
