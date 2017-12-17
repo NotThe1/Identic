@@ -280,10 +280,10 @@ public class Identic {
 		// ---------------FileTypes--------------------------------
 
 	private void loadTargetList() {
-		if (cboTypeLists.getSelectedIndex() == -1) {// Nothing selected
+		if (cboTypeLists1.getSelectedIndex() == -1) {// Nothing selected
 			return;
 		}
-		String listName = (String) cboTypeLists.getSelectedItem();
+		String listName = (String) cboTypeLists1.getSelectedItem();
 		lblActiveListFind.setText(listName);
 		String listFile = fileListDirectory + listName + LIST_SUFFIX_DOT;
 		lblStatus.setText(listFile);
@@ -578,7 +578,7 @@ public class Identic {
 			typeListModel.addElement(f.getName().replace(LIST_SUFFIX_DOT, EMPTY_STRING));
 		} // for
 		Preferences myPrefs = Preferences.userNodeForPackage(Identic.class).node(this.getClass().getSimpleName());
-		cboTypeLists.setSelectedItem(myPrefs.get("ActiveList", "Pictures"));
+		cboTypeLists1.setSelectedItem(myPrefs.get("ActiveList", "Pictures"));
 		myPrefs = null;
 	}// initFileTypes
 
@@ -593,7 +593,7 @@ public class Identic {
 		myPrefs.putInt("Divider", splitPane1.getDividerLocation());
 		myPrefs.put("ListDirectory", fileListDirectory);
 		myPrefs.putInt("SideButtonIndex", sideButtonIndex);
-		myPrefs.put("ActiveList", (String) cboTypeLists.getSelectedItem());
+		myPrefs.put("ActiveList", (String) cboTypeLists1.getSelectedItem());
 		myPrefs.put("SourceDirectory", lblSourceFolder.getText());
 		myPrefs = null;
 	}// appClose
@@ -606,7 +606,6 @@ public class Identic {
 		splitPane1.setDividerLocation(174);
 
 		fileListDirectory = myPrefs.get("ListDirectory", EMPTY_STRING);
-		// cboTypeLists.setSelectedItem(myPrefs.get("ActiveList", "Pictures"));
 		sideButtonIndex = myPrefs.getInt("SideButtonIndex", 0);
 		lblSourceFolder.setText(myPrefs.get("SourceDirectory", NOT_SET));
 
@@ -614,12 +613,12 @@ public class Identic {
 
 		// These two arrays are synchronized to control the button positions and the selection of the correct panels.
 		catalogPanelIndex = 1; // index of btnFindDuplicatesWithCatalogs
-		sideMenuButtons = new JButton[] { btnFindDuplicates, btnFindDuplicatesWithCatalogs, btnDisplayResults,
+		sideMenuButtons = new JButton[] { btnFindDuplicates, btnListsAndCatalogs, btnDisplayResults,
 				btnCopyMoveRemove, btnApplicationLog };
 		sideMenuPanelNames = new String[] { panelFindDuplicates.getName(), panelFindDuplicatesWithCatalogs.getName(),
 				panelDisplayResults.getName(), panelCopyMoveRemove.getName(), paneApplicationlLog.getName() };
 
-		cboTypeLists.setModel(typeListModel);
+		cboTypeLists1.setModel(typeListModel);
 
 		listFindDuplicatesActive.setModel(targetModel);
 		listExcluded.setModel(excludeModel);
@@ -712,12 +711,12 @@ public class Identic {
 		btnFindDuplicates.setMaximumSize(new Dimension(1000, 23));
 		panelSideMenu.add(btnFindDuplicates);
 
-		btnFindDuplicatesWithCatalogs = new JButton("Find with Catalogs");
-		btnFindDuplicatesWithCatalogs.setAlignmentX(Component.CENTER_ALIGNMENT);
-		btnFindDuplicatesWithCatalogs.addActionListener(identicAdapter);
-		btnFindDuplicatesWithCatalogs.setName(BTN_FIND_DUPS_WITH_CATALOGS);
-		btnFindDuplicatesWithCatalogs.setMaximumSize(new Dimension(1000, 23));
-		panelSideMenu.add(btnFindDuplicatesWithCatalogs);
+		btnListsAndCatalogs = new JButton("Lists and Catalogs");
+		btnListsAndCatalogs.setAlignmentX(Component.CENTER_ALIGNMENT);
+		btnListsAndCatalogs.addActionListener(identicAdapter);
+		btnListsAndCatalogs.setName(BTN_FIND_DUPS_WITH_CATALOGS);
+		btnListsAndCatalogs.setMaximumSize(new Dimension(1000, 23));
+		panelSideMenu.add(btnListsAndCatalogs);
 
 		btnDisplayResults = new JButton("Display Results");
 		btnDisplayResults.setAlignmentX(Component.CENTER_ALIGNMENT);
@@ -871,32 +870,7 @@ public class Identic {
 		gbc_verticalStrut_19.gridy = 12;
 		panelFindDuplicates.add(verticalStrut_19, gbc_verticalStrut_19);
 
-		JPanel panel_3 = new JPanel();
-		panel_3.setBorder(new TitledBorder(new LineBorder(new Color(0, 0, 0), 1, true), "Active List",
-				TitledBorder.LEADING, TitledBorder.TOP, null, new Color(0, 0, 0)));
-		GridBagConstraints gbc_panel_3 = new GridBagConstraints();
-		gbc_panel_3.insets = new Insets(0, 0, 5, 0);
-		gbc_panel_3.anchor = GridBagConstraints.NORTH;
-		gbc_panel_3.fill = GridBagConstraints.HORIZONTAL;
-		gbc_panel_3.gridx = 0;
-		gbc_panel_3.gridy = 13;
-		panelFindDuplicates.add(panel_3, gbc_panel_3);
-		GridBagLayout gbl_panel_3 = new GridBagLayout();
-		gbl_panel_3.columnWidths = new int[] { 0, 0 };
-		gbl_panel_3.rowHeights = new int[] { 0, 0 };
-		gbl_panel_3.columnWeights = new double[] { 1.0, Double.MIN_VALUE };
-		gbl_panel_3.rowWeights = new double[] { 0.0, Double.MIN_VALUE };
-		panel_3.setLayout(gbl_panel_3);
 
-		cboTypeLists = new JComboBox<String>();
-		cboTypeLists.addActionListener(identicAdapter);
-		cboTypeLists.setName(CBO_TYPES_LIST);
-		GridBagConstraints gbc_cboTypeLists = new GridBagConstraints();
-		gbc_cboTypeLists.anchor = GridBagConstraints.NORTH;
-		gbc_cboTypeLists.fill = GridBagConstraints.HORIZONTAL;
-		gbc_cboTypeLists.gridx = 0;
-		gbc_cboTypeLists.gridy = 0;
-		panel_3.add(cboTypeLists, gbc_cboTypeLists);
 
 		Component verticalStrut_20 = Box.createVerticalStrut(20);
 		GridBagConstraints gbc_verticalStrut_20 = new GridBagConstraints();
@@ -905,14 +879,14 @@ public class Identic {
 		gbc_verticalStrut_20.gridy = 14;
 		panelFindDuplicates.add(verticalStrut_20, gbc_verticalStrut_20);
 
-		JButton btnManageTypeList = new JButton("Manage Type Lists");
-		btnManageTypeList.addActionListener(identicAdapter);
-		btnManageTypeList.setName(BTN_MANAGE_TYPE_LIST);
-		GridBagConstraints gbc_btnManageTypeList = new GridBagConstraints();
-		gbc_btnManageTypeList.insets = new Insets(0, 0, 5, 0);
-		gbc_btnManageTypeList.gridx = 0;
-		gbc_btnManageTypeList.gridy = 15;
-		panelFindDuplicates.add(btnManageTypeList, gbc_btnManageTypeList);
+//		JButton btnManageTypeList = new JButton("Manage Type Lists");
+//		btnManageTypeList.addActionListener(identicAdapter);
+//		btnManageTypeList.setName(BTN_MANAGE_TYPE_LIST);
+//		GridBagConstraints gbc_btnManageTypeList = new GridBagConstraints();
+//		gbc_btnManageTypeList.insets = new Insets(0, 0, 5, 0);
+//		gbc_btnManageTypeList.gridx = 0;
+//		gbc_btnManageTypeList.gridy = 15;
+//		panelFindDuplicates.add(btnManageTypeList, gbc_btnManageTypeList);
 
 		cbSaveExcludedFiles = new JCheckBox("Save Excluded Files");
 		cbSaveExcludedFiles.addActionListener(identicAdapter);
@@ -928,16 +902,53 @@ public class Identic {
 		panelDetails.add(panelFindDuplicatesWithCatalogs, PNL_FIND_DUPS_WITH_CATALOGS);// "name_669979253199403"
 		GridBagLayout gbl_panelFindDuplicatesByName = new GridBagLayout();
 		gbl_panelFindDuplicatesByName.columnWidths = new int[] { 0, 0 };
-		gbl_panelFindDuplicatesByName.rowHeights = new int[] { 0, 0 };
-		gbl_panelFindDuplicatesByName.columnWeights = new double[] { 0.0, Double.MIN_VALUE };
-		gbl_panelFindDuplicatesByName.rowWeights = new double[] { 0.0, Double.MIN_VALUE };
+		gbl_panelFindDuplicatesByName.rowHeights = new int[] { 0, 0, 0 };
+		gbl_panelFindDuplicatesByName.columnWeights = new double[] { 1.0, Double.MIN_VALUE };
+		gbl_panelFindDuplicatesByName.rowWeights = new double[] { 0.0, 0.0, Double.MIN_VALUE };
 		panelFindDuplicatesWithCatalogs.setLayout(gbl_panelFindDuplicatesByName);
+		
+		JPanel panel_9 = new JPanel();
+		GridBagConstraints gbc_panel_9 = new GridBagConstraints();
+		gbc_panel_9.insets = new Insets(0, 0, 5, 0);
+		gbc_panel_9.fill = GridBagConstraints.BOTH;
+		gbc_panel_9.gridx = 0;
+		gbc_panel_9.gridy = 0;
+		panelFindDuplicatesWithCatalogs.add(panel_9, gbc_panel_9);
+		GridBagLayout gbl_panel_9 = new GridBagLayout();
+		gbl_panel_9.columnWidths = new int[]{0, 0};
+		gbl_panel_9.rowHeights = new int[]{0, 0};
+		gbl_panel_9.columnWeights = new double[]{1.0, Double.MIN_VALUE};
+		gbl_panel_9.rowWeights = new double[]{0.0, Double.MIN_VALUE};
+		panel_9.setLayout(gbl_panel_9);
 
 		JLabel lblFindDuplicatesBy = new JLabel("Find Duplicates With Catalogs");
 		GridBagConstraints gbc_lblFindDuplicatesBy = new GridBagConstraints();
 		gbc_lblFindDuplicatesBy.gridx = 0;
 		gbc_lblFindDuplicatesBy.gridy = 0;
-		panelFindDuplicatesWithCatalogs.add(lblFindDuplicatesBy, gbc_lblFindDuplicatesBy);
+		panel_9.add(lblFindDuplicatesBy, gbc_lblFindDuplicatesBy);
+		
+		JPanel panel_10 = new JPanel();
+		panel_10.setBorder(new CompoundBorder(new TitledBorder(UIManager.getBorder("TitledBorder.border"), "Active List", TitledBorder.LEADING, TitledBorder.TOP, null, new Color(0, 0, 0)), new LineBorder(new Color(0, 0, 0), 1, true)));
+		GridBagConstraints gbc_panel_10 = new GridBagConstraints();
+		gbc_panel_10.fill = GridBagConstraints.BOTH;
+		gbc_panel_10.gridx = 0;
+		gbc_panel_10.gridy = 1;
+		panelFindDuplicatesWithCatalogs.add(panel_10, gbc_panel_10);
+		GridBagLayout gbl_panel_10 = new GridBagLayout();
+		gbl_panel_10.columnWidths = new int[]{0, 0};
+		gbl_panel_10.rowHeights = new int[]{0, 0};
+		gbl_panel_10.columnWeights = new double[]{1.0, Double.MIN_VALUE};
+		gbl_panel_10.rowWeights = new double[]{0.0, Double.MIN_VALUE};
+		panel_10.setLayout(gbl_panel_10);
+		
+		cboTypeLists1 = new JComboBox<String>();
+		cboTypeLists1.addActionListener(identicAdapter);
+		cboTypeLists1.setName("cboTypeLists");
+		GridBagConstraints gbc_cboTypeLists1 = new GridBagConstraints();
+		gbc_cboTypeLists1.fill = GridBagConstraints.HORIZONTAL;
+		gbc_cboTypeLists1.gridx = 0;
+		gbc_cboTypeLists1.gridy = 0;
+		panel_10.add(cboTypeLists1, gbc_cboTypeLists1);
 
 		panelDisplayResults = new JPanel();
 		panelDisplayResults.setName(PNL_DISPLAY_RESULTS);
@@ -1531,14 +1542,14 @@ public class Identic {
 		gbc_lblFilesNotProcessed.gridy = 0;
 		panel_1.add(lblFilesNotProcessed, gbc_lblFilesNotProcessed);
 
-		JPanel panelMainFindWithCatalogs = new JPanel();
-		panelMain.add(panelMainFindWithCatalogs, PNL_FIND_DUPS_WITH_CATALOGS);
-		GridBagLayout gbl_panelMainFIndDuplicatesByName = new GridBagLayout();
-		gbl_panelMainFIndDuplicatesByName.columnWidths = new int[] { 200, 0 };
-		gbl_panelMainFIndDuplicatesByName.rowHeights = new int[] { 0, 0, 0, 0 };
-		gbl_panelMainFIndDuplicatesByName.columnWeights = new double[] { 1.0, Double.MIN_VALUE };
-		gbl_panelMainFIndDuplicatesByName.rowWeights = new double[] { 0.0, 1.0, 1.0, Double.MIN_VALUE };
-		panelMainFindWithCatalogs.setLayout(gbl_panelMainFIndDuplicatesByName);
+		JPanel panelListsAndCatalogs = new JPanel();
+		panelMain.add(panelListsAndCatalogs, PNL_FIND_DUPS_WITH_CATALOGS);
+		GridBagLayout gbl_panelListsAndCatalogs = new GridBagLayout();
+		gbl_panelListsAndCatalogs.columnWidths = new int[] { 200, 0 };
+		gbl_panelListsAndCatalogs.rowHeights = new int[] { 0, 0, 0, 0 };
+		gbl_panelListsAndCatalogs.columnWeights = new double[] { 1.0, Double.MIN_VALUE };
+		gbl_panelListsAndCatalogs.rowWeights = new double[] { 0.0, 1.0, 1.0, Double.MIN_VALUE };
+		panelListsAndCatalogs.setLayout(gbl_panelListsAndCatalogs);
 
 		JLabel lblFindDuplicatesBy_1 = new JLabel("Find Duplicates With Catalogs");
 		lblFindDuplicatesBy_1.setHorizontalAlignment(SwingConstants.CENTER);
@@ -1546,7 +1557,7 @@ public class Identic {
 		gbc_lblFindDuplicatesBy_1.insets = new Insets(0, 0, 5, 0);
 		gbc_lblFindDuplicatesBy_1.gridx = 0;
 		gbc_lblFindDuplicatesBy_1.gridy = 0;
-		panelMainFindWithCatalogs.add(lblFindDuplicatesBy_1, gbc_lblFindDuplicatesBy_1);
+		panelListsAndCatalogs.add(lblFindDuplicatesBy_1, gbc_lblFindDuplicatesBy_1);
 		
 		JPanel panel_8 = new JPanel();
 		GridBagConstraints gbc_panel_8 = new GridBagConstraints();
@@ -1554,7 +1565,7 @@ public class Identic {
 		gbc_panel_8.insets = new Insets(0, 0, 5, 0);
 		gbc_panel_8.gridx = 0;
 		gbc_panel_8.gridy = 1;
-		panelMainFindWithCatalogs.add(panel_8, gbc_panel_8);
+		panelListsAndCatalogs.add(panel_8, gbc_panel_8);
 		GridBagLayout gbl_panel_8 = new GridBagLayout();
 		gbl_panel_8.columnWidths = new int[]{200, 50, 200, 0};
 		gbl_panel_8.rowHeights = new int[]{0, 0};
@@ -1643,7 +1654,7 @@ public class Identic {
 		gbc_panel_7.fill = GridBagConstraints.BOTH;
 		gbc_panel_7.gridx = 0;
 		gbc_panel_7.gridy = 2;
-		panelMainFindWithCatalogs.add(panel_7, gbc_panel_7);
+		panelListsAndCatalogs.add(panel_7, gbc_panel_7);
 		GridBagLayout gbl_panel_7 = new GridBagLayout();
 		gbl_panel_7.columnWidths = new int[] {0, 0};
 		gbl_panel_7.rowHeights = new int[]{0, 0, 0, 0, 0};
@@ -1828,6 +1839,14 @@ public class Identic {
 		mnuCatalogRemove.addActionListener(identicAdapter);
 		mnuCatalogRemove.setName(MNU_CATALOG_REMOVE);
 		mnuCatalog.add(mnuCatalogRemove);
+		
+		JMenu mnuList = new JMenu("Type List");
+		menuBar.add(mnuList);
+		
+		mnuListManage = new JMenuItem("Manage Lists...");
+		mnuListManage.setName(MNU_LIST_MANAGE);
+		mnuListManage.addActionListener(identicAdapter);
+		mnuList.add(mnuListManage);
 
 		JMenu mnuReports = new JMenu("Reports");
 		menuBar.add(mnuReports);
@@ -1858,6 +1877,9 @@ public class Identic {
 			// Menus
 			case MNU_FILE_EXIT:
 				doFileExit();
+				break;
+			case MNU_LIST_MANAGE:
+				doManageTypeList();
 				break;
 			case MNU_REPORTS_LOG_FILES:
 				break;
@@ -1915,9 +1937,9 @@ public class Identic {
 			case BTN_START:
 				doStart();
 				break;
-			case BTN_MANAGE_TYPE_LIST:
-				doManageTypeList();
-				break;
+//			case BTN_MANAGE_TYPE_LIST:
+//				doManageTypeList();
+//				break;
 
 			// Find Show Results
 			case RB_ALL_THE_FILES:
@@ -1960,6 +1982,8 @@ public class Identic {
 	private static final String MNU_REPORTS_LOG_FILES = "mnuReportsLogFiles";
 	private static final String MNU_REPORTS_XML_DOC = "mnuReportsXMLdoc";
 	private static final String MNU_HELP_ABOUT = "mnuHelpAbout";
+	
+	private static final String MNU_LIST_MANAGE = "mnuListManage";
 
 	private static final String MNU_CATALOG_NEW = "mnuCatalogNew";
 	private static final String MNU_CATALOG_ADD = "mnuCatalogAdd";
@@ -2001,7 +2025,7 @@ public class Identic {
 	private JSplitPane splitPane1;
 
 	private JButton btnFindDuplicates;
-	private JButton btnFindDuplicatesWithCatalogs;
+	private JButton btnListsAndCatalogs;
 	private JButton btnDisplayResults;
 	private JButton btnCopyMoveRemove;
 	private JButton btnApplicationLog;
@@ -2023,7 +2047,7 @@ public class Identic {
 	private JLabel lblActiveListFind;
 	private JList<String> listFindDuplicatesActive;
 	private JList<String> listExcluded;
-	private JComboBox<String> cboTypeLists;
+	private JComboBox<String> cboTypeLists1;
 	private JTextPane txtLog;
 	private JScrollPane scrollPaneResults;
 	private JCheckBox cbSaveExcludedFiles;
@@ -2042,6 +2066,7 @@ public class Identic {
 	private JTextField txtExcessStorage;
 	private JLabel lblDisplayResults;
 	private JTable tableResults;
+	private JMenuItem mnuListManage;
 	private JMenu mnuCatalog;
 	private JMenuItem mnuCatalogNew;
 	private JMenuItem mnuCatalogAdd;
