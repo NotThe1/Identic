@@ -62,9 +62,17 @@ public class SubjectTableModel extends AbstractTableModel{
 		} //
 	}// setValueAt
 	
+	public Object[] getRow(int rowNumber) {
+		Object[] row = new Object[this.getColumnCount()];
+		for (int i = 0; i < columns-1; i++) {
+			row[i] = lookup.get(new Point(rowNumber, i));
+		} // for
+		return row;
+	}//getRow
+	
 	public void addRow(Object[] values) {
 		rows++;
-		for (int i = 0; i < columns; i++) {
+		for (int i = 0; i < columns-1; i++) {
 			lookup.put(new Point(rows - 1, i), values[i]);
 		} // for
 	}// addRow
