@@ -33,7 +33,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.nio.file.attribute.FileTime;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
@@ -162,44 +161,57 @@ public class Identic {
 		ml.showDialog();
 		ml = null;
 	}// doManageTypeList
-	
+
 	private void doStart() {
-		if( rbNoCatalog.isSelected()) {
-			doStartNoCatalog() ;
-		}else if( rbWithCatalog.isSelected()) {
-			doStartWithCatalog();
-		}else if( rbOnlyCatalogs.isSelected()) {
+		initialiseFind();
+		if (rbNoCatalog.isSelected()) {	
+			log.addInfo(" doStartNoCatalogs()");
+			log.addInfo(lblSourceFolder.getText());
+			doStartNoCatalog();
+		} else if (rbWithCatalog.isSelected()) {
+			if (inUseCatalogItemModel.getSize() < 1) {
+				JOptionPane.showMessageDialog(frmIdentic, "At least One Catalog Item need to be\n on \"In Use\" List",
+						"Find Eith Catalog(s)", JOptionPane.ERROR_MESSAGE);
+				return;
+			} // if less than two
+			log.addInfo(" doStartWithCatalogs()");
+			log.addInfo(lblSourceFolder.getText());
 			doStartOnlyCatalogs();
-		}//if start type
-		
-	}//doStart
-	
+			doStartNoCatalog();
+		} else if (rbOnlyCatalogs.isSelected()) {
+			if (inUseCatalogItemModel.getSize() < 2) {
+				JOptionPane.showMessageDialog(frmIdentic, "At least Two Catalog Items need to be\n on \"In Use\" List",
+						"Find Only Catalogs", JOptionPane.ERROR_MESSAGE);
+				return;
+			} // if less than two
+			log.addInfo(" doStartNoCatalogs()");
+			doStartOnlyCatalogs();
+		} // if start type
+		log.addTimeStamp("End :");
+		markTheDuplicates();
+		displaySummary();
+
+	}// doStart
+
 	private void doStartOnlyCatalogs() {
-		if (inUseCatalogItemModel.getSize() < 2) {
-			JOptionPane.showMessageDialog(frmIdentic, "At least Two Catalog Items need to be\n on \"In Use\" List",
-					"Find Only Catalogs", JOptionPane.ERROR_MESSAGE);
-			return;
-		} // if less than two
+		GatherFromCatalogs gatherFromCatalogs = new GatherFromCatalogs();
+		Thread threadGather = new Thread(gatherFromCatalogs);
+		threadGather.start();
 
-		CatalogItem catalogItem;
-		for ( int i = 0 ; i < inUseCatalogItemModel.getSize();i++) {
-			catalogItem = inUseCatalogItemModel.get(i);
-			System.out.println(catalogItem.getEntryName());
-		}//for each catalog Item	
-	}//doStartWithCatalog
-	
-	private void doStartWithCatalog() {
-		List<CatalogItem> catalogItems = lstCatAvailable.getSelectedValuesList();
-		if (inUseCatalogItemModel.getSize() < 1) {
-			JOptionPane.showMessageDialog(frmIdentic, "At least One Catalog Item need to be\n on \"In Use\" List",
-					"Find Eith Catalog(s)", JOptionPane.ERROR_MESSAGE);
-			return;
-		} // if less than two
+		IdentifyDuplicates identifyDuplicates = new IdentifyDuplicates(threadGather);
+		Thread threadIdentifyDuplicates = new Thread(identifyDuplicates);
+		threadIdentifyDuplicates.start();
+
+		try {
+			threadGather.join();
+			threadIdentifyDuplicates.join();
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		} // try
+
+	}// doStartWithCatalog
 
 
-	
-	}//doStartWithCatalog
-	
 	/*
 	 * Start button initiates the scanning of the directories,identifying candidate and reject files, and buils a model
 	 * that contains the results for later display or saving.
@@ -222,23 +234,7 @@ public class Identic {
 					JOptionPane.DEFAULT_OPTION, JOptionPane.ERROR_MESSAGE);
 			return;
 		} // if
-		qSubjects.clear();
-		qRejects.clear();
 
-		fileCount = 0;
-		folderCount = 0;
-		subjectCount = 0;
-		rejectCount = 0;
-		excludeModel.clear();
-		hashCounts.clear();
-		subjectTableModel.clear();
-		rejectTableModel.clear();
-		lblFilesNotProcessed.setText(String.format("%,d", 0));
-
-		log.addTimeStamp("Start :");
-		log.addInfo(lblSourceFolder.getText());
-
-		// --------------------------
 		IdentifySubjects identifySubjects = new IdentifySubjects();
 		Thread threadIdentify = new Thread(identifySubjects);
 		threadIdentify.start();
@@ -265,15 +261,7 @@ public class Identic {
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		} // try
-		log.addTimeStamp("End :");
 
-		// Set<String> keys = hashCounts.keySet();
-		// appLogger.addNL();
-		// for (String key : keys) {
-		// appLogger.addInfo(String.format("%s - %,d occurances", key, hashCounts.get(key)));
-		// } // for
-		markTheDuplicates();
-		displaySummary();
 	}// doStart
 
 	private void displaySummary() {
@@ -300,6 +288,26 @@ public class Identic {
 		txtExcessStorage.setText(String.format("%,d", 0));
 
 	}// displaySummary
+
+	private void initialiseFind() {
+		qSubjects.clear();
+		qRejects.clear();
+
+		fileCount = 0;
+		folderCount = 0;
+		subjectCount = 0;
+		rejectCount = 0;
+		excludeModel.clear();
+		hashCounts.clear();
+		subjectTableModel.clear();
+		rejectTableModel.clear();
+		lblFilesNotProcessed.setText(String.format("%,d", 0));
+		hashIDs.clear();
+		hashCounts.clear();
+
+		log.addTimeStamp("Start :");
+
+	}// initialiseFind
 
 	// ---------------Find Duplicates--------------------------
 
@@ -781,7 +789,6 @@ public class Identic {
 		myPrefs = null;
 	}// appClose
 
-	
 	private void appInit() {
 
 		Preferences myPrefs = Preferences.userNodeForPackage(Identic.class).node(this.getClass().getSimpleName());
@@ -792,9 +799,9 @@ public class Identic {
 		// fileListDirectory = myPrefs.get("ListDirectory", EMPTY_STRING);
 		sideButtonIndex = myPrefs.getInt("SideButtonIndex", 0);
 		lblSourceFolder.setText(myPrefs.get("SourceDirectory", NOT_SET));
-		
+
 		String findTypeButton = myPrefs.get("findTypeButton", RB_CATALOG_NO);
-		switch(findTypeButton) {
+		switch (findTypeButton) {
 		case RB_CATALOG_NO:
 			rbNoCatalog.setSelected(true);
 			break;
@@ -804,7 +811,7 @@ public class Identic {
 		case RB_CATALOG_ONLY:
 			rbOnlyCatalogs.setSelected(true);
 			break;
-		}//switch find Type
+		}// switch find Type
 
 		myPrefs = null;
 
@@ -828,7 +835,7 @@ public class Identic {
 		bgShowResults.add(rbUniqueFiles);
 		bgShowResults.add(rbFilesNotProcessed);
 		bgShowResults.clearSelection();
-		
+
 		bgFindType.add(rbNoCatalog);
 		bgFindType.add(rbWithCatalog);
 		bgFindType.add(rbOnlyCatalogs);
@@ -952,14 +959,14 @@ public class Identic {
 
 		JButton btnStart = new JButton("Start");
 		btnStart.addActionListener(identicAdapter);
-		
+
 		Component verticalStrut = Box.createVerticalStrut(20);
 		GridBagConstraints gbc_verticalStrut = new GridBagConstraints();
 		gbc_verticalStrut.insets = new Insets(0, 0, 5, 0);
 		gbc_verticalStrut.gridx = 0;
 		gbc_verticalStrut.gridy = 0;
 		panelFindDuplicates.add(verticalStrut, gbc_verticalStrut);
-		
+
 		JPanel panelRadioButtons = new JPanel();
 		panelRadioButtons.setBorder(new BevelBorder(BevelBorder.LOWERED, null, null, null, null));
 		GridBagConstraints gbc_panelRadioButtons = new GridBagConstraints();
@@ -969,12 +976,12 @@ public class Identic {
 		gbc_panelRadioButtons.gridy = 1;
 		panelFindDuplicates.add(panelRadioButtons, gbc_panelRadioButtons);
 		GridBagLayout gbl_panelRadioButtons = new GridBagLayout();
-		gbl_panelRadioButtons.columnWidths = new int[]{0, 0};
-		gbl_panelRadioButtons.rowHeights = new int[]{0, 0, 0, 0};
-		gbl_panelRadioButtons.columnWeights = new double[]{1.0, Double.MIN_VALUE};
-		gbl_panelRadioButtons.rowWeights = new double[]{0.0, 0.0, 0.0, Double.MIN_VALUE};
+		gbl_panelRadioButtons.columnWidths = new int[] { 0, 0 };
+		gbl_panelRadioButtons.rowHeights = new int[] { 0, 0, 0, 0 };
+		gbl_panelRadioButtons.columnWeights = new double[] { 1.0, Double.MIN_VALUE };
+		gbl_panelRadioButtons.rowWeights = new double[] { 0.0, 0.0, 0.0, Double.MIN_VALUE };
 		panelRadioButtons.setLayout(gbl_panelRadioButtons);
-		
+
 		rbNoCatalog = new JRadioButton("No Catalog(s)");
 		rbNoCatalog.setName(RB_CATALOG_NO);
 		rbNoCatalog.setActionCommand(RB_CATALOG_NO);
@@ -985,7 +992,7 @@ public class Identic {
 		gbc_rbNoCatalog.gridx = 0;
 		gbc_rbNoCatalog.gridy = 0;
 		panelRadioButtons.add(rbNoCatalog, gbc_rbNoCatalog);
-		
+
 		rbWithCatalog = new JRadioButton("With Catalog(s)");
 		rbWithCatalog.setName(RB_CATALOG_WITH);
 		rbWithCatalog.setActionCommand(RB_CATALOG_WITH);
@@ -995,7 +1002,7 @@ public class Identic {
 		gbc_rbWithCatalog.gridx = 0;
 		gbc_rbWithCatalog.gridy = 1;
 		panelRadioButtons.add(rbWithCatalog, gbc_rbWithCatalog);
-		
+
 		rbOnlyCatalogs = new JRadioButton("Only Catalogs");
 		rbOnlyCatalogs.setName(RB_CATALOG_ONLY);
 		rbOnlyCatalogs.setActionCommand(RB_CATALOG_ONLY);
@@ -2018,10 +2025,10 @@ public class Identic {
 		JSeparator separator = new JSeparator();
 		mnuCatalog.add(separator);
 
-//		mnuCatalogClose = new JMenuItem("Close");
-//		mnuCatalogClose.addActionListener(identicAdapter);
-//		mnuCatalogClose.setName(MNU_CATALOG_CLOSE);
-//		mnuCatalog.add(mnuCatalogClose);
+		// mnuCatalogClose = new JMenuItem("Close");
+		// mnuCatalogClose.addActionListener(identicAdapter);
+		// mnuCatalogClose.setName(MNU_CATALOG_CLOSE);
+		// mnuCatalog.add(mnuCatalogClose);
 
 		JSeparator separator_2 = new JSeparator();
 		mnuCatalog.add(separator_2);
@@ -2039,16 +2046,16 @@ public class Identic {
 		JSeparator separator_1 = new JSeparator();
 		mnuCatalog.add(separator_1);
 
-//		mnuCatalogClear = new JMenuItem("Clear");
-//		mnuCatalogClear.addActionListener(identicAdapter);
-//		mnuCatalogClear.setName(MNU_CATALOG_CLEAR);
-//		mnuCatalog.add(mnuCatalogClear);
-//
-//		mnuCatalogReplace = new JMenuItem("Replace");
-//		mnuCatalogReplace.addActionListener(identicAdapter);
-//		mnuCatalogReplace.setName(MNU_CATALOG_REPLACE);
-//		mnuCatalog.add(mnuCatalogReplace);
-//
+		// mnuCatalogClear = new JMenuItem("Clear");
+		// mnuCatalogClear.addActionListener(identicAdapter);
+		// mnuCatalogClear.setName(MNU_CATALOG_CLEAR);
+		// mnuCatalog.add(mnuCatalogClear);
+		//
+		// mnuCatalogReplace = new JMenuItem("Replace");
+		// mnuCatalogReplace.addActionListener(identicAdapter);
+		// mnuCatalogReplace.setName(MNU_CATALOG_REPLACE);
+		// mnuCatalog.add(mnuCatalogReplace);
+		//
 		mnuCatalogRemove = new JMenuItem("Remove");
 		mnuCatalogRemove.addActionListener(identicAdapter);
 		mnuCatalogRemove.setName(MNU_CATALOG_REMOVE);
@@ -2153,7 +2160,7 @@ public class Identic {
 			case RB_FILES_NOT_PROCESSED:
 				doShowResults();
 				break;
-				
+
 			// Types of Find
 			case RB_CATALOG_NO:
 			case RB_CATALOG_WITH:
@@ -2193,8 +2200,8 @@ public class Identic {
 	private static final String EMPTY_STRING = "";
 	private static final String LIST_SUFFIX = "typeList";
 	private static final String LIST_SUFFIX_DOT = ".typeList";
-	private static final String CATALOG_SUFFIX = "ser";
-	private static final String CATALOG_SUFFIX_DOT = ".ser";
+	private static final String CATALOG_SUFFIX = "catalog";
+	private static final String CATALOG_SUFFIX_DOT = ".catalog";
 
 	private static final String MNU_FILE_EXIT = "mnuFileExit";
 	private static final String MNU_REPORTS_LOG_FILES = "mnuReportsLogFiles";
@@ -2206,11 +2213,11 @@ public class Identic {
 	private static final String MNU_CATALOG_NEW = "mnuCatalogNew";
 	private static final String MNU_CATALOG_COMBINE = "mnuCatalogCombine";
 	private static final String MNU_CATALOG_LOAD = "mnuCatalogLoad";
-//	private static final String MNU_CATALOG_CLOSE = "mnuCatalogClose";
+	// private static final String MNU_CATALOG_CLOSE = "mnuCatalogClose";
 	private static final String MNU_CATALOG_IMPORT = "mnuCatalogImport";
 	private static final String MNU_CATALOG_EXPORT = "mnuCatalogExport";
-//	private static final String MNU_CATALOG_CLEAR = "mnuCatalogClear";
-//	private static final String MNU_CATALOG_REPLACE = "mnuCatalogReplace";
+	// private static final String MNU_CATALOG_CLEAR = "mnuCatalogClear";
+	// private static final String MNU_CATALOG_REPLACE = "mnuCatalogReplace";
 	private static final String MNU_CATALOG_REMOVE = "mnuCatalogRemove";
 
 	// Side Menu Buttons
@@ -2231,11 +2238,10 @@ public class Identic {
 	private static final String RB_DUPLICATE_FILES = "rbDuplicateFiles";
 	private static final String RB_UNIQUE_FILES = "rbUniqueFiles";
 	private static final String RB_FILES_NOT_PROCESSED = "rbFilesNotProcessed";
-	
+
 	private static final String RB_CATALOG_NO = "rbNoCatalog";
 	private static final String RB_CATALOG_WITH = "rbWithCatalog";
 	private static final String RB_CATALOG_ONLY = "rbOnlyCatalogs";
-	
 
 	private static final String CBO_TYPES_LIST = "cboTypeLists";
 	private static final String PNL_FIND_DUPS = "pnlFindDuplicates";
@@ -2368,11 +2374,11 @@ public class Identic {
 
 			@Override
 			public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-				FileTime lastModifieTime;
+				String lastModifieTime;
 				long fileSize;
 				fileCount++;
 				String fileName = file.getFileName().toString();
-				lastModifieTime = Files.getLastModifiedTime(file);
+				lastModifieTime = Files.getLastModifiedTime(file).toString();
 				// System.out.println(Files.getLastModifiedTime(file).to(TimeUnit.SECONDS));
 				// System.out.println(Files.getLastModifiedTime(file).toString());
 				fileSize = Files.size(file);
@@ -2451,8 +2457,8 @@ public class Identic {
 
 	/*
 	 * 
-	 * MakeFileKey - takes as input qSubjects and adds the hashKey to each FileStatSubject and
-	 *  loads the FileStatSubject into qHashes queue.
+	 * MakeFileKey - takes as input qSubjects and adds the hashKey to each FileStatSubject and loads the FileStatSubject
+	 * into qHashes queue.
 	 *
 	 */
 
@@ -2541,8 +2547,8 @@ public class Identic {
 		@Override
 		public void run() {
 			fileID = 0;
-			hashIDs.clear();
-			hashCounts.clear();
+//			hashIDs.clear();
+//			hashCounts.clear();
 			FileStatSubject subject;
 			while (true) {
 				try {
@@ -2573,6 +2579,30 @@ public class Identic {
 	}// class IdentifyDuplicates
 
 	/////////////////////////////////////////
+
+	public class GatherFromCatalogs implements Runnable {
+
+		@Override
+		public void run() {
+			FileStatSubject fileStatSubject;
+			SubjectTableModel subjectTableModel;
+			CatalogItem catalogItem;
+			for (int i = 0; i < inUseCatalogItemModel.getSize(); i++) {
+				catalogItem = inUseCatalogItemModel.get(i);
+				subjectTableModel = catalogItem.getSubjectTableModel();
+				for (int rowNumber = 0; rowNumber < subjectTableModel.getRowCount(); rowNumber++) {
+					Object[] o = subjectTableModel.getCatalogItem(rowNumber);
+					fileStatSubject = new FileStatSubject(o);
+					// System.out.printf("row %d [%s]\t[%s]\t[%d]\t[%s]\t[%s] %n", rowNumber,o[0],o[1],o[2],o[3],o[4]);
+					// System.out.printf("[%s]\t[%s]\t[%d]\t[%s]\t[%s] %n",
+					// fileStatSubject.getFileName(),fileStatSubject.getDirectory(),fileStatSubject.getFileSize(),
+					// fileStatSubject.getFileTime(),fileStatSubject.getHashKey());
+					qHashes.add(fileStatSubject);
+				} // for each row
+				System.out.println(catalogItem.getEntryName());
+			} // for each catalog Item
+		}// run
+	}// class GatherFromCatalogs
 
 	//////////////////////////// [[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[
 

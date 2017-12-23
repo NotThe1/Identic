@@ -1,15 +1,14 @@
 package identic;
 
 import java.nio.file.Path;
-import java.nio.file.attribute.FileTime;
 
 public class FileStat {
 	private Path filePath;
 	private long fileSize;
-	private FileTime fileTime;
+	private String fileTime;
 	private String	hashKey;
 	
-	public FileStat(Path filePath, long fileSize, FileTime fileTime){
+	public FileStat(Path filePath, long fileSize, String fileTime){
 		this.filePath = filePath;
 		this.fileSize = fileSize;
 		this.fileTime = fileTime;
@@ -27,7 +26,7 @@ public class FileStat {
 		return fileSize;
 	}//getFileName
 	
-	public FileTime getFileTime(){
+	public String getFileTime(){
 		return fileTime;
 	}//getFileName
 	

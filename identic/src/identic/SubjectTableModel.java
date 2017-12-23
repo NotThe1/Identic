@@ -69,6 +69,17 @@ public class SubjectTableModel extends AbstractTableModel{
 		} // for
 		return row;
 	}//getRow
+
+	// omit the two columns Duplicate an File ID
+	
+	public Object[] getCatalogItem(int rowNumber) {
+		Object[] row = new Object[this.getColumnCount()];
+		for (int i = 0; i < 4; i++) {
+			row[i] = lookup.get(new Point(rowNumber, i));
+		} // for
+		row[4] = lookup.get(new Point(rowNumber, 6));
+		return row;
+	}//getCatalogItem
 	
 	public void addRow(Object[] values) {
 		rows++;

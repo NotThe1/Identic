@@ -1,17 +1,23 @@
 package identic;
 
 import java.nio.file.Path;
-import java.nio.file.attribute.FileTime;
+import java.nio.file.Paths;
 
 public class FileStatSubject extends FileStat {
 
 	String hashKey;
 
-//	public FileStatSubject(Path filePath, long fileSize, FileTime fileTime, String hashKey) {
-//		super(filePath, fileSize, fileTime);
-//		this.hashKey = hashKey;
-//	}// Constructor
-	public FileStatSubject(Path filePath, long fileSize, FileTime fileTime) {
+	public FileStatSubject(Path filePath, long fileSize, String fileTime, String hashKey) {
+		super(filePath, fileSize, fileTime);
+		this.hashKey = hashKey;
+	}// Constructor
+	
+	public FileStatSubject ( Object[] catalogItem) {
+		super(Paths.get((String)catalogItem[1] , (String)catalogItem[0]) , (long)catalogItem[2] ,(String)catalogItem[3]) ;
+		this.hashKey = (String)catalogItem[4] ;
+	}//Constructor
+	
+	public FileStatSubject(Path filePath, long fileSize, String fileTime) {
 		super(filePath, fileSize, fileTime);
 	}// Constructor
 	
