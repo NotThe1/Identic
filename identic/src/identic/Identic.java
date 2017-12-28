@@ -164,7 +164,7 @@ public class Identic {
 
 	private void doStart() {
 		initialiseFind();
-		if (rbNoCatalog.isSelected()) {	
+		if (rbNoCatalog.isSelected()) {
 			log.addInfo(" doStartNoCatalogs()");
 			log.addInfo(lblSourceFolder.getText());
 			doStartNoCatalog();
@@ -210,7 +210,6 @@ public class Identic {
 		} // try
 
 	}// doStartWithCatalog
-
 
 	/*
 	 * Start button initiates the scanning of the directories,identifying candidate and reject files, and buils a model
@@ -494,7 +493,7 @@ public class Identic {
 		lblSelectedCatalogName.setText(catalogItem.getEntryName());
 		lblSelectedCatalogDescription.setText(catalogItem.getEntryDescription());
 		lblSelectedCatalogDirectory.setText(catalogItem.getEntryStartDirectory());
-		String rowCount = String.format("%,d Rows", catalogItem.getSubjectTableModel().getRowCount());
+		String rowCount = String.format("%,d Rows", catalogItem.getFileStats().size());
 		lblSelectedCatalogCount.setText(rowCount);
 	}// doCatalogListSelected
 
@@ -539,17 +538,18 @@ public class Identic {
 
 		log.addInfo(String.format("[doCatalogCombine()] Name: %s", catalogDialog.getName()));
 		log.addInfo(String.format("Description: %s", catalogDialog.getDescription()));
-		SubjectTableModel newCombinedTableModel = new SubjectTableModel();
-		List<String> startingDirectorys = new ArrayList<String>();
+
+		ArrayList<FileStat> newCombinedFileStats = null;
+		
+		List<String> startingDirectorys = new ArrayList<String>(); // possibble future use
+		
 		for (CatalogItem catalogItem : catalogItems) {
-			startingDirectorys.add(catalogItem.getEntryStartDirectory());
-			for (int rowNumber = 0; rowNumber < catalogItem.subjectTableModel.getRowCount(); rowNumber++) {
-				newCombinedTableModel.addRow(catalogItem.subjectTableModel.getRow(rowNumber));
-			} // for each row
+			startingDirectorys.add(catalogItem.getEntryStartDirectory());// possibble future use
+			newCombinedFileStats.addAll(catalogItem.getFileStats());
 		} // for each catalogItem
 
 		CatalogItem testOut = new CatalogItem(catalogDialog.getName(), catalogDialog.getDescription(),
-				makeStartingDirectory(startingDirectorys), newCombinedTableModel);
+				makeStartingDirectory(startingDirectorys), newCombinedFileStats);
 
 		try {
 			FileOutputStream fos = new FileOutputStream(
@@ -571,7 +571,7 @@ public class Identic {
 
 	}// doCatalogCombine
 
-	private String makeStartingDirectory(List<String> startingDirectorys) {
+	private String makeStartingDirectory(List<String> startingDirectorys) {// possibble future use
 		String result = "";
 		result = startingDirectorys.get(0);
 
@@ -645,18 +645,18 @@ public class Identic {
 
 		CatalogDialog catalogDialog = CatalogDialog.makeNewCatalogDialog();
 		if (catalogDialog.showDialog() == JOptionPane.OK_OPTION) {
-			System.out.printf("state: JOptionPane.OK_OPTION%n");
+			// System.out.printf("state: JOptionPane.OK_OPTION%n");
 			log.addInfo(String.format("Name: %s", catalogDialog.getName()));
 			log.addInfo(String.format("Description: %s", catalogDialog.getDescription()));
-			// CatalogItem ci = new CatalogItem(catalogDialog.getName(), catalogDialog.getDescription(),
-			// lblSourceFolder.getText(), subjectTableModel);
-			CatalogItem testOut = new CatalogItem(catalogDialog.getName(), catalogDialog.getDescription(),
-					lblSourceFolder.getText(), subjectTableModel);
+
+			 CatalogItem catalogItem = new CatalogItem(catalogDialog.getName(), catalogDialog.getDescription(),
+			 lblSourceFolder.getText(), collectFileInfo(subjectTableModel));
+
 			try {
 				FileOutputStream fos = new FileOutputStream(
 						getApplcationWorkingDirectory() + catalogDialog.getName() + CATALOG_SUFFIX_DOT);
 				ObjectOutputStream oos = new ObjectOutputStream(fos);
-				oos.writeObject(testOut);
+				oos.writeObject(catalogItem);
 				oos.close();
 				fos.close();
 			} catch (IOException e) {
@@ -666,28 +666,22 @@ public class Identic {
 				log.addError(message);
 				e.printStackTrace();
 			} // try
-
-			// try {
-			// FileInputStream fis = new FileInputStream(getApplcationWorkingDirectory() + catalogDialog.getName() +
-			// CATALOG_SUFFIX_DOT);
-			// ObjectInputStream ois = new ObjectInputStream(fis);
-			// CatalogItem testIn = (CatalogItem) ois.readObject();
-			// ois.close();
-			// fis.close();
-			// System.out.printf("Name: %s, Desc: %s%n", testIn.getEntryName(), testIn.getEntryDescription());
-			// System.out.printf("Directory %s, %n", testIn.getEntryStartDirectory());
-			// System.out.printf("RowCount %s, %n", testIn.getSubjectTableModel().getRowCount());
-			// } catch (Exception e) {
-			// // TODO: handle exception
-			// } // try
 		} else {
 			// if valid
 			System.out.printf("state: NOT OK_OPTION%n");
 		} // if
 		catalogDialog = null;
-		doCatalogLoadList();
+		 doCatalogLoadList();
 
 	}// doCatalogNew
+
+	private ArrayList<FileStat> collectFileInfo(SubjectTableModel subjectTableModel) {
+		ArrayList<FileStat> result = new ArrayList();
+		for (int row = 0; row < subjectTableModel.getRowCount(); row++) {
+			result.add(subjectTableModel.getFileStat(row));
+		} // for - row
+		return result;
+	}
 
 	//////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////
@@ -2390,12 +2384,13 @@ public class Identic {
 					part = parts[partsCount - 1].toUpperCase();
 					if (targetSuffixes.contains(part)) {
 						subjectCount++;
-						qSubjects.add(new FileStat(file, fileSize, lastModifieTime));
+						qSubjects.add(new FileStat(file.toString(), fileSize, lastModifieTime));
 					} else {
 						rejectCount++;
 						lblFilesNotProcessed.setText(String.format("%,d", rejectCount));
 						keepSuffixCount(part);
-						qRejects.add(new FileStatReject(file, fileSize, lastModifieTime, FileStat.NOT_ON_LIST));
+						qRejects.add(
+								new FileStatReject(file.toString(), fileSize, lastModifieTime, FileStat.NOT_ON_LIST));
 					} // if
 				} // if - only process files with suffixes
 				return FileVisitResult.CONTINUE;
@@ -2403,7 +2398,7 @@ public class Identic {
 
 			@Override
 			public FileVisitResult visitFileFailed(Path file, IOException exc) throws IOException {
-				qRejects.add(new FileStatReject(file, 0, null, FileStat.IO_EXCEPTION));
+				qRejects.add(new FileStatReject(file.toString(), 0, null, FileStat.IO_EXCEPTION));
 				return FileVisitResult.CONTINUE;
 			}// FileVisitResult
 
@@ -2487,7 +2482,7 @@ public class Identic {
 					fileName = fileStat.getFileName();
 					count++;
 					try {
-						key = hashFile(fileStat.getFilePathString(), algorithm);
+						key = hashFile(fileStat.getFilePath(), algorithm);
 						fileStat.setHashKey(key);
 						qHashes.add(fileStat);
 						// appLogger.addInfo(key + " - " + fileName);
@@ -2547,8 +2542,8 @@ public class Identic {
 		@Override
 		public void run() {
 			fileID = 0;
-//			hashIDs.clear();
-//			hashCounts.clear();
+			// hashIDs.clear();
+			// hashCounts.clear();
 			FileStat subject;
 			while (true) {
 				try {
@@ -2582,25 +2577,18 @@ public class Identic {
 
 	public class GatherFromCatalogs implements Runnable {
 
-		@Override
+		// @Override
 		public void run() {
-			FileStat fileStat;
-			SubjectTableModel subjectTableModel;
+			// SubjectTableModel subjectTableModel;
 			CatalogItem catalogItem;
 			for (int i = 0; i < inUseCatalogItemModel.getSize(); i++) {
 				catalogItem = inUseCatalogItemModel.get(i);
-				subjectTableModel = catalogItem.getSubjectTableModel();
-				for (int rowNumber = 0; rowNumber < subjectTableModel.getRowCount(); rowNumber++) {
-					Object[] o = subjectTableModel.getCatalogItem(rowNumber);
-					fileStat = new FileStat(o);
-					// System.out.printf("row %d [%s]\t[%s]\t[%d]\t[%s]\t[%s] %n", rowNumber,o[0],o[1],o[2],o[3],o[4]);
-					// System.out.printf("[%s]\t[%s]\t[%d]\t[%s]\t[%s] %n",
-					// fileStatSubject.getFileName(),fileStatSubject.getDirectory(),fileStatSubject.getFileSize(),
-					// fileStatSubject.getFileTime(),fileStatSubject.getHashKey());
+				ArrayList<FileStat> fileStats = catalogItem.getFileStats();
+				for (FileStat fileStat : fileStats) {
 					qHashes.add(fileStat);
-				} // for each row
+				} // for - fileStat
 				System.out.println(catalogItem.getEntryName());
-			} // for each catalog Item
+			} // for - each catalog Item
 		}// run
 	}// class GatherFromCatalogs
 

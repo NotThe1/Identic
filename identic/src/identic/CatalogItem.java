@@ -3,12 +3,13 @@ package identic;
 import java.io.Serializable;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 
 public class CatalogItem implements Serializable{
 	
 	private static final long serialVersionUID = 1L;
 	String entryName,entryDescription,entryStartDirectory;
-	SubjectTableModel subjectTableModel;
+	ArrayList<FileStat> fileStats;
 	public static final String EMPTY_ITEM = "emptyItem";
 	
 	
@@ -27,11 +28,11 @@ public class CatalogItem implements Serializable{
 
 	
 	public CatalogItem(String entryName,String entryDescription,String entryStartDirectory,
-			SubjectTableModel subjectTableModel	) {
+			ArrayList<FileStat> fileStats	) {
 		this.entryName = entryName;
 		this.entryDescription = entryDescription;
 		this.entryStartDirectory = entryStartDirectory;
-		this.subjectTableModel = subjectTableModel;
+		this.fileStats = fileStats;
 	}//CatalogItem
 
 	public String getEntryName() {
@@ -58,12 +59,12 @@ public class CatalogItem implements Serializable{
 		this.entryStartDirectory = entryStartDirectory;
 	}//setEntryStartDirectory
 
-	public SubjectTableModel getSubjectTableModel() {
-		return subjectTableModel;
+	public ArrayList<FileStat> getFileStats() {
+		return fileStats;
 	}//getSubjectTableModel
 
-	public void setSubjectTableModel(SubjectTableModel subjectTableModel) {
-		this.subjectTableModel = subjectTableModel;
+	public void setFileStats(ArrayList<FileStat> fileStats) {
+		this.fileStats= fileStats;
 	}//setSubjectTableModel
 	
 	public String toString() {

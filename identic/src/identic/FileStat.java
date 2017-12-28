@@ -1,40 +1,40 @@
 package identic;
 
-import java.nio.file.Path;
+import java.io.Serializable;
 import java.nio.file.Paths;
 
-public class FileStat {
-	private Path filePath;
+public class FileStat implements Serializable{
+	private String filePath;
 	private long fileSize;
 	private String fileTime;
 	private String	hashKey;
 	
-	public FileStat(Path filePath, long fileSize, String fileTime){
+	public FileStat(String filePath, long fileSize, String fileTime){
 		this.filePath = filePath;
 		this.fileSize = fileSize;
 		this.fileTime = fileTime;
 	}//Constructor
 	
-	public FileStat(Path filePath, long fileSize, String fileTime, String hashKey){
+	public FileStat(String filePath, long fileSize, String fileTime, String hashKey){
 		this.filePath = filePath;
 		this.fileSize = fileSize;
 		this.fileTime = fileTime;
 		this.hashKey= hashKey;
 	}//Constructor
 	
-	public FileStat ( Object[] catalogItem) {
-		this.filePath = Paths.get((String)catalogItem[1] , (String)catalogItem[0]);
-		this.fileSize = (long)catalogItem[2];
-		this.fileTime = (String)catalogItem[3];
-		this.hashKey= (String)catalogItem[4] ;
-
+//	public FileStat ( Object[] catalogItem) {
+//		this.filePath = Paths.get((String)catalogItem[1] , (String)catalogItem[0]);
+//		this.fileSize = (long)catalogItem[2];
+//		this.fileTime = (String)catalogItem[3];
+//		this.hashKey= (String)catalogItem[4] ;
+//
 //		super(Paths.get((String)catalogItem[1] , (String)catalogItem[0]) , (long)catalogItem[2] ,(String)catalogItem[3]) ;
 //		this.hashKey = (String)catalogItem[4] ;
-	}//Constructor
+//	}//Constructor
 	
 
 	
-	public Path getFilePath(){
+	public String getFilePath(){
 		return filePath;
 	}//getFilePath
 	
@@ -60,16 +60,17 @@ public class FileStat {
 
 
 	public String getFileName(){
-		return filePath== null?"":filePath.getFileName().toString();
+		return Paths.get(this.filePath).getFileName().toString();
+//		return filePath== null?"":this.filePath;
 	}//getFileName
 	
 	public String getDirectory(){
-		return filePath== null?"":filePath.getParent().toString();
+		return Paths.get(filePath).getParent().toString();
 	}//getDirectory
 	
-	public Path getParent(){
-		return filePath.getParent();
-	}//getParent
+//	public String getParent(){
+//		return filePath.getParent();
+//	}//getParent
 	
 //	public String getModifiedDate(){
 //		return fileTime.toString();
