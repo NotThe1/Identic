@@ -95,12 +95,12 @@ public class Identic {
 	private DefaultListModel<String> excludeModel = new DefaultListModel<>();
 	private ArrayList<String> targetSuffixes = new ArrayList<>();
 
-	private LinkedBlockingQueue<FileStatSubject> qSubjects = new LinkedBlockingQueue<FileStatSubject>();
+	private LinkedBlockingQueue<FileStat> qSubjects = new LinkedBlockingQueue<FileStat>();
 
 	private LinkedBlockingQueue<FileStatReject> qRejects = new LinkedBlockingQueue<FileStatReject>();
 	private RejectTableModel rejectTableModel = new RejectTableModel();
 
-	private LinkedBlockingQueue<FileStatSubject> qHashes = new LinkedBlockingQueue<FileStatSubject>();
+	private LinkedBlockingQueue<FileStat> qHashes = new LinkedBlockingQueue<FileStat>();
 	private SubjectTableModel subjectTableModel = new SubjectTableModel();
 
 	private HashMap<String, Integer> hashCounts = new HashMap<String, Integer>();;
@@ -2390,7 +2390,7 @@ public class Identic {
 					part = parts[partsCount - 1].toUpperCase();
 					if (targetSuffixes.contains(part)) {
 						subjectCount++;
-						qSubjects.add(new FileStatSubject(file, fileSize, lastModifieTime));
+						qSubjects.add(new FileStat(file, fileSize, lastModifieTime));
 					} else {
 						rejectCount++;
 						lblFilesNotProcessed.setText(String.format("%,d", rejectCount));
@@ -2476,20 +2476,20 @@ public class Identic {
 
 		@Override
 		public void run() {
-			FileStatSubject fileStatSubject;
+			FileStat fileStat;
 
 			int count = 0;
 			String fileName = null;
 			String key = null;
 			while (true) {
 				try {
-					fileStatSubject = qSubjects.remove();
-					fileName = fileStatSubject.getFileName();
+					fileStat = qSubjects.remove();
+					fileName = fileStat.getFileName();
 					count++;
 					try {
-						key = hashFile(fileStatSubject.getFilePathString(), algorithm);
-						fileStatSubject.setHashKey(key);
-						qHashes.add(fileStatSubject);
+						key = hashFile(fileStat.getFilePathString(), algorithm);
+						fileStat.setHashKey(key);
+						qHashes.add(fileStat);
 						// appLogger.addInfo(key + " - " + fileName);
 					} catch (HashGenerationException e) {
 						log.addError("HashGenerationError", fileName);
@@ -2549,7 +2549,7 @@ public class Identic {
 			fileID = 0;
 //			hashIDs.clear();
 //			hashCounts.clear();
-			FileStatSubject subject;
+			FileStat subject;
 			while (true) {
 				try {
 					subject = qHashes.remove();
@@ -2584,7 +2584,7 @@ public class Identic {
 
 		@Override
 		public void run() {
-			FileStatSubject fileStatSubject;
+			FileStat fileStat;
 			SubjectTableModel subjectTableModel;
 			CatalogItem catalogItem;
 			for (int i = 0; i < inUseCatalogItemModel.getSize(); i++) {
@@ -2592,12 +2592,12 @@ public class Identic {
 				subjectTableModel = catalogItem.getSubjectTableModel();
 				for (int rowNumber = 0; rowNumber < subjectTableModel.getRowCount(); rowNumber++) {
 					Object[] o = subjectTableModel.getCatalogItem(rowNumber);
-					fileStatSubject = new FileStatSubject(o);
+					fileStat = new FileStat(o);
 					// System.out.printf("row %d [%s]\t[%s]\t[%d]\t[%s]\t[%s] %n", rowNumber,o[0],o[1],o[2],o[3],o[4]);
 					// System.out.printf("[%s]\t[%s]\t[%d]\t[%s]\t[%s] %n",
 					// fileStatSubject.getFileName(),fileStatSubject.getDirectory(),fileStatSubject.getFileSize(),
 					// fileStatSubject.getFileTime(),fileStatSubject.getHashKey());
-					qHashes.add(fileStatSubject);
+					qHashes.add(fileStat);
 				} // for each row
 				System.out.println(catalogItem.getEntryName());
 			} // for each catalog Item

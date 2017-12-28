@@ -88,7 +88,7 @@ public class SubjectTableModel extends AbstractTableModel{
 		} // for
 	}// addRow
 	
-	public void addRow(FileStatSubject subject){
+	public void addRow(FileStat subject){
 		rows++;
 		lookup.put(new Point(rows - 1, 0), subject.getFileName());
 		lookup.put(new Point(rows - 1, 1), subject.getDirectory());
@@ -99,7 +99,7 @@ public class SubjectTableModel extends AbstractTableModel{
 		lookup.put(new Point(rows - 1, 6), subject.getHashKey());
 	}//addRow
 
-	public void addRow(FileStatSubject subject,Integer fileID){
+	public void addRow(FileStat subject,Integer fileID){
 		rows++;
 		lookup.put(new Point(rows - 1, 0), subject.getFileName());
 		lookup.put(new Point(rows - 1, 1), subject.getDirectory());
