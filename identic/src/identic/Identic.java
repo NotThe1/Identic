@@ -155,6 +155,12 @@ public class Identic {
 			lblSourceFolder.setText(fc.getSelectedFile().getAbsolutePath());
 		} // if
 	}// doSourceDirectory
+	
+	private void doShowTypeList() {
+		DisplayActiveTypeList dl = new DisplayActiveTypeList();
+		dl.show("List name", targetModel);
+		dl = null;
+	}//doShowTypeList
 
 	private void doManageTypeList() {
 		ManageLists ml = new ManageLists();
@@ -179,7 +185,7 @@ public class Identic {
 			doStartOnlyCatalogs();
 			doStartNoCatalog();
 		} else if (rbOnlyCatalogs.isSelected()) {
-			if (inUseCatalogItemModel.getSize() < 2) {
+			if (inUseCatalogItemModel.getSize() < 1) {
 				JOptionPane.showMessageDialog(frmIdentic, "At least Two Catalog Items need to be\n on \"In Use\" List",
 						"Find Only Catalogs", JOptionPane.ERROR_MESSAGE);
 				return;
@@ -518,7 +524,7 @@ public class Identic {
 			String message = String.format("[doCatalogImport()] name : %s", name);
 			log.addError(message);
 			e.printStackTrace();
-		} // try ccopy
+		} // try copy
 
 		doCatalogLoadList();
 	}// doCatalogImport
@@ -539,7 +545,7 @@ public class Identic {
 		log.addInfo(String.format("[doCatalogCombine()] Name: %s", catalogDialog.getName()));
 		log.addInfo(String.format("Description: %s", catalogDialog.getDescription()));
 
-		ArrayList<FileStat> newCombinedFileStats = null;
+		ArrayList<FileStat> newCombinedFileStats = new ArrayList<FileStat>();
 		
 		List<String> startingDirectorys = new ArrayList<String>(); // possibble future use
 		
@@ -548,14 +554,14 @@ public class Identic {
 			newCombinedFileStats.addAll(catalogItem.getFileStats());
 		} // for each catalogItem
 
-		CatalogItem testOut = new CatalogItem(catalogDialog.getName(), catalogDialog.getDescription(),
+		CatalogItem combinedCatalogItem = new CatalogItem(catalogDialog.getName(), catalogDialog.getDescription(),
 				makeStartingDirectory(startingDirectorys), newCombinedFileStats);
 
 		try {
 			FileOutputStream fos = new FileOutputStream(
 					getApplcationWorkingDirectory() + catalogDialog.getName() + CATALOG_SUFFIX_DOT);
 			ObjectOutputStream oos = new ObjectOutputStream(fos);
-			oos.writeObject(testOut);
+			oos.writeObject(combinedCatalogItem);
 			oos.close();
 			fos.close();
 		} catch (IOException e) {
@@ -702,6 +708,11 @@ public class Identic {
 			return false;
 		}// accept
 	}// ListFilter
+	
+	private void updateTypeListMenu() {
+//		MenuElement[] menuItems = mnuList.getSubElements();
+		Component[] menuItems = mnuList.getComponents();
+	}//updateTypeListMenu
 
 	private void initPanels() {
 		doSideMenu(sideMenuButtons[sideButtonIndex]);
@@ -2055,13 +2066,22 @@ public class Identic {
 		mnuCatalogRemove.setName(MNU_CATALOG_REMOVE);
 		mnuCatalog.add(mnuCatalogRemove);
 
-		JMenu mnuList = new JMenu("Type List");
+		mnuList = new JMenu("Type List");
 		menuBar.add(mnuList);
 
 		mnuListManage = new JMenuItem("Manage Lists...");
 		mnuListManage.setName(MNU_LIST_MANAGE);
 		mnuListManage.addActionListener(identicAdapter);
 		mnuList.add(mnuListManage);
+		
+		JMenuItem mnuListShow = new JMenuItem("Show Active Type List");
+		mnuListShow.setName(MNU_LIST_SHOW);
+		mnuListShow.addActionListener(identicAdapter);
+		mnuList.add(mnuListShow);
+		
+		mnuListSeparator = new JSeparator();
+		mnuListSeparator.setName(MNU_LIST_SEPARATOR);
+		mnuList.add(mnuListSeparator);
 
 		JMenu mnuReports = new JMenu("Reports");
 		menuBar.add(mnuReports);
@@ -2093,16 +2113,14 @@ public class Identic {
 			case MNU_FILE_EXIT:
 				doFileExit();
 				break;
+				
 			case MNU_LIST_MANAGE:
 				doManageTypeList();
 				break;
-			case MNU_REPORTS_LOG_FILES:
+			case MNU_LIST_SHOW:
+				doShowTypeList();
 				break;
-			case MNU_REPORTS_XML_DOC:
-				break;
-			case MNU_HELP_ABOUT:
-				break;
-
+				
 			case MNU_CATALOG_NEW:
 				doCatalogNew();
 				break;
@@ -2120,6 +2138,13 @@ public class Identic {
 				break;
 			case MNU_CATALOG_REMOVE:
 				doCatalogRemove();
+				break;
+
+			case MNU_REPORTS_LOG_FILES:
+				break;
+			case MNU_REPORTS_XML_DOC:
+				break;
+			case MNU_HELP_ABOUT:
 				break;
 
 			// Buttons---------------------------------------------
@@ -2203,6 +2228,8 @@ public class Identic {
 	private static final String MNU_HELP_ABOUT = "mnuHelpAbout";
 
 	private static final String MNU_LIST_MANAGE = "mnuListManage";
+	private static final String MNU_LIST_SHOW = "mnuListShow";
+	private static final String MNU_LIST_SEPARATOR = "mnuListSeparator";
 
 	private static final String MNU_CATALOG_NEW = "mnuCatalogNew";
 	private static final String MNU_CATALOG_COMBINE = "mnuCatalogCombine";
@@ -2304,6 +2331,8 @@ public class Identic {
 	private JRadioButton rbNoCatalog;
 	private JRadioButton rbOnlyCatalogs;
 	private JRadioButton rbWithCatalog;
+	private JSeparator mnuListSeparator;
+	private JMenu mnuList;
 	// ListModel<CatalogItemModel> cim;
 	// ListModel<CatalogItem> cim1;
 
@@ -2583,10 +2612,7 @@ public class Identic {
 			CatalogItem catalogItem;
 			for (int i = 0; i < inUseCatalogItemModel.getSize(); i++) {
 				catalogItem = inUseCatalogItemModel.get(i);
-				ArrayList<FileStat> fileStats = catalogItem.getFileStats();
-				for (FileStat fileStat : fileStats) {
-					qHashes.add(fileStat);
-				} // for - fileStat
+				qHashes.addAll(catalogItem.getFileStats());
 				System.out.println(catalogItem.getEntryName());
 			} // for - each catalog Item
 		}// run
