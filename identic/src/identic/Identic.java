@@ -63,6 +63,7 @@ import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JRadioButton;
+import javax.swing.JRadioButtonMenuItem;
 import javax.swing.JScrollPane;
 import javax.swing.JSeparator;
 import javax.swing.JSplitPane;
@@ -107,8 +108,9 @@ public class Identic {
 
 	private HashMap<String, Integer> hashIDs = new HashMap<String, Integer>();
 
-	private ButtonGroup bgShowResults = new ButtonGroup();;
-	private ButtonGroup bgFindType = new ButtonGroup();;
+	private ButtonGroup bgShowResults = new ButtonGroup();
+	private ButtonGroup bgFindType = new ButtonGroup();
+	private ButtonGroup bgListNames = new ButtonGroup();
 
 	private Path startPath;
 	private int fileCount;
@@ -121,6 +123,7 @@ public class Identic {
 	// private String fileListDirectory;
 	private int sideButtonIndex;
 	private int catalogPanelIndex;
+	private String activeTypeList;
 
 	private CatalogItemModel availableCatalogItemModel = new CatalogItemModel();
 	private JList<CatalogItem> lstCatAvailable = new JList<CatalogItem>(availableCatalogItemModel);
@@ -158,7 +161,7 @@ public class Identic {
 	
 	private void doShowTypeList() {
 		DisplayActiveTypeList dl = new DisplayActiveTypeList();
-		dl.show("List name", targetModel);
+		dl.show(activeTypeList, targetModel);
 		dl = null;
 	}//doShowTypeList
 
@@ -167,6 +170,31 @@ public class Identic {
 		ml.showDialog();
 		ml = null;
 	}// doManageTypeList
+	
+	private void doListUpdate() {
+		MenuUtility.clearList(mnuList);
+		bgListNames = new ButtonGroup();
+		JMenuItem newItem;
+		String fileName;
+		for (int i = 0; i < typeListModel.getSize(); i++) {
+			fileName = typeListModel.getElementAt(i);
+			newItem = MenuUtility.addStringItem(mnuList, fileName,new JRadioButtonMenuItem());
+			newItem.addActionListener(identicAdapter);
+			newItem.setName(MNU_LIST);
+			bgListNames.add(newItem);
+		}// for - each file name
+		
+		for ( int i = 0; i < mnuList.getItemCount(); i ++) {
+			if (mnuList.getItem(i)== null){
+				continue;
+			}
+			if(mnuList.getItem(i).getText().equals(activeTypeList)) {
+				mnuList.getItem(i).setSelected(true);
+			}
+		}//
+
+		loadTargetList();
+	}//doListUpdate
 
 	private void doStart() {
 		initialiseFind();
@@ -336,14 +364,12 @@ public class Identic {
 		// ---------------FileTypes--------------------------------
 
 	private void loadTargetList() {
-		if (cboTypeLists1.getSelectedIndex() == -1) {// Nothing selected
-			return;
-		}
-		String listName = (String) cboTypeLists1.getSelectedItem();
-		lblActiveListFind.setText(listName);
+		activeTypeList = bgListNames.getSelection().getActionCommand();
+		
+		lblActiveListFind.setText(activeTypeList);
 
-		String listFile = getApplcationWorkingDirectory() + listName + LIST_SUFFIX_DOT;
-		lblStatus.setText(listFile);
+		String listFile = getApplcationWorkingDirectory() + activeTypeList + LIST_SUFFIX_DOT;
+		lblStatus.setText(activeTypeList);
 
 		Path pathTypeList = Paths.get(listFile);
 		try {
@@ -709,10 +735,6 @@ public class Identic {
 		}// accept
 	}// ListFilter
 	
-	private void updateTypeListMenu() {
-//		MenuElement[] menuItems = mnuList.getSubElements();
-		Component[] menuItems = mnuList.getComponents();
-	}//updateTypeListMenu
 
 	private void initPanels() {
 		doSideMenu(sideMenuButtons[sideButtonIndex]);
@@ -762,13 +784,15 @@ public class Identic {
 		// set up cbo model
 
 		typeListModel.removeAllElements();
+		
 		for (File f : files) {
 			typeListModel.addElement(f.getName().replace(LIST_SUFFIX_DOT, EMPTY_STRING));
 		} // for
-		Preferences myPrefs = Preferences.userNodeForPackage(Identic.class).node(this.getClass().getSimpleName());
-		cboTypeLists1.setSelectedItem(myPrefs.get("ActiveList", "Pictures"));
-		myPrefs = null;
+		
+		doListUpdate();		// update the the list of file types on the menu
 	}// initFileTypes
+	
+
 
 	private String getApplcationWorkingDirectory() {
 		String folder = System.getProperty("java.io.tmpdir");
@@ -787,7 +811,7 @@ public class Identic {
 		myPrefs.putInt("Divider", splitPane1.getDividerLocation());
 		// myPrefs.put("ListDirectory", fileListDirectory);
 		myPrefs.putInt("SideButtonIndex", sideButtonIndex);
-		myPrefs.put("ActiveList", (String) cboTypeLists1.getSelectedItem());
+		myPrefs.put("ActiveList", bgListNames.getSelection().getActionCommand());
 		myPrefs.put("SourceDirectory", lblSourceFolder.getText());
 		String findTypeButton = bgFindType.getSelection().getActionCommand();
 		myPrefs.put("findTypeButton", findTypeButton);
@@ -817,6 +841,8 @@ public class Identic {
 			rbOnlyCatalogs.setSelected(true);
 			break;
 		}// switch find Type
+		
+		activeTypeList = myPrefs.get("ActiveList", "Pictures");
 
 		myPrefs = null;
 
@@ -827,7 +853,7 @@ public class Identic {
 		sideMenuPanelNames = new String[] { panelFindDuplicates.getName(), panelFindDuplicatesWithCatalogs.getName(),
 				panelDisplayResults.getName(), panelCopyMoveRemove.getName(), paneApplicationlLog.getName() };
 
-		cboTypeLists1.setModel(typeListModel);
+//		cboTypeLists1.setModel(typeListModel);
 
 		listFindDuplicatesActive.setModel(targetModel);
 		listExcluded.setModel(excludeModel);
@@ -1135,33 +1161,6 @@ public class Identic {
 		gbc_verticalStrut_26.gridx = 0;
 		gbc_verticalStrut_26.gridy = 0;
 		panel_9.add(verticalStrut_26, gbc_verticalStrut_26);
-
-		JPanel panel_10 = new JPanel();
-		panel_10.setBorder(
-				new CompoundBorder(
-						new TitledBorder(UIManager.getBorder("TitledBorder.border"), "Active List",
-								TitledBorder.LEADING, TitledBorder.TOP, null, new Color(0, 0, 0)),
-						new LineBorder(new Color(0, 0, 0), 1, true)));
-		GridBagConstraints gbc_panel_10 = new GridBagConstraints();
-		gbc_panel_10.fill = GridBagConstraints.BOTH;
-		gbc_panel_10.gridx = 0;
-		gbc_panel_10.gridy = 1;
-		panelFindDuplicatesWithCatalogs.add(panel_10, gbc_panel_10);
-		GridBagLayout gbl_panel_10 = new GridBagLayout();
-		gbl_panel_10.columnWidths = new int[] { 0, 0 };
-		gbl_panel_10.rowHeights = new int[] { 0, 0 };
-		gbl_panel_10.columnWeights = new double[] { 1.0, Double.MIN_VALUE };
-		gbl_panel_10.rowWeights = new double[] { 0.0, Double.MIN_VALUE };
-		panel_10.setLayout(gbl_panel_10);
-
-		cboTypeLists1 = new JComboBox<String>();
-		cboTypeLists1.addActionListener(identicAdapter);
-		cboTypeLists1.setName("cboTypeLists");
-		GridBagConstraints gbc_cboTypeLists1 = new GridBagConstraints();
-		gbc_cboTypeLists1.fill = GridBagConstraints.HORIZONTAL;
-		gbc_cboTypeLists1.gridx = 0;
-		gbc_cboTypeLists1.gridy = 0;
-		panel_10.add(cboTypeLists1, gbc_cboTypeLists1);
 
 		panelDisplayResults = new JPanel();
 		panelDisplayResults.setName(PNL_DISPLAY_RESULTS);
@@ -2079,9 +2078,19 @@ public class Identic {
 		mnuListShow.addActionListener(identicAdapter);
 		mnuList.add(mnuListShow);
 		
-		mnuListSeparator = new JSeparator();
-		mnuListSeparator.setName(MNU_LIST_SEPARATOR);
-		mnuList.add(mnuListSeparator);
+		JSeparator separatorFileStart = new JSeparator();
+		separatorFileStart.setName(MenuUtility.RECENT_FILES_START);
+		mnuList.add(separatorFileStart);
+
+		JSeparator separatorFileEnd = new JSeparator();
+		separatorFileEnd.setName(MenuUtility.RECENT_FILES_END);
+		separatorFileEnd.setVisible(false);
+		mnuList.add(separatorFileEnd);
+
+		JMenuItem mnuListUpdate = new JMenuItem("Update List");
+		mnuListUpdate.setName(MNU_LIST_UPDATE);
+		mnuListUpdate.addActionListener(identicAdapter);
+		mnuList.add(mnuListUpdate);
 
 		JMenu mnuReports = new JMenu("Reports");
 		menuBar.add(mnuReports);
@@ -2114,11 +2123,18 @@ public class Identic {
 				doFileExit();
 				break;
 				
+			case MNU_LIST:
+				loadTargetList();
+
+				break;
 			case MNU_LIST_MANAGE:
 				doManageTypeList();
 				break;
 			case MNU_LIST_SHOW:
 				doShowTypeList();
+				break;
+			case MNU_LIST_UPDATE:
+				doListUpdate();
 				break;
 				
 			case MNU_CATALOG_NEW:
@@ -2192,7 +2208,7 @@ public class Identic {
 				break;
 
 			case CBO_TYPES_LIST:
-				loadTargetList();
+			//	loadTargetList();
 				break;
 
 			case CB_SAVE_EXCLUDED_FILES:
@@ -2227,9 +2243,10 @@ public class Identic {
 	private static final String MNU_REPORTS_XML_DOC = "mnuReportsXMLdoc";
 	private static final String MNU_HELP_ABOUT = "mnuHelpAbout";
 
+	private static final String MNU_LIST = "mnuList";	// Menu - used for all added items on the menu
 	private static final String MNU_LIST_MANAGE = "mnuListManage";
 	private static final String MNU_LIST_SHOW = "mnuListShow";
-	private static final String MNU_LIST_SEPARATOR = "mnuListSeparator";
+	private static final String MNU_LIST_UPDATE = "mnuListUpdate";
 
 	private static final String MNU_CATALOG_NEW = "mnuCatalogNew";
 	private static final String MNU_CATALOG_COMBINE = "mnuCatalogCombine";
