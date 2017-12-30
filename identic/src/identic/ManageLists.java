@@ -307,7 +307,7 @@ public class ManageLists extends JDialog {
 		myPrefs.putInt("LocX", point.x);
 		myPrefs.putInt("LocY", point.y);
 
-		myPrefs.put("ListDirectory", fileListDirectory);
+//		myPrefs.put("ListDirectory", fileListDirectory);
 		myPrefs = null;
 		dispose();
 	}// appClose
