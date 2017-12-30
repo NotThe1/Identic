@@ -71,7 +71,6 @@ import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.JTextPane;
 import javax.swing.RowFilter;
-import javax.swing.ScrollPaneConstants;
 import javax.swing.SwingConstants;
 import javax.swing.TransferHandler;
 import javax.swing.UIManager;
@@ -85,7 +84,7 @@ import javax.swing.filechooser.FileNameExtensionFilter;
 import javax.swing.table.TableRowSorter;
 import javax.swing.text.BadLocationException;
 
-public class Identic {
+public class Identic0 {
 
 	private IdenticAdapter identicAdapter = new IdenticAdapter();
 	private JButton[] sideMenuButtons;
@@ -137,7 +136,7 @@ public class Identic {
 		EventQueue.invokeLater(new Runnable() {
 			public void run() {
 				try {
-					Identic window = new Identic();
+					Identic0 window = new Identic0();
 					window.frmIdentic.setVisible(true);
 				} catch (Exception e) {
 					e.printStackTrace();
@@ -366,7 +365,7 @@ public class Identic {
 	private void loadTargetList() {
 		activeTypeList = bgListNames.getSelection().getActionCommand();
 		
-		lblActiveListFind.setText(activeTypeList);
+//		lblActiveListFind.setText(activeTypeList);
 
 		String listFile = getApplcationWorkingDirectory() + activeTypeList + LIST_SUFFIX_DOT;
 		lblStatus.setText(activeTypeList);
@@ -779,9 +778,6 @@ public class Identic {
 			files = targetDirectory.listFiles(new ListFilter(LIST_SUFFIX_DOT));
 		} // if no type list files in target directory
 
-		// cim.r
-
-		// set up cbo model
 
 		typeListModel.removeAllElements();
 		
@@ -801,7 +797,7 @@ public class Identic {
 	}// getApplcationWorkingDirectory
 
 	private void appClose() {
-		Preferences myPrefs = Preferences.userNodeForPackage(Identic.class).node(this.getClass().getSimpleName());
+		Preferences myPrefs = Preferences.userNodeForPackage(Identic0.class).node(this.getClass().getSimpleName());
 		Dimension dim = frmIdentic.getSize();
 		myPrefs.putInt("Height", dim.height);
 		myPrefs.putInt("Width", dim.width);
@@ -820,7 +816,7 @@ public class Identic {
 
 	private void appInit() {
 
-		Preferences myPrefs = Preferences.userNodeForPackage(Identic.class).node(this.getClass().getSimpleName());
+		Preferences myPrefs = Preferences.userNodeForPackage(Identic0.class).node(this.getClass().getSimpleName());
 		frmIdentic.setSize(886, 779);
 		frmIdentic.setLocation(myPrefs.getInt("LocX", 100), myPrefs.getInt("LocY", 100));
 		splitPane1.setDividerLocation(174);
@@ -855,7 +851,7 @@ public class Identic {
 
 //		cboTypeLists1.setModel(typeListModel);
 
-		listFindDuplicatesActive.setModel(targetModel);
+//		listFindDuplicatesActive.setModel(targetModel);
 		listExcluded.setModel(excludeModel);
 		txtLog.setText(EMPTY_STRING);
 		log.setDoc(txtLog.getStyledDocument());
@@ -883,7 +879,7 @@ public class Identic {
 
 	}// appInit
 
-	public Identic() {
+	public Identic0() {
 		initialize();
 		appInit();
 		initFileTypes();
@@ -1357,28 +1353,6 @@ public class Identic {
 		gbl_panelActiveList.columnWeights = new double[] { 0.0, Double.MIN_VALUE };
 		gbl_panelActiveList.rowWeights = new double[] { 1.0, Double.MIN_VALUE };
 		panelActiveList.setLayout(gbl_panelActiveList);
-
-		JScrollPane scrollPane_2 = new JScrollPane();
-		scrollPane_2.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED);
-		scrollPane_2.setPreferredSize(new Dimension(160, 0));
-		scrollPane_2.setMinimumSize(new Dimension(160, 0));
-		GridBagConstraints gbc_scrollPane_2 = new GridBagConstraints();
-		gbc_scrollPane_2.fill = GridBagConstraints.BOTH;
-		gbc_scrollPane_2.gridx = 0;
-		gbc_scrollPane_2.gridy = 0;
-		panelActiveList.add(scrollPane_2, gbc_scrollPane_2);
-
-		listFindDuplicatesActive = new JList<String>();
-		listFindDuplicatesActive.setEnabled(false);
-		listFindDuplicatesActive.setMinimumSize(new Dimension(145, 0));
-		listFindDuplicatesActive.setPreferredSize(new Dimension(145, 500));
-		scrollPane_2.setViewportView(listFindDuplicatesActive);
-
-		lblActiveListFind = new JLabel("New label");
-		lblActiveListFind.setForeground(new Color(0, 128, 128));
-		lblActiveListFind.setFont(new Font("Tahoma", Font.BOLD, 13));
-		lblActiveListFind.setHorizontalAlignment(SwingConstants.CENTER);
-		scrollPane_2.setColumnHeaderView(lblActiveListFind);
 
 		JPanel panelSummary = new JPanel();
 		panelSummary.setMinimumSize(new Dimension(255, 0));
@@ -2311,8 +2285,6 @@ public class Identic {
 	private JLabel lblFolderCount;
 	private JLabel lblSourceFolder;
 	private JPanel panelActiveList;
-	private JLabel lblActiveListFind;
-	private JList<String> listFindDuplicatesActive;
 	private JList<String> listExcluded;
 	private JComboBox<String> cboTypeLists1;
 	private JTextPane txtLog;
