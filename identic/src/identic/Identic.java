@@ -673,6 +673,15 @@ public class Identic {
 		tpMain = new JTabbedPane(JTabbedPane.TOP);
 		splitPane1.setRightComponent(tpMain);
 		
+		JPanel tabResults = new JPanel();
+		tpMain.addTab("Results", null, tabResults, null);
+		GridBagLayout gbl_tabResults = new GridBagLayout();
+		gbl_tabResults.columnWidths = new int[]{0};
+		gbl_tabResults.rowHeights = new int[]{0};
+		gbl_tabResults.columnWeights = new double[]{Double.MIN_VALUE};
+		gbl_tabResults.rowWeights = new double[]{Double.MIN_VALUE};
+		tabResults.setLayout(gbl_tabResults);
+		
 		JPanel tabSummary = new JPanel();
 		tabSummary.setName(TAB_SUMMARY);
 		tpMain.addTab("Summary", null, tabSummary, null);
