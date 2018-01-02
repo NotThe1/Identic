@@ -29,18 +29,30 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.URISyntaxException;
+import java.nio.file.FileVisitResult;
+import java.nio.file.FileVisitor;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.NoSuchElementException;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.prefs.Preferences;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.swing.Box;
+import javax.swing.ButtonGroup;
 import javax.swing.DefaultListModel;
 import javax.swing.DropMode;
 import javax.swing.JButton;
+import javax.swing.JCheckBox;
 import javax.swing.JComponent;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
@@ -51,6 +63,7 @@ import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.JRadioButton;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
 import javax.swing.JTabbedPane;
@@ -70,10 +83,24 @@ public class Identic {
 	private IdenticAdapter identicAdapter = new IdenticAdapter();
 	private ManageListsAdapter manageListsAdapter = new ManageListsAdapter();
 	private CatalogAdapter catalogAdapter = new CatalogAdapter();
-	
+
 	private AppLogger log = AppLogger.getInstance();
 
-	//Type List
+	private ButtonGroup bgFindType = new ButtonGroup();
+
+	// Find
+	private LinkedBlockingQueue<FileStat> qSubjects = new LinkedBlockingQueue<FileStat>();
+	private LinkedBlockingQueue<FileStatReject> qRejects = new LinkedBlockingQueue<FileStatReject>();
+	private LinkedBlockingQueue<FileStat> qHashes = new LinkedBlockingQueue<FileStat>();
+
+	private SubjectTableModel subjectTableModel = new SubjectTableModel();
+	private RejectTableModel rejectTableModel = new RejectTableModel();
+	private DefaultListModel<String> excludeModel = new DefaultListModel<>();
+
+	private HashMap<String, Integer> hashCounts = new HashMap<String, Integer>();;
+	private HashMap<String, Integer> hashIDs = new HashMap<String, Integer>();
+
+	// Type List
 	private DefaultListModel<String> availableListsModel = new DefaultListModel<>();
 	private DefaultListModel<String> editListModel = new DefaultListModel<>();
 	private ArrayList<String> targetSuffixes = new ArrayList<>();
@@ -81,8 +108,9 @@ public class Identic {
 
 	private String workingDirectory;
 	private String activeTypeList;
+	String targetListRegex;
 
-	//Catalog
+	// Catalog
 	private CatalogItemModel availableCatalogItemModel = new CatalogItemModel();
 	private JList<CatalogItem> lstCatalogAvailable;// = new JList<CatalogItem>(availableCatalogItemModel);
 	private CatalogItemModel inUseCatalogItemModel = new CatalogItemModel();
@@ -109,22 +137,22 @@ public class Identic {
 		folder = folder.replace("Temp", "Identic");
 		return folder;
 	}// getApplcationWorkingDirectory
-	
-//	private void doTabSummary() {
-//		log.addInfo("doTabSummary()");
-//	}//doTabSummary
-//
-//	private void doTabCatalogs() {
-//		log.addInfo("doTabCatalogs()");
-//	}// doTabCatalogs
-//
-//	private void doTabTypes() {
-//		log.addInfo("doTabTypes()");
-//	}// doTabTypes
-//
-//	private void doTabLog() {
-//		log.addInfo("doTabLog()");
-//	}// doTabLog
+
+	// private void doTabSummary() {
+	// log.addInfo("doTabSummary()");
+	// }//doTabSummary
+	//
+	// private void doTabCatalogs() {
+	// log.addInfo("doTabCatalogs()");
+	// }// doTabCatalogs
+	//
+	// private void doTabTypes() {
+	// log.addInfo("doTabTypes()");
+	// }// doTabTypes
+	//
+	// private void doTabLog() {
+	// log.addInfo("doTabLog()");
+	// }// doTabLog
 
 	// Tab Catalog Code /////////////////////////////////////////////////////////
 	private void doCatalogLoad() {
@@ -133,7 +161,7 @@ public class Identic {
 		if (!Files.exists(p)) {
 			JOptionPane.showMessageDialog(frmIdentic, "Initializing Catalog lists in " + p.toString(), "Initialization",
 					JOptionPane.INFORMATION_MESSAGE);
-//			System.err.println("Making new directory");
+			// System.err.println("Making new directory");
 			log.addInfo("Making new Catalog directory");
 			try {
 				Files.createDirectories(p);
@@ -171,13 +199,13 @@ public class Identic {
 		} // for file
 		lstCatalogAvailable.updateUI();
 		lstCatalogInUse.updateUI();
-	}//doCatalogLoad
+	}// doCatalogLoad
 
 	private void doCatalogNew() {
-	}//doCatalogNew
+	}// doCatalogNew
 
 	private void doCatalogCombine() {
-	}//doCatalogCombine
+	}// doCatalogCombine
 
 	private void doCatalogImport() {
 		JFileChooser chooser = new JFileChooser();
@@ -246,7 +274,6 @@ public class Identic {
 
 	}// doCatalogExport
 
-
 	private void doCatalogRemove() {
 		CatalogItem catalogItem = lstCatalogAvailable.getSelectedValue();
 		if (catalogItem == null) {
@@ -264,7 +291,6 @@ public class Identic {
 		doCatalogLoad();
 	}// doCatalogRemove
 
-	
 	private void doCatalogListSelected(ListSelectionEvent listSelectionEvent) {
 		JList<CatalogItem> list = (JList<CatalogItem>) listSelectionEvent.getSource();
 		CatalogItem catalogItem = list.getSelectedValue();
@@ -274,10 +300,6 @@ public class Identic {
 		String rowCount = String.format("%,d Rows", catalogItem.getFileStats().size());
 		lblCatalogCount.setText(rowCount);
 	}// doCatalogListSelected
-	
-
-	
-	
 
 	// Tab Lists Code ///////////////////////////////////////////////////////////
 
@@ -305,10 +327,19 @@ public class Identic {
 			e.printStackTrace();
 		} // try targetModel
 		targetModel.removeAllElements();
-		for (String line : targetSuffixes) {
-			targetModel.addElement(line);
-		} // for
 
+		StringBuilder sb = new StringBuilder("(?i)\\.("); // case insensitive
+		for (String line : targetSuffixes) {
+			line = line.trim();
+			targetModel.addElement(line);
+			sb.append(line);
+			sb.append("|");
+		} // for
+		sb.deleteCharAt(sb.length() - 1); // remove trailing |
+		sb.append(")$"); // restrict to end of string
+		targetListRegex = sb.toString();
+		String message = String.format("[loadTargetList()] sb: %s%n%n", targetListRegex);
+		log.addInfo(message);
 	}// loadTargetList
 
 	private void doLoadTargetEdit() {
@@ -526,6 +557,179 @@ public class Identic {
 		// lblStatus.setText(url.getPath());
 	}// initFileTypes
 
+	private void doSourceFolder() {
+		JFileChooser fc = new JFileChooser(lblSourceFolder.getText());
+		fc.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+		fc.setMultiSelectionEnabled(false);
+		fc.setDialogTitle("Select Starting Directory");
+		fc.setApproveButtonText("Select");
+
+		if (fc.showOpenDialog(frmIdentic) == JFileChooser.APPROVE_OPTION) {
+			lblSourceFolder.setText(fc.getSelectedFile().getAbsolutePath());
+		} // if
+	}// doSourceFolder
+
+	private void doStart() {
+		initialiseFind();
+		if (rbNoCatalog.isSelected()) {
+			log.addInfo(" doStartNoCatalogs()");
+			log.addInfo(lblSourceFolder.getText());
+			doStartNoCatalog();
+		} else if (rbWithCatalog.isSelected()) {
+			if (!isCatalogSelected()) {
+				return;
+			} // if catalog selected
+			log.addInfo(" doStartWithCatalogs()");
+			log.addInfo(lblSourceFolder.getText());
+			// doStartOnlyCatalogs();
+			// doStartNoCatalog();
+		} else if (rbOnlyCatalogs.isSelected()) {
+			if (!isCatalogSelected()) {
+				return;
+			} // if catalog selected
+			log.addInfo(" doStartNoCatalogs()");
+			// doStartOnlyCatalogs();
+		} // if start type
+		log.addTimeStamp("End :");
+		markTheDuplicates();
+		displaySummary();
+		//
+	}// doStart
+
+	/*
+	 * Start button initiates the scanning of the directories,identifying candidate and reject files, and buils a model
+	 * that contains the results for later display or saving.
+	 * 
+	 * It uses 3 queues: qRejects, qSubject (candidates) & qHashes. It produces 2 Models: rejectTableModel &
+	 * subjectTableModel
+	 * 
+	 * the work is done by multiple threads: 1) first thread - identifySubjects generates two queues qRejects &
+	 * qSubjects 2) two threads are then run: showRejects( reads qRejects) produces RejectTableModel. & MakeFileKey
+	 * (reads qSubjects) to produce the qHashes queue 3) then identifySubjects is started ( reads qHashes) to product
+	 * the subjectTableModel, which is used by the rest of the application
+	 * 
+	 * 
+	 */
+
+	private void doStartNoCatalog() {
+		// startPath = Paths.get(lblSourceFolder.getText());
+		if (!Files.exists(Paths.get(lblSourceFolder.getText()))) {
+			JOptionPane.showConfirmDialog(frmIdentic, "Starting Folder NOT Valid!", "Find Duplicates - Start",
+					JOptionPane.DEFAULT_OPTION, JOptionPane.ERROR_MESSAGE);
+			return;
+		} // if starting folder not there
+
+		IdentifySubjects identifySubjects = new IdentifySubjects();
+		Thread threadIdentify = new Thread(identifySubjects);
+		threadIdentify.start();
+
+		MakeFileKey makeFileKey = new MakeFileKey(threadIdentify);
+		Thread threadMakeFileKey = new Thread(makeFileKey);
+		threadMakeFileKey.start();
+
+		ShowRejects showRejects = new ShowRejects(threadIdentify);
+		Thread threadRejects = new Thread(showRejects);
+		if (cbSaveExcludedFiles.isSelected()) {
+			threadRejects.start();
+		} // if
+
+		IdentifyDuplicates identifyDuplicates = new IdentifyDuplicates(threadMakeFileKey);
+		Thread threadIdentifyDuplicates = new Thread(identifyDuplicates);
+		threadIdentifyDuplicates.start();
+
+		try {
+			threadIdentify.join();
+			threadMakeFileKey.join();
+			threadRejects.join();
+			threadIdentifyDuplicates.join();
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		} // try
+
+	}// doStartNoCatalog
+
+	private boolean isCatalogSelected() {
+		return isCatalogSelected(1);
+	}// isCatalogSelected
+
+	private boolean isCatalogSelected(int minimum) {
+		boolean result = true;
+		if (inUseCatalogItemModel.getSize() < minimum) {
+			JOptionPane.showMessageDialog(frmIdentic, "Not enough Catalog Items found\n on \"In Use\" List",
+					"Find With Catalog(s)", JOptionPane.ERROR_MESSAGE);
+			result = false;
+		} // if less than one
+		return result;
+	}// isCatalogSelected
+
+	private void initialiseFind() {
+		qSubjects.clear();
+		qRejects.clear();
+
+		// fileCount = 0;
+		// folderCount = 0;
+		// subjectCount = 0;
+		// rejectCount = 0;
+		excludeModel.clear();
+		hashCounts.clear();
+		subjectTableModel.clear();
+		rejectTableModel.clear();
+		// lblFilesNotProcessed.setText(String.format("%,d", 0));
+		hashIDs.clear();
+		hashCounts.clear();
+
+		log.addTimeStamp("Start :");
+
+	}// initialiseFind
+
+	// ---------------Find Duplicates--------------------------
+
+	private void markTheDuplicates() {
+		int rows = subjectTableModel.getRowCount();
+		String hashKey;
+		// long excessStorage = 0l;
+		for (int row = 0; row < rows; row++) {
+			hashKey = (String) subjectTableModel.getValueAt(row, 6);
+			try {
+				if (hashCounts.get(hashKey) > 1) {
+					subjectTableModel.setValueAt(true, row, 4);
+				} // set dup flag if > 1
+			} catch (Exception e) {
+				System.out.println("HashKey = " + hashKey);
+			} // try
+		} // for
+	}// markTheDuplicates
+
+	private void displaySummary() {
+		int totalFileCount = rejectTableModel.getRowCount() + subjectTableModel.getRowCount();
+		log.addInfo("totalFileCount = " + totalFileCount);
+		log.addNL();
+		log.addInfo("Reject  = " + rejectTableModel.getRowCount());
+		log.addInfo("Subject = " + subjectTableModel.getRowCount());
+
+		// lblFolderCount.setText(String.format("%,d", folderCount));
+		// lblFileCount.setText(String.format("%,d", fileCount));
+		// txtTotalFilesProcessed.setText(String.format("%,d", fileCount));
+		// int filesWithNoDups = 0;
+		//
+		// Set<String> hashKeys = hashCounts.keySet();
+		// for (String hashKey : hashKeys) {
+		// if (hashCounts.get(hashKey) == 1) {
+		// filesWithNoDups++;
+		// } // if
+		// } // for
+		// txtFilesWithNoDuplicates.setText(String.format("%,d", filesWithNoDups));
+		// int uniqueFilesWithDups = hashCounts.size() - filesWithNoDups;
+		// txtUniqueFilesWithDuplicates.setText(String.format("%,d", uniqueFilesWithDups));
+		// txtTotalNumberOfUniqueFiles.setText(String.format("%,d", hashCounts.size()));
+		//
+		// int filesWithDup = subjectCount - filesWithNoDups;
+		// txtFilesWithDuplicates.setText(String.format("%,d", filesWithDup));
+		// txtRedundantFiles.setText(String.format("%,d", filesWithDup - uniqueFilesWithDups));
+		// txtExcessStorage.setText(String.format("%,d", 0));
+
+	}// displaySummary
+
 	// Swing code ///////////////////////////////////////////////////////////////
 
 	private void doFileExit() {
@@ -542,12 +746,12 @@ public class Identic {
 		myPrefs.putInt("LocX", point.x);
 		myPrefs.putInt("LocY", point.y);
 		myPrefs.putInt("Divider", splitPane1.getDividerLocation());
+		myPrefs.put("SourceFolder", lblSourceFolder.getText());
 		myPrefs.put("ActiveList", activeTypeList);
 		// // myPrefs.put("ListDirectory", fileListDirectory);
 		// myPrefs.putInt("SideButtonIndex", sideButtonIndex);
-		// myPrefs.put("SourceDirectory", lblSourceFolder.getText());
-		// String findTypeButton = bgFindType.getSelection().getActionCommand();
-		// myPrefs.put("findTypeButton", findTypeButton);
+		String findTypeButton = bgFindType.getSelection().getActionCommand();
+		myPrefs.put("findTypeButton", findTypeButton);
 		myPrefs = null;
 	}// appClose
 
@@ -560,28 +764,28 @@ public class Identic {
 		// frmIdentic.setSize(myPrefs.getInt("Width", 886), myPrefs.getInt("Height", 779));
 
 		frmIdentic.setLocation(myPrefs.getInt("LocX", 100), myPrefs.getInt("LocY", 100));
-		splitPane1.setDividerLocation(myPrefs.getInt("Divider", 174));
+		lblSourceFolder.setText(myPrefs.get("SourceFolder", EMPTY_STRING));
+		activeTypeList = myPrefs.get("ActiveList", "Pictures");
+		// splitPane1.setDividerLocation(myPrefs.getInt("Divider", 174));
 		//
 		// // fileListDirectory = myPrefs.get("ListDirectory", EMPTY_STRING);
 		// sideButtonIndex = myPrefs.getInt("SideButtonIndex", 0);
-		// lblSourceFolder.setText(myPrefs.get("SourceDirectory", NOT_SET));
 		//
-		// String findTypeButton = myPrefs.get("findTypeButton", RB_CATALOG_NO);
-		// switch (findTypeButton) {
-		// case RB_CATALOG_NO:
-		// rbNoCatalog.setSelected(true);
-		// break;
-		// case RB_CATALOG_WITH:
-		// rbWithCatalog.setSelected(true);
-		// break;
-		// case RB_CATALOG_ONLY:
-		// rbOnlyCatalogs.setSelected(true);
-		// break;
-		// }// switch find Type
-		//
-		activeTypeList = myPrefs.get("ActiveList", "Pictures");
-		loadTargetList();
-		//
+		String findTypeButton = myPrefs.get("findTypeButton", RB_CATALOG_NO);
+		switch (findTypeButton) {
+		case RB_CATALOG_NO:
+			rbNoCatalog.setSelected(true);
+			break;
+		case RB_CATALOG_WITH:
+			rbWithCatalog.setSelected(true);
+			break;
+		case RB_CATALOG_ONLY:
+			rbOnlyCatalogs.setSelected(true);
+			break;
+		}// switch find Type
+			//
+			// loadTargetList();
+			//
 		myPrefs = null;
 
 		// TypeLists //////
@@ -613,23 +817,23 @@ public class Identic {
 		// bgShowResults.add(rbFilesNotProcessed);
 		// bgShowResults.clearSelection();
 		//
-		// bgFindType.add(rbNoCatalog);
-		// bgFindType.add(rbWithCatalog);
-		// bgFindType.add(rbOnlyCatalogs);
-		//
-		 availableCatalogItemModel.clear();
-		 lstCatalogAvailable.setDragEnabled(true);
-		 lstCatalogAvailable.setDropMode(DropMode.INSERT);
-		 lstCatalogAvailable.setTransferHandler(new ListTransferHandler());
-		
-		 inUseCatalogItemModel.clear();
-		 lstCatalogInUse.setDragEnabled(true);
-		 lstCatalogInUse.setDropMode(DropMode.INSERT);
-		 lstCatalogInUse.setTransferHandler(new ListTransferHandler());
-		 
-		 doCatalogLoad();
-		 
-//		tpMain.addChangeListener(identicAdapter);
+		bgFindType.add(rbNoCatalog);
+		bgFindType.add(rbWithCatalog);
+		bgFindType.add(rbOnlyCatalogs);
+
+		availableCatalogItemModel.clear();
+		lstCatalogAvailable.setDragEnabled(true);
+		lstCatalogAvailable.setDropMode(DropMode.INSERT);
+		lstCatalogAvailable.setTransferHandler(new ListTransferHandler());
+
+		inUseCatalogItemModel.clear();
+		lstCatalogInUse.setDragEnabled(true);
+		lstCatalogInUse.setDropMode(DropMode.INSERT);
+		lstCatalogInUse.setTransferHandler(new ListTransferHandler());
+
+		doCatalogLoad();
+		loadTargetList();
+		// tpMain.addChangeListener(identicAdapter);
 	}// appInit
 
 	/**
@@ -663,6 +867,7 @@ public class Identic {
 		frmIdentic.getContentPane().setLayout(gridBagLayout);
 
 		splitPane1 = new JSplitPane();
+		splitPane1.setEnabled(false);
 		GridBagConstraints gbc_splitPane1 = new GridBagConstraints();
 		gbc_splitPane1.insets = new Insets(0, 0, 5, 0);
 		gbc_splitPane1.fill = GridBagConstraints.BOTH;
@@ -670,26 +875,85 @@ public class Identic {
 		gbc_splitPane1.gridy = 0;
 		frmIdentic.getContentPane().add(splitPane1, gbc_splitPane1);
 
+		JPanel panelForTabbedPane = new JPanel();
+		splitPane1.setRightComponent(panelForTabbedPane);
+		GridBagLayout gbl_panelForTabbedPane = new GridBagLayout();
+		gbl_panelForTabbedPane.columnWidths = new int[] { 672, 0 };
+		gbl_panelForTabbedPane.rowHeights = new int[] { 0, 521, 0 };
+		gbl_panelForTabbedPane.columnWeights = new double[] { 1.0, Double.MIN_VALUE };
+		gbl_panelForTabbedPane.rowWeights = new double[] { 0.0, 1.0, Double.MIN_VALUE };
+		panelForTabbedPane.setLayout(gbl_panelForTabbedPane);
+
+		JPanel panel = new JPanel();
+		GridBagConstraints gbc_panel = new GridBagConstraints();
+		gbc_panel.fill = GridBagConstraints.BOTH;
+		gbc_panel.insets = new Insets(0, 0, 5, 0);
+		gbc_panel.gridx = 0;
+		gbc_panel.gridy = 0;
+		panelForTabbedPane.add(panel, gbc_panel);
+		GridBagLayout gbl_panel = new GridBagLayout();
+		gbl_panel.columnWidths = new int[] { 120, 72, 0 };
+		gbl_panel.rowHeights = new int[] { 0, 0 };
+		gbl_panel.columnWeights = new double[] { 0.0, Double.MIN_VALUE };
+		gbl_panel.rowWeights = new double[] { 0.0, Double.MIN_VALUE };
+		panel.setLayout(gbl_panel);
+
+		JButton btnSourceFolder = new JButton("Source Folder...");
+		btnSourceFolder.setName(BTN_SOURCE_FOLDER);
+		btnSourceFolder.addActionListener(identicAdapter);
+		btnSourceFolder.setHorizontalAlignment(SwingConstants.LEFT);
+		btnSourceFolder.setForeground(Color.BLACK);
+		btnSourceFolder.setFont(new Font("Tahoma", Font.PLAIN, 14));
+		GridBagConstraints gbc_btnSourceFolder = new GridBagConstraints();
+		gbc_btnSourceFolder.anchor = GridBagConstraints.WEST;
+		gbc_btnSourceFolder.insets = new Insets(0, 0, 0, 5);
+		gbc_btnSourceFolder.gridx = 0;
+		gbc_btnSourceFolder.gridy = 0;
+		panel.add(btnSourceFolder, gbc_btnSourceFolder);
+
+		lblSourceFolder = new JLabel("");
+		GridBagConstraints gbc_lblSourceFolder = new GridBagConstraints();
+		gbc_lblSourceFolder.anchor = GridBagConstraints.WEST;
+		gbc_lblSourceFolder.insets = new Insets(0, 0, 0, 5);
+		gbc_lblSourceFolder.gridx = 1;
+		gbc_lblSourceFolder.gridy = 0;
+		panel.add(lblSourceFolder, gbc_lblSourceFolder);
+		lblSourceFolder.setHorizontalAlignment(SwingConstants.CENTER);
+		lblSourceFolder.setForeground(new Color(0, 0, 205));
+		lblSourceFolder.setFont(new Font("Tahoma", Font.BOLD, 14));
+
 		tpMain = new JTabbedPane(JTabbedPane.TOP);
-		splitPane1.setRightComponent(tpMain);
-		
+		GridBagConstraints gbc_tpMain = new GridBagConstraints();
+		gbc_tpMain.fill = GridBagConstraints.BOTH;
+		gbc_tpMain.gridx = 0;
+		gbc_tpMain.gridy = 1;
+		panelForTabbedPane.add(tpMain, gbc_tpMain);
+		// splitPane1.setRightComponent(tpMain);
+
 		JPanel tabResults = new JPanel();
 		tpMain.addTab("Results", null, tabResults, null);
 		GridBagLayout gbl_tabResults = new GridBagLayout();
-		gbl_tabResults.columnWidths = new int[]{0};
-		gbl_tabResults.rowHeights = new int[]{0};
-		gbl_tabResults.columnWeights = new double[]{Double.MIN_VALUE};
-		gbl_tabResults.rowWeights = new double[]{Double.MIN_VALUE};
+		gbl_tabResults.columnWidths = new int[] { 0, 0 };
+		gbl_tabResults.rowHeights = new int[] { 0, 0 };
+		gbl_tabResults.columnWeights = new double[] { 1.0, Double.MIN_VALUE };
+		gbl_tabResults.rowWeights = new double[] { 1.0, Double.MIN_VALUE };
 		tabResults.setLayout(gbl_tabResults);
-		
+
+		JSplitPane splitPaneResults = new JSplitPane();
+		GridBagConstraints gbc_splitPaneResults = new GridBagConstraints();
+		gbc_splitPaneResults.fill = GridBagConstraints.BOTH;
+		gbc_splitPaneResults.gridx = 0;
+		gbc_splitPaneResults.gridy = 0;
+		tabResults.add(splitPaneResults, gbc_splitPaneResults);
+
 		JPanel tabSummary = new JPanel();
 		tabSummary.setName(TAB_SUMMARY);
 		tpMain.addTab("Summary", null, tabSummary, null);
 		GridBagLayout gbl_tabSummary = new GridBagLayout();
-		gbl_tabSummary.columnWidths = new int[]{0};
-		gbl_tabSummary.rowHeights = new int[]{0};
-		gbl_tabSummary.columnWeights = new double[]{Double.MIN_VALUE};
-		gbl_tabSummary.rowWeights = new double[]{Double.MIN_VALUE};
+		gbl_tabSummary.columnWidths = new int[] { 0 };
+		gbl_tabSummary.rowHeights = new int[] { 0 };
+		gbl_tabSummary.columnWeights = new double[] { Double.MIN_VALUE };
+		gbl_tabSummary.rowWeights = new double[] { Double.MIN_VALUE };
 		tabSummary.setLayout(gbl_tabSummary);
 
 		JPanel tabTypes = new JPanel();
@@ -1100,20 +1364,20 @@ public class Identic {
 		gbl_panelCatalogInUse.columnWeights = new double[] { 1.0, Double.MIN_VALUE };
 		gbl_panelCatalogInUse.rowWeights = new double[] { 1.0, Double.MIN_VALUE };
 		panelCatalogInUse.setLayout(gbl_panelCatalogInUse);
-		
+
 		JScrollPane scrollPaneCatalogInUse = new JScrollPane();
 		GridBagConstraints gbc_scrollPaneCatalogInUse = new GridBagConstraints();
 		gbc_scrollPaneCatalogInUse.fill = GridBagConstraints.BOTH;
 		gbc_scrollPaneCatalogInUse.gridx = 0;
 		gbc_scrollPaneCatalogInUse.gridy = 0;
 		panelCatalogInUse.add(scrollPaneCatalogInUse, gbc_scrollPaneCatalogInUse);
-		
-//		lstCatalogInUse = new JList();
+
+		// lstCatalogInUse = new JList();
 		lstCatalogInUse = new JList<CatalogItem>(inUseCatalogItemModel);
 		lstCatalogInUse.addListSelectionListener(catalogAdapter);
 
 		scrollPaneCatalogInUse.setViewportView(lstCatalogInUse);
-		
+
 		JLabel label_2 = new JLabel("In Use");
 		label_2.setMaximumSize(new Dimension(43, 14));
 		label_2.setMinimumSize(new Dimension(43, 14));
@@ -1123,7 +1387,7 @@ public class Identic {
 		label_2.setForeground(Color.BLUE);
 		label_2.setFont(new Font("Tahoma", Font.BOLD, 14));
 		scrollPaneCatalogInUse.setColumnHeaderView(label_2);
-		
+
 		Component horizontalGlue = Box.createHorizontalGlue();
 		GridBagConstraints gbc_horizontalGlue = new GridBagConstraints();
 		gbc_horizontalGlue.insets = new Insets(0, 0, 0, 5);
@@ -1144,18 +1408,18 @@ public class Identic {
 		gbl_panelCatalogAvailable.columnWeights = new double[] { 1.0, Double.MIN_VALUE };
 		gbl_panelCatalogAvailable.rowWeights = new double[] { 1.0, Double.MIN_VALUE };
 		panelCatalogAvailable.setLayout(gbl_panelCatalogAvailable);
-		
+
 		JScrollPane scrollPaneCatalogAvailable = new JScrollPane();
 		GridBagConstraints gbc_scrollPaneCatalogAvailable = new GridBagConstraints();
 		gbc_scrollPaneCatalogAvailable.fill = GridBagConstraints.BOTH;
 		gbc_scrollPaneCatalogAvailable.gridx = 0;
 		gbc_scrollPaneCatalogAvailable.gridy = 0;
 		panelCatalogAvailable.add(scrollPaneCatalogAvailable, gbc_scrollPaneCatalogAvailable);
-		
+
 		lstCatalogAvailable = new JList<CatalogItem>(availableCatalogItemModel);
 		lstCatalogAvailable.addListSelectionListener(catalogAdapter);
 		scrollPaneCatalogAvailable.setViewportView(lstCatalogAvailable);
-		
+
 		JLabel label_3 = new JLabel("Available");
 		label_3.setAlignmentX(Component.CENTER_ALIGNMENT);
 		label_3.setHorizontalAlignment(SwingConstants.CENTER);
@@ -1241,6 +1505,102 @@ public class Identic {
 		txtLog.setFont(new Font("Courier New", Font.PLAIN, 15));
 		scrollPaneAppLog.setViewportView(txtLog);
 
+		JPanel panelLeft = new JPanel();
+		splitPane1.setLeftComponent(panelLeft);
+		GridBagLayout gbl_panelLeft = new GridBagLayout();
+		gbl_panelLeft.columnWidths = new int[] { 0, 0, 0, 0 };
+		gbl_panelLeft.rowHeights = new int[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+		gbl_panelLeft.columnWeights = new double[] { 0.0, 1.0, 0.0, Double.MIN_VALUE };
+		gbl_panelLeft.rowWeights = new double[] { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, Double.MIN_VALUE };
+		panelLeft.setLayout(gbl_panelLeft);
+
+		Component verticalStrut_6 = Box.createVerticalStrut(60);
+		GridBagConstraints gbc_verticalStrut_6 = new GridBagConstraints();
+		gbc_verticalStrut_6.insets = new Insets(0, 0, 5, 5);
+		gbc_verticalStrut_6.gridx = 1;
+		gbc_verticalStrut_6.gridy = 1;
+		panelLeft.add(verticalStrut_6, gbc_verticalStrut_6);
+
+		JPanel panel_1 = new JPanel();
+		panel_1.setBorder(new BevelBorder(BevelBorder.LOWERED, null, null, null, null));
+		GridBagConstraints gbc_panel_1 = new GridBagConstraints();
+		gbc_panel_1.insets = new Insets(0, 0, 5, 5);
+		gbc_panel_1.fill = GridBagConstraints.BOTH;
+		gbc_panel_1.gridx = 1;
+		gbc_panel_1.gridy = 2;
+		panelLeft.add(panel_1, gbc_panel_1);
+		GridBagLayout gbl_panel_1 = new GridBagLayout();
+		gbl_panel_1.columnWidths = new int[] { 0, 0 };
+		gbl_panel_1.rowHeights = new int[] { 0, 0, 0, 0 };
+		gbl_panel_1.columnWeights = new double[] { 1.0, Double.MIN_VALUE };
+		gbl_panel_1.rowWeights = new double[] { 0.0, 0.0, 0.0, Double.MIN_VALUE };
+		panel_1.setLayout(gbl_panel_1);
+
+		rbNoCatalog = new JRadioButton("No Catalog(s)");
+		rbNoCatalog.setName("rbNoCatalog");
+		rbNoCatalog.setActionCommand("rbNoCatalog");
+		GridBagConstraints gbc_rbNoCatalog = new GridBagConstraints();
+		gbc_rbNoCatalog.anchor = GridBagConstraints.SOUTHWEST;
+		gbc_rbNoCatalog.insets = new Insets(0, 0, 5, 0);
+		gbc_rbNoCatalog.gridx = 0;
+		gbc_rbNoCatalog.gridy = 0;
+		panel_1.add(rbNoCatalog, gbc_rbNoCatalog);
+
+		rbWithCatalog = new JRadioButton("With Catalog(s)");
+		rbWithCatalog.setName("rbWithCatalog");
+		rbWithCatalog.setActionCommand("rbWithCatalog");
+		GridBagConstraints gbc_rbWithCatalog = new GridBagConstraints();
+		gbc_rbWithCatalog.anchor = GridBagConstraints.WEST;
+		gbc_rbWithCatalog.insets = new Insets(0, 0, 5, 0);
+		gbc_rbWithCatalog.gridx = 0;
+		gbc_rbWithCatalog.gridy = 1;
+		panel_1.add(rbWithCatalog, gbc_rbWithCatalog);
+
+		rbOnlyCatalogs = new JRadioButton("Only Catalogs");
+		rbOnlyCatalogs.setName("rbOnlyCatalogs");
+		rbOnlyCatalogs.setActionCommand("rbOnlyCatalogs");
+		GridBagConstraints gbc_rbOnlyCatalogs = new GridBagConstraints();
+		gbc_rbOnlyCatalogs.anchor = GridBagConstraints.WEST;
+		gbc_rbOnlyCatalogs.gridx = 0;
+		gbc_rbOnlyCatalogs.gridy = 2;
+		panel_1.add(rbOnlyCatalogs, gbc_rbOnlyCatalogs);
+
+		Component verticalStrut_7 = Box.createVerticalStrut(40);
+		GridBagConstraints gbc_verticalStrut_7 = new GridBagConstraints();
+		gbc_verticalStrut_7.insets = new Insets(0, 0, 5, 5);
+		gbc_verticalStrut_7.gridx = 1;
+		gbc_verticalStrut_7.gridy = 3;
+		panelLeft.add(verticalStrut_7, gbc_verticalStrut_7);
+
+		cbSaveExcludedFiles = new JCheckBox("Save Excluded Files");
+		cbSaveExcludedFiles.setSelected(false);
+		cbSaveExcludedFiles.setName("cbSaveExcludedFiles");
+		GridBagConstraints gbc_cbSaveExcludedFiles = new GridBagConstraints();
+		gbc_cbSaveExcludedFiles.anchor = GridBagConstraints.WEST;
+		gbc_cbSaveExcludedFiles.insets = new Insets(0, 0, 5, 5);
+		gbc_cbSaveExcludedFiles.gridx = 1;
+		gbc_cbSaveExcludedFiles.gridy = 4;
+		panelLeft.add(cbSaveExcludedFiles, gbc_cbSaveExcludedFiles);
+
+		Component verticalStrut_8 = Box.createVerticalStrut(60);
+		GridBagConstraints gbc_verticalStrut_8 = new GridBagConstraints();
+		gbc_verticalStrut_8.insets = new Insets(0, 0, 5, 5);
+		gbc_verticalStrut_8.gridx = 1;
+		gbc_verticalStrut_8.gridy = 7;
+		panelLeft.add(verticalStrut_8, gbc_verticalStrut_8);
+
+		JButton btnStart = new JButton("Start");
+		btnStart.setName(BTN_START);
+		btnStart.addActionListener(identicAdapter);
+		GridBagConstraints gbc_btnStart = new GridBagConstraints();
+		gbc_btnStart.fill = GridBagConstraints.HORIZONTAL;
+		gbc_btnStart.anchor = GridBagConstraints.NORTH;
+		gbc_btnStart.insets = new Insets(0, 0, 0, 5);
+		gbc_btnStart.gridx = 1;
+		gbc_btnStart.gridy = 8;
+		panelLeft.add(btnStart, gbc_btnStart);
+		splitPane1.setDividerLocation(150);
+
 		JPanel panelStatus = new JPanel();
 		panelStatus.setBorder(new BevelBorder(BevelBorder.LOWERED, null, null, null, null));
 		GridBagConstraints gbc_panelStatus = new GridBagConstraints();
@@ -1279,14 +1639,19 @@ public class Identic {
 	}// initialize
 
 	// Constants
+	private static final String EMPTY_STRING = "";
+
 	private static final String TAB_SUMMARY = "tabSummary";
 	private static final String TAB_CATALOGS = "tabCatalogs";
 	private static final String TAB_TYPES = "tabTypes";
 	private static final String TAB_LOG = "tabLog";
 
 	private static final String MNU_FILE_EXIT = "mnuFileExit";
+	private static final String BTN_SOURCE_FOLDER = "btnSourceFolder";
 
-	private static final String EMPTY_STRING = "";
+	private static final String RB_CATALOG_NO = "rbNoCatalog";
+	private static final String RB_CATALOG_WITH = "rbWithCatalog";
+	private static final String RB_CATALOG_ONLY = "rbOnlyCatalogs";
 
 	// Lists Constants
 	private static final String EDIT_ADD = "Add";
@@ -1311,16 +1676,16 @@ public class Identic {
 	private static final String LIST_SUFFIX_DOT = "." + LIST_SUFFIX;
 
 	// Catalog Constants
+	private static final String BTN_START = "btnStart";
 	private static final String BTN_CATALOG_RELOAD = "btnCatalogReload";
 	private static final String BTN_CATALOG_NEW = "btnCatalogNew";
 	private static final String BTN_CATALOG_COMBINE = "btnCatalogCombine";
 	private static final String BTN_CATALOG_IMPORT = "btnCatalogImport";
 	private static final String BTN_CATALOG_EXPORT = "btnCatalogExport";
 	private static final String BTN_CATALOG_REMOVE = "btnCatalogRemove";
-	
+
 	private static final String CATALOG_SUFFIX = "catalog";
 	private static final String CATALOG_SUFFIX_DOT = "." + CATALOG_SUFFIX;
-
 
 	// members
 	private JFrame frmIdentic;
@@ -1342,10 +1707,270 @@ public class Identic {
 	private JLabel lblCatalogDirectory;
 	private JLabel lblCatalogCount;
 	private JLabel lblCatalogDescription;
-//	private JList lstCatalogInUse;
-//	private JList lstCatalogAvailable;
+	private JLabel lblSourceFolder;
+	private JRadioButton rbNoCatalog;
+	private JRadioButton rbWithCatalog;
+	private JRadioButton rbOnlyCatalogs;
+	private JCheckBox cbSaveExcludedFiles;
+	// private JList lstCatalogInUse;
+	// private JList lstCatalogAvailable;
 
 	////////////////////// Included Classes ///////////////////////////////////////////
+
+	/*
+	 * Class Identify Subjects - is the first pass at the targeted file. It populates two LinkedBlockingQueues. The
+	 * first queue,qSubjects contains FileStatSubject which captures file full name, file size, and last date Modified
+	 * for those files that are to be processed by this pass. The second queue, qRejects, contains FileStatSubject,
+	 * which extends FileStatSubject with 'reason' for reject. it also tracks the number of occurrences of each file
+	 * suffix
+	 */
+	public class IdentifySubjects implements Runnable {
+		// private AppLogger appLogger = AppLogger.getInstance();
+
+		private HashMap<String, Integer> members = new HashMap<>();
+
+		public IdentifySubjects() {
+		}// Constructor
+
+		@Override
+		public void run() {
+			members.clear();
+			MyWalker myWalker = new MyWalker();
+			Path startPath = Paths.get(lblSourceFolder.getText());
+			try {
+				Files.walkFileTree(startPath, myWalker);
+			} catch (IOException e) {
+				e.printStackTrace();
+			} // try
+				// logSummary();
+		}// run
+
+		// private void logSummary() {
+		// log.addNL(2);
+		// log.addSpecial("folderCount = " + folderCount);
+		// log.addSpecial("fileCount = " + fileCount);
+		// log.addSpecial("subjectCount = " + subjectCount);
+		// log.addSpecial("rejectCount = " + rejectCount);
+		// log.addNL();
+		// log.addInfo(String.format("%,d File Types excluded", members.size()));
+		// Set<String> keys = members.keySet();
+		// log.addNL();
+		// for (String key : keys) {
+		// log.addInfo(String.format("%s - %,d occurances", key, members.get(key)));
+		// } // for
+		// }// logSummary
+
+		class MyWalker implements FileVisitor<Path> {
+			Pattern patternSubjects = Pattern.compile(targetListRegex);
+			Pattern patternRejects = Pattern.compile("\\.(.+$)");
+			Matcher matcher;
+
+			@Override
+			public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+				return FileVisitResult.CONTINUE;
+			}// FileVisitResult
+
+			@Override
+			public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+				// folderCount++;
+				return FileVisitResult.CONTINUE;
+			}// FileVisitResult
+
+			@Override
+			public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+				String fileName = file.toString();
+				String lastModifieTime = Files.getLastModifiedTime(file).toString();
+				long fileSize = Files.size(file);
+
+				matcher = patternSubjects.matcher(fileName);
+				String message;
+				if (matcher.find()) {
+					qSubjects.add(new FileStat(fileName, fileSize, lastModifieTime));
+					message = String.format("target: %s - %s", fileName,matcher.group(1));
+				} else {
+					matcher= patternRejects.matcher(fileName);
+					String extension = null;
+					if (matcher.find()) {
+						 extension = matcher.group(1);
+					}
+					qRejects.add(new FileStatReject(fileName, fileSize, lastModifieTime, FileStat.NOT_ON_LIST));
+					message = String.format("reject: %s: %s", fileName, extension);
+				} // if - match
+				log.addInfo(message);
+
+				return FileVisitResult.CONTINUE;
+			}// FileVisitResult
+
+			@Override
+			public FileVisitResult visitFileFailed(Path file, IOException exc) throws IOException {
+				qRejects.add(new FileStatReject(file.toString(), 0, null, FileStat.IO_EXCEPTION));
+				return FileVisitResult.CONTINUE;
+			}// FileVisitResult
+
+			private void keepSuffixCount(String suffix) {
+
+				Integer occurances = members.get(suffix);
+				if (occurances == null) {
+					members.put(suffix, 1);
+					excludeModel.addElement(suffix);
+				} else {
+					members.put(suffix, occurances + 1);
+				} // if unique
+			}// keepSuffixCount
+		}// class MyWalker
+	}// class IdentifySubjects
+		//////////////////////
+
+	public class MakeFileKey implements Runnable {
+		private static final int bufSize = 1024;
+		String algorithm = "SHA-1"; // 160 bits
+		// String algorithm = "MD5"; // 128 bits
+		// String algorithm = "SHA-256"; // 256 bits
+		private Thread priorThread;
+		// private AppLogger appLogger = AppLogger.getInstance();
+
+		public MakeFileKey(Thread priorThread) {
+			this.priorThread = priorThread;
+		}// Constructor
+
+		@Override
+		public void run() {
+			FileStat fileStat;
+
+			int count = 0;
+			String fileName = null;
+			String key = null;
+			while (true) {
+				try {
+					fileStat = qSubjects.remove();
+					fileName = fileStat.getFileName();
+					count++;
+					try {
+						key = hashFile(fileStat.getFilePath(), algorithm);
+						fileStat.setHashKey(key);
+						qHashes.add(fileStat);
+						// appLogger.addInfo(key + " - " + fileName);
+					} catch (HashGenerationException e) {
+						log.addError("HashGenerationError", fileName);
+						e.printStackTrace();
+					} //
+				} catch (NoSuchElementException ex) {
+					if (priorThread.getState().equals(Thread.State.TERMINATED)) {
+						log.addSpecial("From MakeFileKey count = " + count);
+						return;
+					} // if - done ?
+				} // try
+			} // while
+		}// run
+
+		private String hashFile(String file, String algorithm) throws HashGenerationException {
+			try (FileInputStream inputStream = new FileInputStream(file)) {
+				MessageDigest digest = MessageDigest.getInstance(algorithm);
+
+				byte[] bytesBuffer = new byte[bufSize];
+				int bytesRead = -1;
+
+				while ((bytesRead = inputStream.read(bytesBuffer)) != -1) {
+					digest.update(bytesBuffer, 0, bytesRead);
+				} // while
+
+				byte[] hashedBytes = digest.digest();
+
+				return convertByteArrayToHexString(hashedBytes);
+			} catch (NoSuchAlgorithmException | IOException ex) {
+				throw new HashGenerationException("Could not generate hash from file", ex);
+			} // try
+		}// hashFile
+
+		private String convertByteArrayToHexString(byte[] arrayBytes) {
+			StringBuffer stringBuffer = new StringBuffer();
+			for (int i = 0; i < arrayBytes.length; i++) {
+				stringBuffer.append(Integer.toString((arrayBytes[i] & 0xff) + 0x100, 16).substring(1));
+			} // for
+			return stringBuffer.toString();
+		}// convertByteArrayToHexString
+
+	}// class MakeFileKey
+
+	//////////////////////////////////////////
+
+	///////////////////////////
+
+	public class ShowRejects implements Runnable {
+
+		private Thread priorThread;
+		// private AppLogger appLogger = AppLogger.getInstance();
+
+		public ShowRejects(Thread priorThread) {
+			this.priorThread = priorThread;
+		}// Constructor
+
+		@Override
+		public void run() {
+			String fileName = null;
+			FileStatReject reject;
+			while (true) {
+				try {
+					reject = qRejects.remove();
+					rejectTableModel.addRow(reject);
+					fileName = reject.getFileName();
+				} catch (NoSuchElementException ex) {
+					if (priorThread.getState().equals(Thread.State.TERMINATED)) {
+						log.addSpecial(fileName);
+						return;
+					} // if - done ?
+				} // try
+			} // while
+		}// run
+
+	}// class ShowRejects
+		///////////////////
+
+	////////////////////////////////////////////////
+
+	public class IdentifyDuplicates implements Runnable {
+		private Thread priorThread;
+		private Integer fileID;
+
+		public IdentifyDuplicates(Thread priorThread) {
+			this.priorThread = priorThread;
+		}// Constructor
+
+		@Override
+		public void run() {
+			fileID = 0;
+			// hashIDs.clear();
+			// hashCounts.clear();
+			FileStat subject;
+			while (true) {
+				try {
+					subject = qHashes.remove();
+					subjectTableModel.addRow(subject, keepHashKeyCount(subject.getHashKey()));
+				} catch (NoSuchElementException ex) {
+					if (priorThread.getState().equals(Thread.State.TERMINATED)) {
+						return;
+					} // if - done ?
+				} // try
+			} // while
+		}// run
+
+		private Integer keepHashKeyCount(String hashKey) {
+
+			Integer occurances = hashCounts.get(hashKey);
+			if (occurances == null) {
+				hashCounts.put(hashKey, 1);
+				hashIDs.put(hashKey, fileID++);
+				// excludeModel.addElement(filePart);
+			} else {
+				hashCounts.put(hashKey, occurances + 1);
+			} // if unique
+
+			return hashIDs.get(hashKey);
+		}// keepSuffixCount
+
+	}// class IdentifyDuplicates
+
+	//////////////////////////////////
 
 	// ---------------------------------------------------------
 
@@ -1366,7 +1991,7 @@ public class Identic {
 	}// ListFilter
 
 	// -------------------------------------------------------------------
-	
+
 	//////////////////////////// [[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[
 
 	@SuppressWarnings("serial")
@@ -1462,14 +2087,8 @@ public class Identic {
 	}// class ListItemTransferable
 		////////////////////////////////////////// ]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]
 
-	
-// Classes of Adapters ////////////////////////////////////////////////////////////////
-	class IdenticAdapter implements ActionListener, ListSelectionListener {//, ChangeListener
-
-		@Override
-		public void valueChanged(ListSelectionEvent arg0) {
-			// TODO Auto-generated method stub
-		}// valueChanged
+	// Classes of Adapters ////////////////////////////////////////////////////////////////
+	class IdenticAdapter implements ActionListener {// , ListSelectionListener , ChangeListener
 
 		@Override
 		public void actionPerformed(ActionEvent actionEvent) {
@@ -1479,29 +2098,44 @@ public class Identic {
 			case MNU_FILE_EXIT:
 				doFileExit();
 				break;
+
+			case BTN_START:
+				doStart();
+				break;
+
+			case BTN_SOURCE_FOLDER:
+				doSourceFolder();
+				break;
 			}// switch - name
 		}// actionPerformed
 
-//		@Override
-//		public void stateChanged(ChangeEvent changeEvent) {
-//			JTabbedPane tabbedPane = (JTabbedPane) changeEvent.getSource();
-//
-//			switch (tabbedPane.getSelectedComponent().getName()) {
-//			case TAB_SUMMARY:
-//				doTabSummary();
-//				break;
-//			case TAB_CATALOGS:
-//				doTabCatalogs();
-//				break;
-//			case TAB_TYPES:
-//				doTabTypes();
-//				break;
-//			case TAB_LOG:
-//				doTabLog();
-//				break;
-//			}// switch - name
-//
-//		}// stateChanged
+		// @Override
+		// public void stateChanged(ChangeEvent changeEvent) {
+		// JTabbedPane tabbedPane = (JTabbedPane) changeEvent.getSource();
+		//
+		// switch (tabbedPane.getSelectedComponent().getName()) {
+		// case TAB_SUMMARY:
+		// doTabSummary();
+		// break;
+		// case TAB_CATALOGS:
+		// doTabCatalogs();
+		// break;
+		// case TAB_TYPES:
+		// doTabTypes();
+		// break;
+		// case TAB_LOG:
+		// doTabLog();
+		// break;
+		// }// switch - name
+		//
+		// }// stateChanged
+
+		// ***** ListSelectionListener
+
+		// @Override
+		// public void valueChanged(ListSelectionEvent listSelectionEvent) {
+		// doCatalogListSelected(listSelectionEvent);
+		// }// valueChanged
 
 	}// class IdenticAdapter
 
@@ -1597,7 +2231,7 @@ public class Identic {
 
 	////////////////////////////////////////////////////////////////
 
-	class CatalogAdapter implements ActionListener,ListSelectionListener {
+	class CatalogAdapter implements ActionListener, ListSelectionListener {
 		@Override
 		public void actionPerformed(ActionEvent actionEvent) {
 			String name = ((Component) actionEvent.getSource()).getName();
