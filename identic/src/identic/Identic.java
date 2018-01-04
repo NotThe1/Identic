@@ -40,8 +40,11 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
+import java.util.Map.Entry;
 import java.util.NoSuchElementException;
+import java.util.Set;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.prefs.Preferences;
 import java.util.regex.Matcher;
@@ -92,6 +95,8 @@ public class Identic {
 	private LinkedBlockingQueue<FileStat> qSubjects = new LinkedBlockingQueue<FileStat>();
 	private LinkedBlockingQueue<FileStatReject> qRejects = new LinkedBlockingQueue<FileStatReject>();
 	private LinkedBlockingQueue<FileStat> qHashes = new LinkedBlockingQueue<FileStat>();
+	private HashMap<String, Integer> excludedFileTypes = new HashMap<>();
+
 
 	private SubjectTableModel subjectTableModel = new SubjectTableModel();
 	private RejectTableModel rejectTableModel = new RejectTableModel();
@@ -316,7 +321,6 @@ public class Identic {
 	}// changeTargetList
 
 	private void loadTargetList() {
-
 		String listFile = getApplcationWorkingDirectory() + activeTypeList + LIST_SUFFIX_DOT;
 		lblStatusTypeList.setText(activeTypeList);
 
@@ -328,7 +332,7 @@ public class Identic {
 		} // try targetModel
 		targetModel.removeAllElements();
 
-		StringBuilder sb = new StringBuilder("(?i)\\.("); // case insensitive
+		StringBuilder sb = new StringBuilder("(?i)"); // case insensitive
 		for (String line : targetSuffixes) {
 			line = line.trim();
 			targetModel.addElement(line);
@@ -336,7 +340,6 @@ public class Identic {
 			sb.append("|");
 		} // for
 		sb.deleteCharAt(sb.length() - 1); // remove trailing |
-		sb.append(")$"); // restrict to end of string
 		targetListRegex = sb.toString();
 		String message = String.format("[loadTargetList()] sb: %s%n%n", targetListRegex);
 		log.addInfo(message);
@@ -352,7 +355,6 @@ public class Identic {
 		lblListEdit.setText(editName);
 		txtActive.setText(editName);
 		txtEdit.setText(EMPTY_STRING);
-		// lblStatus.setText((String) listFileTypes.getSelectedValue());
 
 		String editFile = workingDirectory + editName + LIST_SUFFIX_DOT;
 		Path p = Paths.get(editFile);
@@ -366,8 +368,6 @@ public class Identic {
 			e.printStackTrace();
 		} // try
 
-		// manageEditButtons("Load");
-		// validate();
 	}// doLoadTargetEdit
 
 	private void doNewTargetEdit() {
@@ -571,6 +571,8 @@ public class Identic {
 
 	private void doStart() {
 		initialiseFind();
+		Date startTime = log.addTimeStamp("Start :");
+
 		if (rbNoCatalog.isSelected()) {
 			log.addInfo(" doStartNoCatalogs()");
 			log.addInfo(lblSourceFolder.getText());
@@ -590,7 +592,7 @@ public class Identic {
 			log.addInfo(" doStartNoCatalogs()");
 			// doStartOnlyCatalogs();
 		} // if start type
-		log.addTimeStamp("End :");
+		log.addElapsedTime(startTime,"End :");
 		markTheDuplicates();
 		displaySummary();
 		//
@@ -678,7 +680,6 @@ public class Identic {
 		hashIDs.clear();
 		hashCounts.clear();
 
-		log.addTimeStamp("Start :");
 
 	}// initialiseFind
 
@@ -701,11 +702,22 @@ public class Identic {
 	}// markTheDuplicates
 
 	private void displaySummary() {
-		int totalFileCount = rejectTableModel.getRowCount() + subjectTableModel.getRowCount();
+		
+		int numberOfTypesExcluded = excludedFileTypes.size();
+		Set<Entry<String, Integer>> excludedFileTypesSet = excludedFileTypes.entrySet();
+		int totalCountOfExcludedFiles = 0;
+		for (Entry entry:excludedFileTypesSet) {
+			Integer value = (Integer) entry.getValue();
+			totalCountOfExcludedFiles += value;
+		}//for - entry
+		
+		int totalFileCount = totalCountOfExcludedFiles + subjectTableModel.getRowCount();
+		
 		log.addInfo("totalFileCount = " + totalFileCount);
 		log.addNL();
-		log.addInfo("Reject  = " + rejectTableModel.getRowCount());
-		log.addInfo("Subject = " + subjectTableModel.getRowCount());
+		log.addInfo("Subject Files = " + subjectTableModel.getRowCount());
+		log.addInfo("Excluded Files = " + totalCountOfExcludedFiles);
+		log.addInfo("Exclude Types  = " + excludeModel.size());
 
 		// lblFolderCount.setText(String.format("%,d", folderCount));
 		// lblFileCount.setText(String.format("%,d", fileCount));
@@ -1640,6 +1652,7 @@ public class Identic {
 
 	// Constants
 	private static final String EMPTY_STRING = "";
+	private static final String NONE = "<none>";
 
 	private static final String TAB_SUMMARY = "tabSummary";
 	private static final String TAB_CATALOGS = "tabCatalogs";
@@ -1725,16 +1738,13 @@ public class Identic {
 	 * suffix
 	 */
 	public class IdentifySubjects implements Runnable {
-		// private AppLogger appLogger = AppLogger.getInstance();
-
-		private HashMap<String, Integer> members = new HashMap<>();
-
+		
 		public IdentifySubjects() {
 		}// Constructor
 
 		@Override
 		public void run() {
-			members.clear();
+			excludedFileTypes.clear();
 			MyWalker myWalker = new MyWalker();
 			Path startPath = Paths.get(lblSourceFolder.getText());
 			try {
@@ -1745,24 +1755,9 @@ public class Identic {
 				// logSummary();
 		}// run
 
-		// private void logSummary() {
-		// log.addNL(2);
-		// log.addSpecial("folderCount = " + folderCount);
-		// log.addSpecial("fileCount = " + fileCount);
-		// log.addSpecial("subjectCount = " + subjectCount);
-		// log.addSpecial("rejectCount = " + rejectCount);
-		// log.addNL();
-		// log.addInfo(String.format("%,d File Types excluded", members.size()));
-		// Set<String> keys = members.keySet();
-		// log.addNL();
-		// for (String key : keys) {
-		// log.addInfo(String.format("%s - %,d occurances", key, members.get(key)));
-		// } // for
-		// }// logSummary
-
 		class MyWalker implements FileVisitor<Path> {
 			Pattern patternSubjects = Pattern.compile(targetListRegex);
-			Pattern patternRejects = Pattern.compile("\\.(.+$)");
+			Pattern patternFileType = Pattern.compile("\\.(.+$)");
 			Matcher matcher;
 
 			@Override
@@ -1781,22 +1776,17 @@ public class Identic {
 				String fileName = file.toString();
 				String lastModifieTime = Files.getLastModifiedTime(file).toString();
 				long fileSize = Files.size(file);
-
-				matcher = patternSubjects.matcher(fileName);
-				String message;
+				
+				matcher = patternFileType.matcher(fileName);
+				String fileType = matcher.find()?matcher.group(1).toLowerCase():NONE;
+				
+				matcher = patternSubjects.matcher(fileType);
 				if (matcher.find()) {
 					qSubjects.add(new FileStat(fileName, fileSize, lastModifieTime));
-					message = String.format("target: %s - %s", fileName,matcher.group(1));
 				} else {
-					matcher= patternRejects.matcher(fileName);
-					String extension = null;
-					if (matcher.find()) {
-						 extension = matcher.group(1);
-					}
+					keepSuffixCount(fileType);
 					qRejects.add(new FileStatReject(fileName, fileSize, lastModifieTime, FileStat.NOT_ON_LIST));
-					message = String.format("reject: %s: %s", fileName, extension);
 				} // if - match
-				log.addInfo(message);
 
 				return FileVisitResult.CONTINUE;
 			}// FileVisitResult
@@ -1809,12 +1799,12 @@ public class Identic {
 
 			private void keepSuffixCount(String suffix) {
 
-				Integer occurances = members.get(suffix);
+				Integer occurances = excludedFileTypes.get(suffix);
 				if (occurances == null) {
-					members.put(suffix, 1);
+					excludedFileTypes.put(suffix, 1);
 					excludeModel.addElement(suffix);
 				} else {
-					members.put(suffix, occurances + 1);
+					excludedFileTypes.put(suffix, occurances + 1);
 				} // if unique
 			}// keepSuffixCount
 		}// class MyWalker
@@ -1856,7 +1846,7 @@ public class Identic {
 					} //
 				} catch (NoSuchElementException ex) {
 					if (priorThread.getState().equals(Thread.State.TERMINATED)) {
-						log.addSpecial("From MakeFileKey count = " + count);
+//						log.addSpecial("From MakeFileKey count = " + count);
 						return;
 					} // if - done ?
 				} // try
