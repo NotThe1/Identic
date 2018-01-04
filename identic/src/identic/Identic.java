@@ -583,14 +583,14 @@ public class Identic {
 			} // if catalog selected
 			log.addInfo(" doStartWithCatalogs()");
 			log.addInfo(lblSourceFolder.getText());
-			// doStartOnlyCatalogs();
-			// doStartNoCatalog();
+			 doStartOnlyCatalogs();
+			 doStartNoCatalog();
 		} else if (rbOnlyCatalogs.isSelected()) {
 			if (!isCatalogSelected()) {
 				return;
 			} // if catalog selected
 			log.addInfo(" doStartNoCatalogs()");
-			// doStartOnlyCatalogs();
+			 doStartOnlyCatalogs();
 		} // if start type
 		log.addElapsedTime(startTime,"End :");
 		markTheDuplicates();
@@ -649,6 +649,25 @@ public class Identic {
 		} // try
 
 	}// doStartNoCatalog
+	
+	private void doStartOnlyCatalogs() {
+		GatherFromCatalogs gatherFromCatalogs = new GatherFromCatalogs();
+		Thread threadGather = new Thread(gatherFromCatalogs);
+		threadGather.start();
+
+		IdentifyDuplicates identifyDuplicates = new IdentifyDuplicates(threadGather);
+		Thread threadIdentifyDuplicates = new Thread(identifyDuplicates);
+		threadIdentifyDuplicates.start();
+
+		try {
+			threadGather.join();
+			threadIdentifyDuplicates.join();
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		} // try
+
+	}// doStartWithCatalog
+
 
 	private boolean isCatalogSelected() {
 		return isCatalogSelected(1);
@@ -676,7 +695,6 @@ public class Identic {
 		hashCounts.clear();
 		subjectTableModel.clear();
 		rejectTableModel.clear();
-		// lblFilesNotProcessed.setText(String.format("%,d", 0));
 		hashIDs.clear();
 		hashCounts.clear();
 
@@ -1959,6 +1977,25 @@ public class Identic {
 		}// keepSuffixCount
 
 	}// class IdentifyDuplicates
+	
+	/////////////////////////////////////////
+
+	public class GatherFromCatalogs implements Runnable {
+
+		// @Override
+		public void run() {
+			// SubjectTableModel subjectTableModel;
+			CatalogItem catalogItem;
+			for (int i = 0; i < inUseCatalogItemModel.getSize(); i++) {
+				catalogItem = inUseCatalogItemModel.get(i);
+				qHashes.addAll(catalogItem.getFileStats());
+				System.out.println(catalogItem.getEntryName());
+			} // for - each catalog Item
+		}// run
+	}// class GatherFromCatalogs
+
+	//////////////////////////// [[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[
+
 
 	//////////////////////////////////
 
