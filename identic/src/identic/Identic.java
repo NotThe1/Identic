@@ -40,7 +40,6 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -256,8 +255,8 @@ public class Identic {
 	private void doCatalogCombine() {
 		List<CatalogItem> catalogItems = new ArrayList<CatalogItem>();
 		try {
-		catalogItems.addAll(lstCatalogInUse.getSelectedValuesList());
-		catalogItems.addAll(lstCatalogAvailable.getSelectedValuesList());			
+			catalogItems.addAll(lstCatalogInUse.getSelectedValuesList());
+			catalogItems.addAll(lstCatalogAvailable.getSelectedValuesList());
 		} catch (Exception e) {
 			// TODO: handle exception
 		}
@@ -827,48 +826,62 @@ public class Identic {
 			Integer value = (Integer) entry.getValue();
 			totalCountOfExcludedFiles += value;
 		} // for - entry
-		
-		Collection<Integer> fileTypeCounts = excludedFileTypes.values();
-		ArrayList<Integer> fileTypeCounts1 =  (ArrayList<Integer>) excludedFileTypes.values();
-//		long excludedTypeNumber = fileTypeCounts1.stream().filter(fileTypeCounts1 -> item == 1).count();
-		
-			
+
 		int totalFileCount = totalCountOfExcludedFiles + subjectTableModel.getRowCount();
-		lblTotalFilesValue.setText(String.format("%,d", totalFileCount));
-		lblTargetFilesValue.setText(String.format("%,d", subjectTableModel.getRowCount()));
-		lblTotalExcludedValue.setText(String.format("%,d", totalCountOfExcludedFiles));
-		lblExcludedTypeCountValue.setText(String.format("%,d", excludedFileTypes.size()));
-
-//		log.addInfo("totalFileCount = " + totalFileCount);
-//		log.addNL();
-//		log.addInfo("Subject Files = " + subjectTableModel.getRowCount());
-//		log.addInfo("Excluded Files = " + totalCountOfExcludedFiles);
-//		// log.addInfo("Exclude Types = " + excludeModel.size());
-//		log.addInfo("Exclude Types  = " + excludedFileTypes.size());
+		setButtonLabel(btnSummaryTotal,totalFileCount);
+		setButtonLabel(btnSummaryExcluded,totalCountOfExcludedFiles);
+		setButtonLabel(btnSummaryExcludedTypes,excludedFileTypes.size());
+		setButtonLabel(btnSummaryTargets,subjectTableModel.getRowCount());
 		
+		
+		int filesWithNoDups = 0;
+		Set<String> hashKeys = hashCounts.keySet();
+		for (String hashKey : hashKeys) {
+			if (hashCounts.get(hashKey) == 1) {
+				filesWithNoDups++;
+			} // if
+		} // for
 
-		// lblFolderCount.setText(String.format("%,d", folderCount));
-		// lblFileCount.setText(String.format("%,d", fileCount));
-		// txtTotalFilesProcessed.setText(String.format("%,d", fileCount));
-		// int filesWithNoDups = 0;
-		//
-		// Set<String> hashKeys = hashCounts.keySet();
-		// for (String hashKey : hashKeys) {
-		// if (hashCounts.get(hashKey) == 1) {
-		// filesWithNoDups++;
-		// } // if
-		// } // for
-		// txtFilesWithNoDuplicates.setText(String.format("%,d", filesWithNoDups));
-		// int uniqueFilesWithDups = hashCounts.size() - filesWithNoDups;
-		// txtUniqueFilesWithDuplicates.setText(String.format("%,d", uniqueFilesWithDups));
-		// txtTotalNumberOfUniqueFiles.setText(String.format("%,d", hashCounts.size()));
-		//
-		// int filesWithDup = subjectCount - filesWithNoDups;
-		// txtFilesWithDuplicates.setText(String.format("%,d", filesWithDup));
-		// txtRedundantFiles.setText(String.format("%,d", filesWithDup - uniqueFilesWithDups));
-		// txtExcessStorage.setText(String.format("%,d", 0));
-
+		int filesWithDups = hashCounts.size() - filesWithNoDups;
+		
+		setButtonLabel(btnSummaryDistinct,hashCounts.size());
+		setButtonLabel(btnSummaryUnique,filesWithNoDups);
+		setButtonLabel(btnSummaryDuplicates,filesWithDups);
+		
 	}// displaySummary
+
+	private void setButtonLabel(JButton btn, int value) {
+		String buttonLabel = "";
+		
+		switch (btn.getName()) {
+		case BTN_SUMMARY_TOTAL:
+		buttonLabel = "Total";
+		break;
+		case BTN_SUMMARY_EXCLUDED:
+		buttonLabel = "Excluded";
+		break;
+		case BTN_SUMMARY_EXCLUDED_TYPES:
+		buttonLabel = " Excluded Types";
+		break;
+		case BTN_SUMMARY_TARGETS:
+		buttonLabel = "Targets";
+		break;
+		case BTN_SUMMARY_DISTINCT:
+		buttonLabel = "Distinct";
+		break;
+		case BTN_SUMMARY_UNIQUE:
+		buttonLabel = "Unique";
+		break;
+		case BTN_SUMMARY_DUPLICATES:
+		buttonLabel = "Duplicates";
+		break;
+		}// switch - btn name
+		
+		btn.setText(String.format(" %,-10d\t%s",value,buttonLabel));
+		
+		btn.setEnabled(value != 0);
+		return;
+	}// setButtonLabel
 
 	// Swing code ///////////////////////////////////////////////////////////////
 
@@ -1095,97 +1108,99 @@ public class Identic {
 		gbl_tabSummary.columnWeights = new double[] { 1.0, Double.MIN_VALUE };
 		gbl_tabSummary.rowWeights = new double[] { 1.0, Double.MIN_VALUE };
 		tabSummary.setLayout(gbl_tabSummary);
-		
+
 		JSplitPane splitPaneSummary = new JSplitPane();
 		GridBagConstraints gbc_splitPaneSummary = new GridBagConstraints();
 		gbc_splitPaneSummary.fill = GridBagConstraints.BOTH;
 		gbc_splitPaneSummary.gridx = 0;
 		gbc_splitPaneSummary.gridy = 0;
 		tabSummary.add(splitPaneSummary, gbc_splitPaneSummary);
-		
+
 		JPanel panelLeftSummary = new JPanel();
 		splitPaneSummary.setLeftComponent(panelLeftSummary);
 		GridBagLayout gbl_panelLeftSummary = new GridBagLayout();
-		gbl_panelLeftSummary.columnWidths = new int[]{0, 0, 70, 0};
-		gbl_panelLeftSummary.rowHeights = new int[]{0, 0, 0, 0, 0, 0, 0, 0, 0};
-		gbl_panelLeftSummary.columnWeights = new double[]{0.0, 0.0, 0.0, Double.MIN_VALUE};
-		gbl_panelLeftSummary.rowWeights = new double[]{0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, Double.MIN_VALUE};
+		gbl_panelLeftSummary.columnWidths = new int[] { 0, 70, 0 };
+		gbl_panelLeftSummary.rowHeights = new int[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+		gbl_panelLeftSummary.columnWeights = new double[] { 0.0, 0.0, Double.MIN_VALUE };
+		gbl_panelLeftSummary.rowWeights = new double[] { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+				0.0, 0.0, Double.MIN_VALUE };
 		panelLeftSummary.setLayout(gbl_panelLeftSummary);
-		
-		JLabel lblTotalFiles = new JLabel("Total Files:");
-		GridBagConstraints gbc_lblTotalFiles = new GridBagConstraints();
-		gbc_lblTotalFiles.anchor = GridBagConstraints.WEST;
-		gbc_lblTotalFiles.insets = new Insets(0, 0, 5, 5);
-		gbc_lblTotalFiles.gridx = 0;
-		gbc_lblTotalFiles.gridy = 1;
-		panelLeftSummary.add(lblTotalFiles, gbc_lblTotalFiles);
-		
-		lblTotalFilesValue = new JLabel("0");
-		lblTotalFilesValue.setFont(new Font("Tahoma", Font.BOLD, 12));
-		GridBagConstraints gbc_lblTotalFilesValue = new GridBagConstraints();
-		gbc_lblTotalFilesValue.insets = new Insets(0, 0, 5, 0);
-		gbc_lblTotalFilesValue.anchor = GridBagConstraints.EAST;
-		gbc_lblTotalFilesValue.gridx = 2;
-		gbc_lblTotalFilesValue.gridy = 1;
-		panelLeftSummary.add(lblTotalFilesValue, gbc_lblTotalFilesValue);
-		
-		JLabel lblTargetFiles = new JLabel("Target Files");
-		GridBagConstraints gbc_lblTargetFiles = new GridBagConstraints();
-		gbc_lblTargetFiles.anchor = GridBagConstraints.NORTHWEST;
-		gbc_lblTargetFiles.insets = new Insets(0, 0, 5, 5);
-		gbc_lblTargetFiles.gridx = 0;
-		gbc_lblTargetFiles.gridy = 3;
-		panelLeftSummary.add(lblTargetFiles, gbc_lblTargetFiles);
-		
-		lblTargetFilesValue = new JLabel("0");
-		lblTargetFilesValue.setFont(new Font("Tahoma", Font.BOLD, 12));
-		GridBagConstraints gbc_lblTargetFilesValue = new GridBagConstraints();
-		gbc_lblTargetFilesValue.anchor = GridBagConstraints.EAST;
-		gbc_lblTargetFilesValue.insets = new Insets(0, 0, 5, 0);
-		gbc_lblTargetFilesValue.gridx = 2;
-		gbc_lblTargetFilesValue.gridy = 3;
-		panelLeftSummary.add(lblTargetFilesValue, gbc_lblTargetFilesValue);
-		
-		JLabel lblTotalExcluded = new JLabel("Total Excluded");
-		GridBagConstraints gbc_lblTotalExcluded = new GridBagConstraints();
-		gbc_lblTotalExcluded.anchor = GridBagConstraints.NORTHWEST;
-		gbc_lblTotalExcluded.insets = new Insets(0, 0, 5, 5);
-		gbc_lblTotalExcluded.gridx = 0;
-		gbc_lblTotalExcluded.gridy = 5;
-		panelLeftSummary.add(lblTotalExcluded, gbc_lblTotalExcluded);
-		
-		lblTotalExcludedValue = new JLabel("0");
-		lblTotalExcludedValue.setFont(new Font("Tahoma", Font.BOLD, 12));
-		GridBagConstraints gbc_lblTotalExcludedValue = new GridBagConstraints();
-		gbc_lblTotalExcludedValue.anchor = GridBagConstraints.SOUTHEAST;
-		gbc_lblTotalExcludedValue.insets = new Insets(0, 0, 5, 0);
-		gbc_lblTotalExcludedValue.gridx = 2;
-		gbc_lblTotalExcludedValue.gridy = 5;
-		panelLeftSummary.add(lblTotalExcludedValue, gbc_lblTotalExcludedValue);
-		
-		JLabel lblExcludedTypeCount = new JLabel("Excluded Type Count");
-		GridBagConstraints gbc_lblExcludedTypeCount = new GridBagConstraints();
-		gbc_lblExcludedTypeCount.anchor = GridBagConstraints.WEST;
-		gbc_lblExcludedTypeCount.insets = new Insets(0, 0, 0, 5);
-		gbc_lblExcludedTypeCount.gridx = 0;
-		gbc_lblExcludedTypeCount.gridy = 7;
-		panelLeftSummary.add(lblExcludedTypeCount, gbc_lblExcludedTypeCount);
-		
-		lblExcludedTypeCountValue = new JLabel("0");
-		lblExcludedTypeCountValue.setFont(new Font("Tahoma", Font.BOLD, 12));
-		GridBagConstraints gbc_lblExcludedTypeCountValue = new GridBagConstraints();
-		gbc_lblExcludedTypeCountValue.anchor = GridBagConstraints.EAST;
-		gbc_lblExcludedTypeCountValue.gridx = 2;
-		gbc_lblExcludedTypeCountValue.gridy = 7;
-		panelLeftSummary.add(lblExcludedTypeCountValue, gbc_lblExcludedTypeCountValue);
-		
+
+		btnSummaryTotal = new JButton("Total Files:");
+		btnSummaryTotal.setName(BTN_SUMMARY_TOTAL);
+		btnSummaryTotal.addActionListener(identicAdapter);
+		GridBagConstraints gbc_btnSummaryTotal = new GridBagConstraints();
+		gbc_btnSummaryTotal.anchor = GridBagConstraints.WEST;
+		gbc_btnSummaryTotal.insets = new Insets(0, 0, 5, 0);
+		gbc_btnSummaryTotal.gridx = 1;
+		gbc_btnSummaryTotal.gridy = 1;
+		panelLeftSummary.add(btnSummaryTotal, gbc_btnSummaryTotal);
+
+		btnSummaryExcluded = new JButton("Total Excluded");
+		btnSummaryExcluded.setName(BTN_SUMMARY_EXCLUDED);
+		btnSummaryExcluded.addActionListener(identicAdapter);
+		GridBagConstraints gbc_btnSummaryExcluded = new GridBagConstraints();
+		gbc_btnSummaryExcluded.anchor = GridBagConstraints.NORTHWEST;
+		gbc_btnSummaryExcluded.insets = new Insets(0, 0, 5, 0);
+		gbc_btnSummaryExcluded.gridx = 1;
+		gbc_btnSummaryExcluded.gridy = 3;
+		panelLeftSummary.add(btnSummaryExcluded, gbc_btnSummaryExcluded);
+
+		btnSummaryExcludedTypes = new JButton("Excluded Type Count");
+		btnSummaryExcludedTypes.setName(BTN_SUMMARY_EXCLUDED_TYPES);
+		btnSummaryExcludedTypes.addActionListener(identicAdapter);
+		GridBagConstraints gbc_btnSummaryExcludedTypes = new GridBagConstraints();
+		gbc_btnSummaryExcludedTypes.insets = new Insets(0, 0, 5, 0);
+		gbc_btnSummaryExcludedTypes.anchor = GridBagConstraints.WEST;
+		gbc_btnSummaryExcludedTypes.gridx = 1;
+		gbc_btnSummaryExcludedTypes.gridy = 5;
+		panelLeftSummary.add(btnSummaryExcludedTypes, gbc_btnSummaryExcludedTypes);
+
+		btnSummaryTargets = new JButton("Target Files");
+		btnSummaryTargets.setName(BTN_SUMMARY_TARGETS);
+		btnSummaryTargets.addActionListener(identicAdapter);
+		GridBagConstraints gbc_btnSummaryTargets = new GridBagConstraints();
+		gbc_btnSummaryTargets.anchor = GridBagConstraints.NORTHWEST;
+		gbc_btnSummaryTargets.insets = new Insets(0, 0, 5, 0);
+		gbc_btnSummaryTargets.gridx = 1;
+		gbc_btnSummaryTargets.gridy = 7;
+		panelLeftSummary.add(btnSummaryTargets, gbc_btnSummaryTargets);
+
+		btnSummaryDistinct = new JButton("Distinct Files");
+		btnSummaryDistinct.setName(BTN_SUMMARY_DISTINCT);
+		btnSummaryDistinct.addActionListener(identicAdapter);
+		GridBagConstraints gbc_btnSummaryDistinct = new GridBagConstraints();
+		gbc_btnSummaryDistinct.anchor = GridBagConstraints.NORTHWEST;
+		gbc_btnSummaryDistinct.insets = new Insets(0, 0, 5, 0);
+		gbc_btnSummaryDistinct.gridx = 1;
+		gbc_btnSummaryDistinct.gridy = 9;
+		panelLeftSummary.add(btnSummaryDistinct, gbc_btnSummaryDistinct);
+
+		btnSummaryUnique = new JButton("Unique Files");
+		btnSummaryUnique.setName(BTN_SUMMARY_UNIQUE);
+		btnSummaryUnique.addActionListener(identicAdapter);
+		GridBagConstraints gbc_btnSummaryUnique = new GridBagConstraints();
+		gbc_btnSummaryUnique.insets = new Insets(0, 0, 5, 0);
+		gbc_btnSummaryUnique.anchor = GridBagConstraints.WEST;
+		gbc_btnSummaryUnique.gridx = 1;
+		gbc_btnSummaryUnique.gridy = 11;
+		panelLeftSummary.add(btnSummaryUnique, gbc_btnSummaryUnique);
+
+		btnSummaryDuplicates = new JButton("Have Duplicates");
+		btnSummaryDuplicates.setName(BTN_SUMMARY_DUPLICATES);
+		GridBagConstraints gbc_btnSummaryDuplicates = new GridBagConstraints();
+		gbc_btnSummaryDuplicates.anchor = GridBagConstraints.WEST;
+		gbc_btnSummaryDuplicates.gridx = 1;
+		gbc_btnSummaryDuplicates.gridy = 13;
+		panelLeftSummary.add(btnSummaryDuplicates, gbc_btnSummaryDuplicates);
+
 		JPanel panelRightSummary = new JPanel();
 		splitPaneSummary.setRightComponent(panelRightSummary);
 		GridBagLayout gbl_panelRightSummary = new GridBagLayout();
-		gbl_panelRightSummary.columnWidths = new int[]{0};
-		gbl_panelRightSummary.rowHeights = new int[]{0};
-		gbl_panelRightSummary.columnWeights = new double[]{Double.MIN_VALUE};
-		gbl_panelRightSummary.rowWeights = new double[]{Double.MIN_VALUE};
+		gbl_panelRightSummary.columnWidths = new int[] { 0 };
+		gbl_panelRightSummary.rowHeights = new int[] { 0 };
+		gbl_panelRightSummary.columnWeights = new double[] { Double.MIN_VALUE };
+		gbl_panelRightSummary.rowWeights = new double[] { Double.MIN_VALUE };
 		panelRightSummary.setLayout(gbl_panelRightSummary);
 		splitPaneSummary.setDividerLocation(300);
 
@@ -1921,6 +1936,14 @@ public class Identic {
 	private static final String CATALOG_SUFFIX = "catalog";
 	private static final String CATALOG_SUFFIX_DOT = "." + CATALOG_SUFFIX;
 
+	private static final String BTN_SUMMARY_TOTAL = "btnSummaryTotal";
+	private static final String BTN_SUMMARY_EXCLUDED = "btnSummaryExcluded";
+	private static final String BTN_SUMMARY_EXCLUDED_TYPES = "btnSummaryExcludedTypes";
+	private static final String BTN_SUMMARY_TARGETS = "btnSummaryTargets";
+	private static final String BTN_SUMMARY_DISTINCT = "btnSummaryDistinct";
+	private static final String BTN_SUMMARY_UNIQUE = "btnSummaryUnique";
+	private static final String BTN_SUMMARY_DUPLICATES = "btnSummaryDuplicates";
+
 	// members
 	private JFrame frmIdentic;
 	private JSplitPane splitPane1;
@@ -1946,10 +1969,13 @@ public class Identic {
 	private JRadioButton rbWithCatalog;
 	private JRadioButton rbOnlyCatalogs;
 	private JCheckBox cbSaveExcludedFiles;
-	private JLabel lblTotalFilesValue;
-	private JLabel lblTargetFilesValue;
-	private JLabel lblTotalExcludedValue;
-	private JLabel lblExcludedTypeCountValue;
+	private JButton btnSummaryTotal;
+	private JButton btnSummaryExcluded;
+	private JButton btnSummaryTargets;
+	private JButton btnSummaryExcludedTypes;
+	private JButton btnSummaryDistinct;
+	private JButton btnSummaryUnique;
+	private JButton btnSummaryDuplicates;
 	// private JList lstCatalogInUse;
 	// private JList lstCatalogAvailable;
 
