@@ -40,8 +40,10 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map.Entry;
 import java.util.NoSuchElementException;
 import java.util.Set;
@@ -96,7 +98,6 @@ public class Identic {
 	private LinkedBlockingQueue<FileStatReject> qRejects = new LinkedBlockingQueue<FileStatReject>();
 	private LinkedBlockingQueue<FileStat> qHashes = new LinkedBlockingQueue<FileStat>();
 	private HashMap<String, Integer> excludedFileTypes = new HashMap<>();
-
 
 	private SubjectTableModel subjectTableModel = new SubjectTableModel();
 	private RejectTableModel rejectTableModel = new RejectTableModel();
@@ -207,10 +208,111 @@ public class Identic {
 	}// doCatalogLoad
 
 	private void doCatalogNew() {
+		if (subjectTableModel.getRowCount() == 0) {
+			JOptionPane.showMessageDialog(frmIdentic, "No Catalog has been created, by FIND");
+			return;
+		} // if
+
+		CatalogDialog catalogDialog = CatalogDialog.makeNewCatalogDialog();
+		if (catalogDialog.showDialog() == JOptionPane.OK_OPTION) {
+			// System.out.printf("state: JOptionPane.OK_OPTION%n");
+			log.addInfo(String.format("Name: %s", catalogDialog.getName()));
+			log.addInfo(String.format("Description: %s", catalogDialog.getDescription()));
+
+			CatalogItem catalogItem = new CatalogItem(catalogDialog.getName(), catalogDialog.getDescription(),
+					lblSourceFolder.getText(), collectFileInfo(subjectTableModel));
+
+			try {
+				FileOutputStream fos = new FileOutputStream(
+						getApplcationWorkingDirectory() + catalogDialog.getName() + CATALOG_SUFFIX_DOT);
+				ObjectOutputStream oos = new ObjectOutputStream(fos);
+				oos.writeObject(catalogItem);
+				oos.close();
+				fos.close();
+			} catch (IOException e) {
+				String message = String.format(
+						"[Identic] doCatalogNew() failed writing catalog object%nName: %s%n Description : %s%n",
+						catalogDialog.getName(), catalogDialog.getDescription());
+				log.addError(message);
+				e.printStackTrace();
+			} // try
+		} else {
+			// if valid
+			System.out.printf("state: NOT OK_OPTION%n");
+		} // if
+		catalogDialog = null;
+		doCatalogLoad();
+
 	}// doCatalogNew
 
+	private ArrayList<FileStat> collectFileInfo(SubjectTableModel subjectTableModel) {
+		ArrayList<FileStat> result = new ArrayList();
+		for (int row = 0; row < subjectTableModel.getRowCount(); row++) {
+			result.add(subjectTableModel.getFileStat(row));
+		} // for - row
+		return result;
+	}
+
 	private void doCatalogCombine() {
+		List<CatalogItem> catalogItems = new ArrayList<CatalogItem>();
+		try {
+		catalogItems.addAll(lstCatalogInUse.getSelectedValuesList());
+		catalogItems.addAll(lstCatalogAvailable.getSelectedValuesList());			
+		} catch (Exception e) {
+			// TODO: handle exception
+		}
+		if (catalogItems.size() < 2) {
+			JOptionPane.showMessageDialog(frmIdentic, "At least Two Catalog Items need to be selected",
+					"Combine Catalog Items", JOptionPane.ERROR_MESSAGE);
+			return;
+		} // if less than two
+
+		CatalogDialog catalogDialog = CatalogDialog.makeNewCatalogDialog();
+		if (catalogDialog.showDialog() != JOptionPane.OK_OPTION) {
+			return;
+		} // if dialog OK
+
+		log.addInfo(String.format("[doCatalogCombine()] Name: %s", catalogDialog.getName()));
+		log.addInfo(String.format("Description: %s", catalogDialog.getDescription()));
+
+		ArrayList<FileStat> newCombinedFileStats = new ArrayList<FileStat>();
+
+		List<String> startingDirectorys = new ArrayList<String>(); // possibble future use
+
+		for (CatalogItem catalogItem : catalogItems) {
+			startingDirectorys.add(catalogItem.getEntryStartDirectory());// possibble future use
+			newCombinedFileStats.addAll(catalogItem.getFileStats());
+		} // for each catalogItem
+
+		CatalogItem combinedCatalogItem = new CatalogItem(catalogDialog.getName(), catalogDialog.getDescription(),
+				makeStartingDirectory(startingDirectorys), newCombinedFileStats);
+
+		try {
+			FileOutputStream fos = new FileOutputStream(
+					getApplcationWorkingDirectory() + catalogDialog.getName() + CATALOG_SUFFIX_DOT);
+			ObjectOutputStream oos = new ObjectOutputStream(fos);
+			oos.writeObject(combinedCatalogItem);
+			oos.close();
+			fos.close();
+		} catch (IOException e) {
+			String message = String.format(
+					"[Identic] doCatalogNew() failed writing catalog object%n" + "Name: %s%n Description : %n",
+					catalogDialog.getName(), catalogDialog.getDescription());
+			log.addError(message);
+			e.printStackTrace();
+		} // try
+
+		catalogDialog = null;
+		doCatalogLoad();
+
 	}// doCatalogCombine
+
+	private String makeStartingDirectory(List<String> startingDirectorys) {// possibble future use
+		String result = "";
+		result = startingDirectorys.get(0);
+
+		return result;
+	}// makeStartingDirectory
 
 	private void doCatalogImport() {
 		JFileChooser chooser = new JFileChooser();
@@ -265,7 +367,7 @@ public class Identic {
 			fos.close();
 		} catch (IOException e) {
 			String message = String.format(
-					"[Identic] doCatalogNew() failed writing catalog object%n" + "Name: %s%n Description : %n",
+					"[Identic] doCatalogNew() failed writing catalog object%nName: %s%n Description : %s%n",
 					catalogItem.getEntryName(), catalogItem.getEntryDescription());
 			log.addError(message);
 			e.printStackTrace();
@@ -583,16 +685,16 @@ public class Identic {
 			} // if catalog selected
 			log.addInfo(" doStartWithCatalogs()");
 			log.addInfo(lblSourceFolder.getText());
-			 doStartOnlyCatalogs();
-			 doStartNoCatalog();
+			doStartOnlyCatalogs();
+			doStartNoCatalog();
 		} else if (rbOnlyCatalogs.isSelected()) {
 			if (!isCatalogSelected()) {
 				return;
 			} // if catalog selected
 			log.addInfo(" doStartNoCatalogs()");
-			 doStartOnlyCatalogs();
+			doStartOnlyCatalogs();
 		} // if start type
-		log.addElapsedTime(startTime,"End :");
+		log.addElapsedTime(startTime, "End :");
 		markTheDuplicates();
 		displaySummary();
 		//
@@ -649,7 +751,7 @@ public class Identic {
 		} // try
 
 	}// doStartNoCatalog
-	
+
 	private void doStartOnlyCatalogs() {
 		GatherFromCatalogs gatherFromCatalogs = new GatherFromCatalogs();
 		Thread threadGather = new Thread(gatherFromCatalogs);
@@ -667,7 +769,6 @@ public class Identic {
 		} // try
 
 	}// doStartWithCatalog
-
 
 	private boolean isCatalogSelected() {
 		return isCatalogSelected(1);
@@ -698,7 +799,6 @@ public class Identic {
 		hashIDs.clear();
 		hashCounts.clear();
 
-
 	}// initialiseFind
 
 	// ---------------Find Duplicates--------------------------
@@ -720,22 +820,32 @@ public class Identic {
 	}// markTheDuplicates
 
 	private void displaySummary() {
-		
-		int numberOfTypesExcluded = excludedFileTypes.size();
+
 		Set<Entry<String, Integer>> excludedFileTypesSet = excludedFileTypes.entrySet();
 		int totalCountOfExcludedFiles = 0;
-		for (Entry entry:excludedFileTypesSet) {
+		for (Entry entry : excludedFileTypesSet) {
 			Integer value = (Integer) entry.getValue();
 			totalCountOfExcludedFiles += value;
-		}//for - entry
+		} // for - entry
 		
+		Collection<Integer> fileTypeCounts = excludedFileTypes.values();
+		ArrayList<Integer> fileTypeCounts1 =  (ArrayList<Integer>) excludedFileTypes.values();
+//		long excludedTypeNumber = fileTypeCounts1.stream().filter(fileTypeCounts1 -> item == 1).count();
+		
+			
 		int totalFileCount = totalCountOfExcludedFiles + subjectTableModel.getRowCount();
+		lblTotalFilesValue.setText(String.format("%,d", totalFileCount));
+		lblTargetFilesValue.setText(String.format("%,d", subjectTableModel.getRowCount()));
+		lblTotalExcludedValue.setText(String.format("%,d", totalCountOfExcludedFiles));
+		lblExcludedTypeCountValue.setText(String.format("%,d", excludedFileTypes.size()));
+
+//		log.addInfo("totalFileCount = " + totalFileCount);
+//		log.addNL();
+//		log.addInfo("Subject Files = " + subjectTableModel.getRowCount());
+//		log.addInfo("Excluded Files = " + totalCountOfExcludedFiles);
+//		// log.addInfo("Exclude Types = " + excludeModel.size());
+//		log.addInfo("Exclude Types  = " + excludedFileTypes.size());
 		
-		log.addInfo("totalFileCount = " + totalFileCount);
-		log.addNL();
-		log.addInfo("Subject Files = " + subjectTableModel.getRowCount());
-		log.addInfo("Excluded Files = " + totalCountOfExcludedFiles);
-		log.addInfo("Exclude Types  = " + excludeModel.size());
 
 		// lblFolderCount.setText(String.format("%,d", folderCount));
 		// lblFileCount.setText(String.format("%,d", fileCount));
@@ -980,11 +1090,104 @@ public class Identic {
 		tabSummary.setName(TAB_SUMMARY);
 		tpMain.addTab("Summary", null, tabSummary, null);
 		GridBagLayout gbl_tabSummary = new GridBagLayout();
-		gbl_tabSummary.columnWidths = new int[] { 0 };
-		gbl_tabSummary.rowHeights = new int[] { 0 };
-		gbl_tabSummary.columnWeights = new double[] { Double.MIN_VALUE };
-		gbl_tabSummary.rowWeights = new double[] { Double.MIN_VALUE };
+		gbl_tabSummary.columnWidths = new int[] { 0, 0 };
+		gbl_tabSummary.rowHeights = new int[] { 0, 0 };
+		gbl_tabSummary.columnWeights = new double[] { 1.0, Double.MIN_VALUE };
+		gbl_tabSummary.rowWeights = new double[] { 1.0, Double.MIN_VALUE };
 		tabSummary.setLayout(gbl_tabSummary);
+		
+		JSplitPane splitPaneSummary = new JSplitPane();
+		GridBagConstraints gbc_splitPaneSummary = new GridBagConstraints();
+		gbc_splitPaneSummary.fill = GridBagConstraints.BOTH;
+		gbc_splitPaneSummary.gridx = 0;
+		gbc_splitPaneSummary.gridy = 0;
+		tabSummary.add(splitPaneSummary, gbc_splitPaneSummary);
+		
+		JPanel panelLeftSummary = new JPanel();
+		splitPaneSummary.setLeftComponent(panelLeftSummary);
+		GridBagLayout gbl_panelLeftSummary = new GridBagLayout();
+		gbl_panelLeftSummary.columnWidths = new int[]{0, 0, 70, 0};
+		gbl_panelLeftSummary.rowHeights = new int[]{0, 0, 0, 0, 0, 0, 0, 0, 0};
+		gbl_panelLeftSummary.columnWeights = new double[]{0.0, 0.0, 0.0, Double.MIN_VALUE};
+		gbl_panelLeftSummary.rowWeights = new double[]{0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, Double.MIN_VALUE};
+		panelLeftSummary.setLayout(gbl_panelLeftSummary);
+		
+		JLabel lblTotalFiles = new JLabel("Total Files:");
+		GridBagConstraints gbc_lblTotalFiles = new GridBagConstraints();
+		gbc_lblTotalFiles.anchor = GridBagConstraints.WEST;
+		gbc_lblTotalFiles.insets = new Insets(0, 0, 5, 5);
+		gbc_lblTotalFiles.gridx = 0;
+		gbc_lblTotalFiles.gridy = 1;
+		panelLeftSummary.add(lblTotalFiles, gbc_lblTotalFiles);
+		
+		lblTotalFilesValue = new JLabel("0");
+		lblTotalFilesValue.setFont(new Font("Tahoma", Font.BOLD, 12));
+		GridBagConstraints gbc_lblTotalFilesValue = new GridBagConstraints();
+		gbc_lblTotalFilesValue.insets = new Insets(0, 0, 5, 0);
+		gbc_lblTotalFilesValue.anchor = GridBagConstraints.EAST;
+		gbc_lblTotalFilesValue.gridx = 2;
+		gbc_lblTotalFilesValue.gridy = 1;
+		panelLeftSummary.add(lblTotalFilesValue, gbc_lblTotalFilesValue);
+		
+		JLabel lblTargetFiles = new JLabel("Target Files");
+		GridBagConstraints gbc_lblTargetFiles = new GridBagConstraints();
+		gbc_lblTargetFiles.anchor = GridBagConstraints.NORTHWEST;
+		gbc_lblTargetFiles.insets = new Insets(0, 0, 5, 5);
+		gbc_lblTargetFiles.gridx = 0;
+		gbc_lblTargetFiles.gridy = 3;
+		panelLeftSummary.add(lblTargetFiles, gbc_lblTargetFiles);
+		
+		lblTargetFilesValue = new JLabel("0");
+		lblTargetFilesValue.setFont(new Font("Tahoma", Font.BOLD, 12));
+		GridBagConstraints gbc_lblTargetFilesValue = new GridBagConstraints();
+		gbc_lblTargetFilesValue.anchor = GridBagConstraints.EAST;
+		gbc_lblTargetFilesValue.insets = new Insets(0, 0, 5, 0);
+		gbc_lblTargetFilesValue.gridx = 2;
+		gbc_lblTargetFilesValue.gridy = 3;
+		panelLeftSummary.add(lblTargetFilesValue, gbc_lblTargetFilesValue);
+		
+		JLabel lblTotalExcluded = new JLabel("Total Excluded");
+		GridBagConstraints gbc_lblTotalExcluded = new GridBagConstraints();
+		gbc_lblTotalExcluded.anchor = GridBagConstraints.NORTHWEST;
+		gbc_lblTotalExcluded.insets = new Insets(0, 0, 5, 5);
+		gbc_lblTotalExcluded.gridx = 0;
+		gbc_lblTotalExcluded.gridy = 5;
+		panelLeftSummary.add(lblTotalExcluded, gbc_lblTotalExcluded);
+		
+		lblTotalExcludedValue = new JLabel("0");
+		lblTotalExcludedValue.setFont(new Font("Tahoma", Font.BOLD, 12));
+		GridBagConstraints gbc_lblTotalExcludedValue = new GridBagConstraints();
+		gbc_lblTotalExcludedValue.anchor = GridBagConstraints.SOUTHEAST;
+		gbc_lblTotalExcludedValue.insets = new Insets(0, 0, 5, 0);
+		gbc_lblTotalExcludedValue.gridx = 2;
+		gbc_lblTotalExcludedValue.gridy = 5;
+		panelLeftSummary.add(lblTotalExcludedValue, gbc_lblTotalExcludedValue);
+		
+		JLabel lblExcludedTypeCount = new JLabel("Excluded Type Count");
+		GridBagConstraints gbc_lblExcludedTypeCount = new GridBagConstraints();
+		gbc_lblExcludedTypeCount.anchor = GridBagConstraints.WEST;
+		gbc_lblExcludedTypeCount.insets = new Insets(0, 0, 0, 5);
+		gbc_lblExcludedTypeCount.gridx = 0;
+		gbc_lblExcludedTypeCount.gridy = 7;
+		panelLeftSummary.add(lblExcludedTypeCount, gbc_lblExcludedTypeCount);
+		
+		lblExcludedTypeCountValue = new JLabel("0");
+		lblExcludedTypeCountValue.setFont(new Font("Tahoma", Font.BOLD, 12));
+		GridBagConstraints gbc_lblExcludedTypeCountValue = new GridBagConstraints();
+		gbc_lblExcludedTypeCountValue.anchor = GridBagConstraints.EAST;
+		gbc_lblExcludedTypeCountValue.gridx = 2;
+		gbc_lblExcludedTypeCountValue.gridy = 7;
+		panelLeftSummary.add(lblExcludedTypeCountValue, gbc_lblExcludedTypeCountValue);
+		
+		JPanel panelRightSummary = new JPanel();
+		splitPaneSummary.setRightComponent(panelRightSummary);
+		GridBagLayout gbl_panelRightSummary = new GridBagLayout();
+		gbl_panelRightSummary.columnWidths = new int[]{0};
+		gbl_panelRightSummary.rowHeights = new int[]{0};
+		gbl_panelRightSummary.columnWeights = new double[]{Double.MIN_VALUE};
+		gbl_panelRightSummary.rowWeights = new double[]{Double.MIN_VALUE};
+		panelRightSummary.setLayout(gbl_panelRightSummary);
+		splitPaneSummary.setDividerLocation(300);
 
 		JPanel tabTypes = new JPanel();
 		tabTypes.setName(TAB_TYPES);
@@ -1743,6 +1946,10 @@ public class Identic {
 	private JRadioButton rbWithCatalog;
 	private JRadioButton rbOnlyCatalogs;
 	private JCheckBox cbSaveExcludedFiles;
+	private JLabel lblTotalFilesValue;
+	private JLabel lblTargetFilesValue;
+	private JLabel lblTotalExcludedValue;
+	private JLabel lblExcludedTypeCountValue;
 	// private JList lstCatalogInUse;
 	// private JList lstCatalogAvailable;
 
@@ -1756,7 +1963,7 @@ public class Identic {
 	 * suffix
 	 */
 	public class IdentifySubjects implements Runnable {
-		
+
 		public IdentifySubjects() {
 		}// Constructor
 
@@ -1794,10 +2001,10 @@ public class Identic {
 				String fileName = file.toString();
 				String lastModifieTime = Files.getLastModifiedTime(file).toString();
 				long fileSize = Files.size(file);
-				
+
 				matcher = patternFileType.matcher(fileName);
-				String fileType = matcher.find()?matcher.group(1).toLowerCase():NONE;
-				
+				String fileType = matcher.find() ? matcher.group(1).toLowerCase() : NONE;
+
 				matcher = patternSubjects.matcher(fileType);
 				if (matcher.find()) {
 					qSubjects.add(new FileStat(fileName, fileSize, lastModifieTime));
@@ -1864,7 +2071,7 @@ public class Identic {
 					} //
 				} catch (NoSuchElementException ex) {
 					if (priorThread.getState().equals(Thread.State.TERMINATED)) {
-//						log.addSpecial("From MakeFileKey count = " + count);
+						// log.addSpecial("From MakeFileKey count = " + count);
 						return;
 					} // if - done ?
 				} // try
@@ -1977,7 +2184,7 @@ public class Identic {
 		}// keepSuffixCount
 
 	}// class IdentifyDuplicates
-	
+
 	/////////////////////////////////////////
 
 	public class GatherFromCatalogs implements Runnable {
@@ -1995,7 +2202,6 @@ public class Identic {
 	}// class GatherFromCatalogs
 
 	//////////////////////////// [[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[
-
 
 	//////////////////////////////////
 
