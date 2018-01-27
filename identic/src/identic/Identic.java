@@ -82,6 +82,7 @@ import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 import javax.swing.filechooser.FileNameExtensionFilter;
 
+
 public class Identic {
 
 	private IdenticAdapter identicAdapter = new IdenticAdapter();
@@ -120,6 +121,8 @@ public class Identic {
 	private JList<CatalogItem> lstCatalogAvailable;// = new JList<CatalogItem>(availableCatalogItemModel);
 	private CatalogItemModel inUseCatalogItemModel = new CatalogItemModel();
 	private JList<CatalogItem> lstCatalogInUse;// = new JList<CatalogItem>(inUseCatalogItemModel);
+	
+	private JList<CatalogItem2> lstCatalogInUse1;// = new JList<CatalogItem>(inUseCatalogItemModel);
 
 	/**
 	 * Launch the application.
@@ -828,12 +831,11 @@ public class Identic {
 		} // for - entry
 
 		int totalFileCount = totalCountOfExcludedFiles + subjectTableModel.getRowCount();
-		setButtonLabel(btnSummaryTotal,totalFileCount);
-		setButtonLabel(btnSummaryExcluded,totalCountOfExcludedFiles);
-		setButtonLabel(btnSummaryExcludedTypes,excludedFileTypes.size());
-		setButtonLabel(btnSummaryTargets,subjectTableModel.getRowCount());
-		
-		
+		setButtonLabel(btnSummaryTotal, totalFileCount);
+		setButtonLabel(btnSummaryExcluded, totalCountOfExcludedFiles);
+		setButtonLabel(btnSummaryExcludedTypes, excludedFileTypes.size());
+		setButtonLabel(btnSummaryTargets, subjectTableModel.getRowCount());
+
 		int filesWithNoDups = 0;
 		Set<String> hashKeys = hashCounts.keySet();
 		for (String hashKey : hashKeys) {
@@ -843,45 +845,82 @@ public class Identic {
 		} // for
 
 		int filesWithDups = hashCounts.size() - filesWithNoDups;
-		
-		setButtonLabel(btnSummaryDistinct,hashCounts.size());
-		setButtonLabel(btnSummaryUnique,filesWithNoDups);
-		setButtonLabel(btnSummaryDuplicates,filesWithDups);
-		
+
+		setButtonLabel(btnSummaryDistinct, hashCounts.size());
+		setButtonLabel(btnSummaryUnique, filesWithNoDups);
+		setButtonLabel(btnSummaryDuplicates, filesWithDups);
+
 	}// displaySummary
 
 	private void setButtonLabel(JButton btn, int value) {
 		String buttonLabel = "";
-		
+
 		switch (btn.getName()) {
 		case BTN_SUMMARY_TOTAL:
-		buttonLabel = "Total";
-		break;
+			buttonLabel = "Total";
+			break;
 		case BTN_SUMMARY_EXCLUDED:
-		buttonLabel = "Excluded";
-		break;
+			buttonLabel = "Excluded";
+			break;
 		case BTN_SUMMARY_EXCLUDED_TYPES:
-		buttonLabel = " Excluded Types";
-		break;
+			buttonLabel = " Excluded Types";
+			break;
 		case BTN_SUMMARY_TARGETS:
-		buttonLabel = "Targets";
-		break;
+			buttonLabel = "Targets";
+			break;
 		case BTN_SUMMARY_DISTINCT:
-		buttonLabel = "Distinct";
-		break;
+			buttonLabel = "Distinct";
+			break;
 		case BTN_SUMMARY_UNIQUE:
-		buttonLabel = "Unique";
-		break;
+			buttonLabel = "Unique";
+			break;
 		case BTN_SUMMARY_DUPLICATES:
-		buttonLabel = "Duplicates";
-		break;
-		}// switch - btn name
-		
-		btn.setText(String.format(" %,-10d\t%s",value,buttonLabel));
-		
+			buttonLabel = "Duplicates";
+			break;
+		default:
+			buttonLabel = "Error";
+			log.addError("[setButtonLabel] Bad button name - " + btn.getName());
+		}// switch - button name
+
+		btn.setText(String.format(" %,-10d\t%s", value, buttonLabel));
+
 		btn.setEnabled(value != 0);
 		return;
 	}// setButtonLabel
+
+	private void doShowResults(String buttonName) {
+		switch (buttonName) {
+		case BTN_SUMMARY_TOTAL:
+			
+			break;
+		case BTN_SUMMARY_EXCLUDED:
+			
+			break;
+		case BTN_SUMMARY_EXCLUDED_TYPES:
+
+			break;
+		case BTN_SUMMARY_TARGETS:
+			
+			break;
+		case BTN_SUMMARY_DISTINCT:
+			
+			break;
+		case BTN_SUMMARY_UNIQUE:
+			
+			break;
+		case BTN_SUMMARY_DUPLICATES:
+			
+			break;
+		default:
+	
+			log.addError("[doShowResults] Bad button name - " + buttonName);
+		}// switch - button name
+
+	}// doShowResults
+
+	private void doShowResults() {
+		doShowResults(BTN_SUMMARY_TOTAL);
+	}// doShowResults
 
 	// Swing code ///////////////////////////////////////////////////////////////
 
@@ -1110,6 +1149,7 @@ public class Identic {
 		tabSummary.setLayout(gbl_tabSummary);
 
 		JSplitPane splitPaneSummary = new JSplitPane();
+		splitPaneSummary.setOneTouchExpandable(true);
 		GridBagConstraints gbc_splitPaneSummary = new GridBagConstraints();
 		gbc_splitPaneSummary.fill = GridBagConstraints.BOTH;
 		gbc_splitPaneSummary.gridx = 0;

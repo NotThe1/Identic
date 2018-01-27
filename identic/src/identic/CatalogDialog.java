@@ -37,6 +37,7 @@ public class CatalogDialog extends JDialog {
 	/**
 	 * Launch the application.
 	 */
+	
 	// public static void main(String[] args) {
 	// try {
 	// CatalogDialog dialog = new CatalogDialog();

@@ -12,7 +12,6 @@ public class CatalogItem implements Serializable{
 	ArrayList<FileStat> fileStats;
 	public static final String EMPTY_ITEM = "emptyItem";
 	
-	
 	public CatalogItem() {
 		this.entryName = EMPTY_ITEM;
 	}//CatalogItem
