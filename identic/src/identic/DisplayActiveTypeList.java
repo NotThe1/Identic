@@ -34,6 +34,7 @@ public class DisplayActiveTypeList extends JDialog {
 	/**
 	 * Launch the application.
 	 */
+	
 	public static void main(String[] args) {
 		try {
 			DisplayActiveTypeList dialog = new DisplayActiveTypeList();

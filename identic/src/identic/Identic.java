@@ -39,9 +39,11 @@ import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.AbstractSet;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.NoSuchElementException;
@@ -74,6 +76,8 @@ import javax.swing.JTabbedPane;
 import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.JTextPane;
+import javax.swing.JToggleButton;
+import javax.swing.RowFilter;
 import javax.swing.SwingConstants;
 import javax.swing.TransferHandler;
 import javax.swing.UIManager;
@@ -84,7 +88,6 @@ import javax.swing.event.ListSelectionListener;
 import javax.swing.filechooser.FileNameExtensionFilter;
 import javax.swing.table.TableRowSorter;
 
-
 public class Identic {
 
 	private IdenticAdapter identicAdapter = new IdenticAdapter();
@@ -94,6 +97,7 @@ public class Identic {
 	private AppLogger log = AppLogger.getInstance();
 
 	private ButtonGroup bgFindType = new ButtonGroup();
+	private ButtonGroup bgSummary = new ButtonGroup();
 
 	// Find
 	private LinkedBlockingQueue<FileStat> qSubjects = new LinkedBlockingQueue<FileStat>();
@@ -105,8 +109,8 @@ public class Identic {
 	private RejectTableModel rejectTableModel = new RejectTableModel();
 	private DefaultListModel<String> excludeModel = new DefaultListModel<>();
 
-	private JTable tableResults = new JTable(subjectTableModel);
-	
+	private JTable tableResults = new JTable();
+
 	private HashMap<String, Integer> hashCounts = new HashMap<String, Integer>();;
 	private HashMap<String, Integer> hashIDs = new HashMap<String, Integer>();
 
@@ -125,8 +129,8 @@ public class Identic {
 	private JList<CatalogItem> lstCatalogAvailable;// = new JList<CatalogItem>(availableCatalogItemModel);
 	private CatalogItemModel inUseCatalogItemModel = new CatalogItemModel();
 	private JList<CatalogItem> lstCatalogInUse;// = new JList<CatalogItem>(inUseCatalogItemModel);
-	
-	private JList<CatalogItem2> lstCatalogInUse1;// = new JList<CatalogItem>(inUseCatalogItemModel);
+
+//	private JList<CatalogItem2> lstCatalogInUse1;// = new JList<CatalogItem>(inUseCatalogItemModel);
 
 	/**
 	 * Launch the application.
@@ -206,7 +210,7 @@ public class Identic {
 				// System.out.printf("Directory %s, %n",catalogItem.getEntryStartDirectory());
 				// System.out.printf("RowCount %s, %n",catalogItem.getSubjectTableModel().getRowCount());
 			} catch (Exception e) {
-				// TODO: handle exception
+				log.addError("[doCatalogLoad()] unable to load Catalog");
 			} // try
 		} // for file
 		lstCatalogAvailable.updateUI();
@@ -252,7 +256,7 @@ public class Identic {
 	}// doCatalogNew
 
 	private ArrayList<FileStat> collectFileInfo(SubjectTableModel subjectTableModel) {
-		ArrayList<FileStat> result = new ArrayList();
+		ArrayList<FileStat> result = new ArrayList<>();
 		for (int row = 0; row < subjectTableModel.getRowCount(); row++) {
 			result.add(subjectTableModel.getFileStat(row));
 		} // for - row
@@ -265,7 +269,7 @@ public class Identic {
 			catalogItems.addAll(lstCatalogInUse.getSelectedValuesList());
 			catalogItems.addAll(lstCatalogAvailable.getSelectedValuesList());
 		} catch (Exception e) {
-			// TODO: handle exception
+			log.addError("[doCatalogCombine] failed to combine catalogs");
 		}
 		if (catalogItems.size() < 2) {
 			JOptionPane.showMessageDialog(frmIdentic, "At least Two Catalog Items need to be selected",
@@ -398,13 +402,14 @@ public class Identic {
 		try {
 			Files.deleteIfExists(Paths.get(getApplcationWorkingDirectory(), name));
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
+			log.addError("[doCatalogRemove] failed to remove catalog: " + name);
 			e.printStackTrace();
 		} // try remove
 		doCatalogLoad();
 	}// doCatalogRemove
 
 	private void doCatalogListSelected(ListSelectionEvent listSelectionEvent) {
+		 @SuppressWarnings("unchecked")
 		JList<CatalogItem> list = (JList<CatalogItem>) listSelectionEvent.getSource();
 		CatalogItem catalogItem = list.getSelectedValue();
 		lblCatalogName.setText(catalogItem.getEntryName());
@@ -507,9 +512,8 @@ public class Identic {
 			Files.deleteIfExists(listPath);
 			Files.createFile(listPath);
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
+			log.addError("[doSaveList] failed to delete file: " + listFile);
 			e.printStackTrace();
-
 		} // try
 
 		ArrayList<String> lines = new ArrayList<>();
@@ -679,6 +683,9 @@ public class Identic {
 
 	private void doStart() {
 		initialiseFind();
+		btnSummaryExcluded.setVisible(cbSaveExcludedFiles.isSelected());
+		// btnSummaryExcluded.setVisble(cbSaveExcludedFiles.isSelected());
+
 		Date startTime = log.addTimeStamp("Start :");
 
 		if (rbNoCatalog.isSelected()) {
@@ -829,15 +836,16 @@ public class Identic {
 
 		Set<Entry<String, Integer>> excludedFileTypesSet = excludedFileTypes.entrySet();
 		int totalCountOfExcludedFiles = 0;
-		for (Entry entry : excludedFileTypesSet) {
+		for (Entry<String, Integer> entry : excludedFileTypesSet) {
 			Integer value = (Integer) entry.getValue();
 			totalCountOfExcludedFiles += value;
 		} // for - entry
 
 		int totalFileCount = totalCountOfExcludedFiles + subjectTableModel.getRowCount();
-		setButtonLabel(btnSummaryTotal, totalFileCount);
+		// setButtonLabel(btnSummaryTotal, totalFileCount);
+		lblTotalFiles.setText(String.format("%,d  Total Files", totalFileCount));
 		setButtonLabel(btnSummaryExcluded, totalCountOfExcludedFiles);
-		setButtonLabel(btnSummaryExcludedTypes, excludedFileTypes.size());
+		// setButtonLabel(btnSummaryExcludedTypes, excludedFileTypes.size());
 		setButtonLabel(btnSummaryTargets, subjectTableModel.getRowCount());
 
 		int filesWithNoDups = 0;
@@ -853,22 +861,15 @@ public class Identic {
 		setButtonLabel(btnSummaryDistinct, hashCounts.size());
 		setButtonLabel(btnSummaryUnique, filesWithNoDups);
 		setButtonLabel(btnSummaryDuplicates, filesWithDups);
-		
 
 	}// displaySummary
 
-	private void setButtonLabel(JButton btn, int value) {
+	private void setButtonLabel(JToggleButton btn, int value) {
 		String buttonLabel = "";
 
 		switch (btn.getName()) {
-		case BTN_SUMMARY_TOTAL:
-			buttonLabel = "Total";
-			break;
 		case BTN_SUMMARY_EXCLUDED:
 			buttonLabel = "Excluded";
-			break;
-		case BTN_SUMMARY_EXCLUDED_TYPES:
-			buttonLabel = " Excluded Types";
 			break;
 		case BTN_SUMMARY_TARGETS:
 			buttonLabel = "Targets";
@@ -895,37 +896,84 @@ public class Identic {
 
 	private void doShowResults(String buttonName) {
 		switch (buttonName) {
-		case BTN_SUMMARY_TOTAL:
-			
-			break;
 		case BTN_SUMMARY_EXCLUDED:
-			
-			break;
-		case BTN_SUMMARY_EXCLUDED_TYPES:
+			// rejectTableModel
+			if (rejectTableModel.getRowCount() > 0) {
+				tableResults.setModel(rejectTableModel);
+				tableResults.setRowSorter(new TableRowSorter(rejectTableModel));
+			} // if
 
 			break;
+
 		case BTN_SUMMARY_TARGETS:
-			
+			if (subjectTableModel.getRowCount() > 0) {
+				tableResults.setModel(subjectTableModel);
+				tableResults.setRowSorter(new TableRowSorter(subjectTableModel));
+			} // if
 			break;
-		case BTN_SUMMARY_DISTINCT:
 			
+		case BTN_SUMMARY_DISTINCT:
+			if (subjectTableModel.getRowCount() > 0) {
+				// -----------------------------------------
+				RowFilter<Object, Object> dupFilter = new RowFilter<Object, Object>() {
+					AbstractSet<String> hashIDs = new HashSet();
+
+					public boolean include(Entry<? extends Object, ? extends Object> entry) {
+						String hashID = (String) entry.getValue(6);
+						if (hashIDs.contains(hashID)) {
+							return false;
+						} else
+							hashIDs.add(hashID);
+						return true;
+					}// include
+				};
+				// -------------------------------------------
+				TableRowSorter tableRowSorter = new TableRowSorter(subjectTableModel);
+				tableRowSorter.setRowFilter(dupFilter);
+				tableResults.setModel(subjectTableModel);
+				tableResults.setRowSorter(tableRowSorter);
+			} // if
 			break;
 		case BTN_SUMMARY_UNIQUE:
-			
+			if (subjectTableModel.getRowCount() > 0) {
+				// -----------------------------------------
+				RowFilter<Object, Object> dupFilter = new RowFilter<Object, Object>() {
+					public boolean include(Entry<? extends Object, ? extends Object> entry) {
+						return !((boolean) entry.getValue(4));
+					}// include
+				};
+				// -------------------------------------------
+				TableRowSorter tableRowSorter = new TableRowSorter(subjectTableModel);
+				tableRowSorter.setRowFilter(dupFilter);
+				tableResults.setModel(subjectTableModel);
+				tableResults.setRowSorter(tableRowSorter);
+
+			} // if
 			break;
 		case BTN_SUMMARY_DUPLICATES:
-			
+			if (subjectTableModel.getRowCount() > 0) {
+
+				RowFilter<Object, Object> dupFilter = new RowFilter<Object, Object>() {
+					public boolean include(Entry<? extends Object, ? extends Object> entry) {
+						return (boolean) entry.getValue(4);
+					}// include
+				};
+
+				TableRowSorter tableRowSorter = new TableRowSorter(subjectTableModel);
+				tableRowSorter.setRowFilter(dupFilter);
+				tableResults.setRowSorter(tableRowSorter);
+
+				tableResults.setModel(subjectTableModel);
+			} // if
+
 			break;
 		default:
-	
+
 			log.addError("[doShowResults] Bad button name - " + buttonName);
 		}// switch - button name
 
 	}// doShowResults
 
-	private void doShowResults() {
-		doShowResults(BTN_SUMMARY_TOTAL);
-	}// doShowResults
 
 	// Swing code ///////////////////////////////////////////////////////////////
 
@@ -984,7 +1032,7 @@ public class Identic {
 
 		splitPaneMain.setDividerLocation(myPrefs.getInt("mainDivider", 150));
 		splitPaneSummary.setDividerLocation(myPrefs.getInt("summaryDivider", 200));
-			//mainDivider
+		// mainDivider
 		myPrefs = null;
 
 		// TypeLists //////
@@ -1020,6 +1068,12 @@ public class Identic {
 		bgFindType.add(rbWithCatalog);
 		bgFindType.add(rbOnlyCatalogs);
 
+		bgSummary.add(btnSummaryExcluded);
+		bgSummary.add(btnSummaryTargets);
+		bgSummary.add(btnSummaryDistinct);
+		bgSummary.add(btnSummaryUnique);
+		bgSummary.add(btnSummaryDuplicates);
+
 		availableCatalogItemModel.clear();
 		lstCatalogAvailable.setDragEnabled(true);
 		lstCatalogAvailable.setDropMode(DropMode.INSERT);
@@ -1032,7 +1086,6 @@ public class Identic {
 
 		doCatalogLoad();
 		loadTargetList();
-		tableResults.setRowSorter(new TableRowSorter(subjectTableModel));
 		// tpMain.addChangeListener(identicAdapter);
 	}// appInit
 
@@ -1151,47 +1204,20 @@ public class Identic {
 		splitPaneSummary.setLeftComponent(panelLeftSummary);
 		GridBagLayout gbl_panelLeftSummary = new GridBagLayout();
 		gbl_panelLeftSummary.columnWidths = new int[] { 0, 70, 0 };
-		gbl_panelLeftSummary.rowHeights = new int[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-		gbl_panelLeftSummary.columnWeights = new double[] { 0.0, 0.0, Double.MIN_VALUE };
+		gbl_panelLeftSummary.rowHeights = new int[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+		gbl_panelLeftSummary.columnWeights = new double[] { 0.0, 1.0, Double.MIN_VALUE };
 		gbl_panelLeftSummary.rowWeights = new double[] { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-				0.0, 0.0, Double.MIN_VALUE };
+				0.0, 0.0, 0.0, Double.MIN_VALUE };
 		panelLeftSummary.setLayout(gbl_panelLeftSummary);
 
-		btnSummaryTotal = new JButton("Total Files:");
-		btnSummaryTotal.setHorizontalAlignment(SwingConstants.LEFT);
-		btnSummaryTotal.setName(BTN_SUMMARY_TOTAL);
-		btnSummaryTotal.addActionListener(identicAdapter);
-		GridBagConstraints gbc_btnSummaryTotal = new GridBagConstraints();
-		gbc_btnSummaryTotal.fill = GridBagConstraints.HORIZONTAL;
-		gbc_btnSummaryTotal.insets = new Insets(0, 0, 5, 0);
-		gbc_btnSummaryTotal.gridx = 1;
-		gbc_btnSummaryTotal.gridy = 1;
-		panelLeftSummary.add(btnSummaryTotal, gbc_btnSummaryTotal);
+		Component verticalStrut_9 = Box.createVerticalStrut(20);
+		GridBagConstraints gbc_verticalStrut_9 = new GridBagConstraints();
+		gbc_verticalStrut_9.insets = new Insets(0, 0, 5, 0);
+		gbc_verticalStrut_9.gridx = 1;
+		gbc_verticalStrut_9.gridy = 0;
+		panelLeftSummary.add(verticalStrut_9, gbc_verticalStrut_9);
 
-		btnSummaryExcluded = new JButton("Total Excluded");
-		btnSummaryExcluded.setHorizontalAlignment(SwingConstants.LEFT);
-		btnSummaryExcluded.setName(BTN_SUMMARY_EXCLUDED);
-		btnSummaryExcluded.addActionListener(identicAdapter);
-		GridBagConstraints gbc_btnSummaryExcluded = new GridBagConstraints();
-		gbc_btnSummaryExcluded.fill = GridBagConstraints.HORIZONTAL;
-		gbc_btnSummaryExcluded.anchor = GridBagConstraints.NORTH;
-		gbc_btnSummaryExcluded.insets = new Insets(0, 0, 5, 0);
-		gbc_btnSummaryExcluded.gridx = 1;
-		gbc_btnSummaryExcluded.gridy = 3;
-		panelLeftSummary.add(btnSummaryExcluded, gbc_btnSummaryExcluded);
-
-		btnSummaryExcludedTypes = new JButton("Excluded Type Count");
-		btnSummaryExcludedTypes.setHorizontalAlignment(SwingConstants.LEFT);
-		btnSummaryExcludedTypes.setName(BTN_SUMMARY_EXCLUDED_TYPES);
-		btnSummaryExcludedTypes.addActionListener(identicAdapter);
-		GridBagConstraints gbc_btnSummaryExcludedTypes = new GridBagConstraints();
-		gbc_btnSummaryExcludedTypes.fill = GridBagConstraints.HORIZONTAL;
-		gbc_btnSummaryExcludedTypes.insets = new Insets(0, 0, 5, 0);
-		gbc_btnSummaryExcludedTypes.gridx = 1;
-		gbc_btnSummaryExcludedTypes.gridy = 5;
-		panelLeftSummary.add(btnSummaryExcludedTypes, gbc_btnSummaryExcludedTypes);
-
-		btnSummaryTargets = new JButton("Target Files");
+		btnSummaryTargets = new JToggleButton("Target Files");
 		btnSummaryTargets.setHorizontalAlignment(SwingConstants.LEFT);
 		btnSummaryTargets.setName(BTN_SUMMARY_TARGETS);
 		btnSummaryTargets.addActionListener(identicAdapter);
@@ -1200,10 +1226,10 @@ public class Identic {
 		gbc_btnSummaryTargets.anchor = GridBagConstraints.NORTH;
 		gbc_btnSummaryTargets.insets = new Insets(0, 0, 5, 0);
 		gbc_btnSummaryTargets.gridx = 1;
-		gbc_btnSummaryTargets.gridy = 7;
+		gbc_btnSummaryTargets.gridy = 1;
 		panelLeftSummary.add(btnSummaryTargets, gbc_btnSummaryTargets);
 
-		btnSummaryDistinct = new JButton("Distinct Files");
+		btnSummaryDistinct = new JToggleButton("Distinct Files");
 		btnSummaryDistinct.setHorizontalAlignment(SwingConstants.LEFT);
 		btnSummaryDistinct.setName(BTN_SUMMARY_DISTINCT);
 		btnSummaryDistinct.addActionListener(identicAdapter);
@@ -1212,10 +1238,10 @@ public class Identic {
 		gbc_btnSummaryDistinct.anchor = GridBagConstraints.NORTH;
 		gbc_btnSummaryDistinct.insets = new Insets(0, 0, 5, 0);
 		gbc_btnSummaryDistinct.gridx = 1;
-		gbc_btnSummaryDistinct.gridy = 9;
+		gbc_btnSummaryDistinct.gridy = 3;
 		panelLeftSummary.add(btnSummaryDistinct, gbc_btnSummaryDistinct);
 
-		btnSummaryUnique = new JButton("Unique Files");
+		btnSummaryUnique = new JToggleButton("Unique Files");
 		btnSummaryUnique.setHorizontalAlignment(SwingConstants.LEFT);
 		btnSummaryUnique.setName(BTN_SUMMARY_UNIQUE);
 		btnSummaryUnique.addActionListener(identicAdapter);
@@ -1223,17 +1249,66 @@ public class Identic {
 		gbc_btnSummaryUnique.fill = GridBagConstraints.HORIZONTAL;
 		gbc_btnSummaryUnique.insets = new Insets(0, 0, 5, 0);
 		gbc_btnSummaryUnique.gridx = 1;
-		gbc_btnSummaryUnique.gridy = 11;
+		gbc_btnSummaryUnique.gridy = 5;
 		panelLeftSummary.add(btnSummaryUnique, gbc_btnSummaryUnique);
 
-		btnSummaryDuplicates = new JButton("Have Duplicates");
+		btnSummaryDuplicates = new JToggleButton("Have Duplicates");
 		btnSummaryDuplicates.setHorizontalAlignment(SwingConstants.LEFT);
 		btnSummaryDuplicates.setName(BTN_SUMMARY_DUPLICATES);
+		btnSummaryDuplicates.addActionListener(identicAdapter);
 		GridBagConstraints gbc_btnSummaryDuplicates = new GridBagConstraints();
+		gbc_btnSummaryDuplicates.insets = new Insets(0, 0, 5, 0);
 		gbc_btnSummaryDuplicates.fill = GridBagConstraints.HORIZONTAL;
 		gbc_btnSummaryDuplicates.gridx = 1;
-		gbc_btnSummaryDuplicates.gridy = 13;
+		gbc_btnSummaryDuplicates.gridy = 7;
 		panelLeftSummary.add(btnSummaryDuplicates, gbc_btnSummaryDuplicates);
+
+		btnSummaryExcluded = new JToggleButton("Total Excluded");
+		btnSummaryExcluded.setHorizontalAlignment(SwingConstants.LEFT);
+		btnSummaryExcluded.setName(BTN_SUMMARY_EXCLUDED);
+		btnSummaryExcluded.addActionListener(identicAdapter);
+
+		Component verticalStrut_10 = Box.createVerticalStrut(20);
+		GridBagConstraints gbc_verticalStrut_10 = new GridBagConstraints();
+		gbc_verticalStrut_10.insets = new Insets(0, 0, 5, 0);
+		gbc_verticalStrut_10.gridx = 1;
+		gbc_verticalStrut_10.gridy = 8;
+		panelLeftSummary.add(verticalStrut_10, gbc_verticalStrut_10);
+		GridBagConstraints gbc_btnSummaryExcluded = new GridBagConstraints();
+		gbc_btnSummaryExcluded.fill = GridBagConstraints.HORIZONTAL;
+		gbc_btnSummaryExcluded.anchor = GridBagConstraints.NORTH;
+		gbc_btnSummaryExcluded.insets = new Insets(0, 0, 5, 0);
+		gbc_btnSummaryExcluded.gridx = 1;
+		gbc_btnSummaryExcluded.gridy = 9;
+		panelLeftSummary.add(btnSummaryExcluded, gbc_btnSummaryExcluded);
+
+		Component verticalStrut_11 = Box.createVerticalStrut(20);
+		GridBagConstraints gbc_verticalStrut_11 = new GridBagConstraints();
+		gbc_verticalStrut_11.insets = new Insets(0, 0, 5, 0);
+		gbc_verticalStrut_11.gridx = 1;
+		gbc_verticalStrut_11.gridy = 10;
+		panelLeftSummary.add(verticalStrut_11, gbc_verticalStrut_11);
+
+		JPanel panel_2 = new JPanel();
+		GridBagConstraints gbc_panel_2 = new GridBagConstraints();
+		gbc_panel_2.insets = new Insets(0, 0, 5, 0);
+		gbc_panel_2.fill = GridBagConstraints.VERTICAL;
+		gbc_panel_2.gridx = 1;
+		gbc_panel_2.gridy = 11;
+		panelLeftSummary.add(panel_2, gbc_panel_2);
+		GridBagLayout gbl_panel_2 = new GridBagLayout();
+		gbl_panel_2.columnWidths = new int[] { 0, 0 };
+		gbl_panel_2.rowHeights = new int[] { 0, 0 };
+		gbl_panel_2.columnWeights = new double[] { 0.0, Double.MIN_VALUE };
+		gbl_panel_2.rowWeights = new double[] { 0.0, Double.MIN_VALUE };
+		panel_2.setLayout(gbl_panel_2);
+
+		lblTotalFiles = new JLabel("Total Files");
+		GridBagConstraints gbc_lblTotalFiles = new GridBagConstraints();
+		gbc_lblTotalFiles.anchor = GridBagConstraints.SOUTHWEST;
+		gbc_lblTotalFiles.gridx = 0;
+		gbc_lblTotalFiles.gridy = 0;
+		panel_2.add(lblTotalFiles, gbc_lblTotalFiles);
 
 		JPanel panelRightSummary = new JPanel();
 		splitPaneSummary.setRightComponent(panelRightSummary);
@@ -1243,7 +1318,7 @@ public class Identic {
 		gbl_panelRightSummary.columnWeights = new double[] { 1.0, Double.MIN_VALUE };
 		gbl_panelRightSummary.rowWeights = new double[] { 1.0, Double.MIN_VALUE };
 		panelRightSummary.setLayout(gbl_panelRightSummary);
-		
+
 		JScrollPane scrollPaneSummary = new JScrollPane();
 		scrollPaneSummary.setViewportView(tableResults);
 
@@ -1252,7 +1327,7 @@ public class Identic {
 		gbc_scrollPaneSummary.gridx = 0;
 		gbc_scrollPaneSummary.gridy = 0;
 		panelRightSummary.add(scrollPaneSummary, gbc_scrollPaneSummary);
-		
+
 		lblSummaryLegend = new JLabel("Summary Results");
 		lblSummaryLegend.setForeground(Color.BLUE);
 		lblSummaryLegend.setFont(new Font("Tahoma", Font.BOLD, 13));
@@ -1991,9 +2066,9 @@ public class Identic {
 	private static final String CATALOG_SUFFIX = "catalog";
 	private static final String CATALOG_SUFFIX_DOT = "." + CATALOG_SUFFIX;
 
-	private static final String BTN_SUMMARY_TOTAL = "btnSummaryTotal";
+//	private static final String BTN_SUMMARY_TOTAL = "btnSummaryTotal";
 	private static final String BTN_SUMMARY_EXCLUDED = "btnSummaryExcluded";
-	private static final String BTN_SUMMARY_EXCLUDED_TYPES = "btnSummaryExcludedTypes";
+//	private static final String BTN_SUMMARY_EXCLUDED_TYPES = "btnSummaryExcludedTypes";
 	private static final String BTN_SUMMARY_TARGETS = "btnSummaryTargets";
 	private static final String BTN_SUMMARY_DISTINCT = "btnSummaryDistinct";
 	private static final String BTN_SUMMARY_UNIQUE = "btnSummaryUnique";
@@ -2024,15 +2099,14 @@ public class Identic {
 	private JRadioButton rbWithCatalog;
 	private JRadioButton rbOnlyCatalogs;
 	private JCheckBox cbSaveExcludedFiles;
-	private JButton btnSummaryTotal;
-	private JButton btnSummaryExcluded;
-	private JButton btnSummaryTargets;
-	private JButton btnSummaryExcludedTypes;
-	private JButton btnSummaryDistinct;
-	private JButton btnSummaryUnique;
-	private JButton btnSummaryDuplicates;
+	private JToggleButton btnSummaryExcluded;
+	private JToggleButton btnSummaryTargets;
+	private JToggleButton btnSummaryDistinct;
+	private JToggleButton btnSummaryUnique;
+	private JToggleButton btnSummaryDuplicates;
 	private JSplitPane splitPaneSummary;
 	private JLabel lblSummaryLegend;
+	private JLabel lblTotalFiles;
 	// private JList lstCatalogInUse;
 	// private JList lstCatalogAvailable;
 
@@ -2422,7 +2496,17 @@ public class Identic {
 			case BTN_SOURCE_FOLDER:
 				doSourceFolder();
 				break;
+
+			case BTN_SUMMARY_EXCLUDED:
+			case BTN_SUMMARY_TARGETS:
+			case BTN_SUMMARY_DISTINCT:
+			case BTN_SUMMARY_UNIQUE:
+			case BTN_SUMMARY_DUPLICATES:
+				doShowResults(name);
+				break;
+
 			}// switch - name
+
 		}// actionPerformed
 
 		// @Override

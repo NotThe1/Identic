@@ -53,7 +53,6 @@ public class MenuUtility {
 	private static final String NUMBER_DELIM = ":";
 	private static final String EMPTY_STRING = "";
 	
-
 	// private static final String NUMBER_DELIM_REDEX = "\\"
 
 	public MenuUtility() {
