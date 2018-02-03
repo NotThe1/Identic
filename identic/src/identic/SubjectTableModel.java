@@ -148,8 +148,10 @@ public class SubjectTableModel extends AbstractTableModel {
 	public static final String DIRECTORY = "Directory";
 	public static final String SIZE = "Size";
 	public static final String DATE = "ModifiedDate";
-	public static final String DUP = "isDup";
-	public static final String ID = "FileID";
+//	public static final String DUP = "isDup";
+//	public static final String ID = "FileID";
+	public static final String DUP = "Dup";
+	public static final String ID = "ID";
 	public static final String HASH_KEY = "HashKey";
 
 	private static final String[] headers = new String[] { NAME, DIRECTORY, SIZE, DATE, DUP, ID, HASH_KEY };

@@ -92,7 +92,7 @@ public class RejectTableModel extends AbstractTableModel {
 		case 1://"Directory"
 			return super.getColumnClass(columnIndex);
 		case 2://"Size"
-			return Number.class;
+			return Long.class;
 		case 3://"Modified Date"
 			return DateFormat.class;
 		case 4:// "Reason"

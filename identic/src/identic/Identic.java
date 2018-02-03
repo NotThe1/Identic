@@ -21,6 +21,7 @@ import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
+import java.awt.print.PrinterException;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -29,9 +30,11 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.URISyntaxException;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.FileVisitResult;
 import java.nio.file.FileVisitor;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
@@ -39,6 +42,7 @@ import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.text.MessageFormat;
 import java.util.AbstractSet;
 import java.util.ArrayList;
 import java.util.Date;
@@ -48,6 +52,7 @@ import java.util.List;
 import java.util.Map.Entry;
 import java.util.NoSuchElementException;
 import java.util.Set;
+import java.util.StringJoiner;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.prefs.Preferences;
 import java.util.regex.Matcher;
@@ -86,6 +91,7 @@ import javax.swing.border.TitledBorder;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 import javax.swing.filechooser.FileNameExtensionFilter;
+import javax.swing.table.TableColumn;
 import javax.swing.table.TableRowSorter;
 
 public class Identic {
@@ -109,7 +115,11 @@ public class Identic {
 	private RejectTableModel rejectTableModel = new RejectTableModel();
 	private DefaultListModel<String> excludeModel = new DefaultListModel<>();
 
-	private JTable tableResults = new JTable();
+	private JTable tableResults = new JTable() {
+		public boolean isCellEditable(int roe, int column) {
+			return column == 4;
+		}
+	};
 
 	private HashMap<String, Integer> hashCounts = new HashMap<String, Integer>();;
 	private HashMap<String, Integer> hashIDs = new HashMap<String, Integer>();
@@ -130,7 +140,7 @@ public class Identic {
 	private CatalogItemModel inUseCatalogItemModel = new CatalogItemModel();
 	private JList<CatalogItem> lstCatalogInUse;// = new JList<CatalogItem>(inUseCatalogItemModel);
 
-//	private JList<CatalogItem2> lstCatalogInUse1;// = new JList<CatalogItem>(inUseCatalogItemModel);
+	// private JList<CatalogItem2> lstCatalogInUse1;// = new JList<CatalogItem>(inUseCatalogItemModel);
 
 	/**
 	 * Launch the application.
@@ -409,7 +419,7 @@ public class Identic {
 	}// doCatalogRemove
 
 	private void doCatalogListSelected(ListSelectionEvent listSelectionEvent) {
-		 @SuppressWarnings("unchecked")
+		@SuppressWarnings("unchecked")
 		JList<CatalogItem> list = (JList<CatalogItem>) listSelectionEvent.getSource();
 		CatalogItem catalogItem = list.getSelectedValue();
 		lblCatalogName.setText(catalogItem.getEntryName());
@@ -683,7 +693,6 @@ public class Identic {
 
 	private void doStart() {
 		initialiseFind();
-		btnSummaryExcluded.setVisible(cbSaveExcludedFiles.isSelected());
 		// btnSummaryExcluded.setVisble(cbSaveExcludedFiles.isSelected());
 
 		Date startTime = log.addTimeStamp("Start :");
@@ -705,8 +714,10 @@ public class Identic {
 				return;
 			} // if catalog selected
 			log.addInfo(" doStartNoCatalogs()");
+			cbSaveExcludedFiles.setSelected(false);
 			doStartOnlyCatalogs();
 		} // if start type
+		btnSummaryExcluded.setVisible(cbSaveExcludedFiles.isSelected());
 		log.addElapsedTime(startTime, "End :");
 		markTheDuplicates();
 		displaySummary();
@@ -862,6 +873,8 @@ public class Identic {
 		setButtonLabel(btnSummaryUnique, filesWithNoDups);
 		setButtonLabel(btnSummaryDuplicates, filesWithDups);
 
+		bgSummary.setSelected(btnSummaryTargets.getModel(), true);
+		doShowResults(BTN_SUMMARY_TARGETS);
 	}// displaySummary
 
 	private void setButtonLabel(JToggleButton btn, int value) {
@@ -909,9 +922,10 @@ public class Identic {
 			if (subjectTableModel.getRowCount() > 0) {
 				tableResults.setModel(subjectTableModel);
 				tableResults.setRowSorter(new TableRowSorter(subjectTableModel));
+				setSubjectColumns();
 			} // if
 			break;
-			
+
 		case BTN_SUMMARY_DISTINCT:
 			if (subjectTableModel.getRowCount() > 0) {
 				// -----------------------------------------
@@ -932,22 +946,26 @@ public class Identic {
 				tableRowSorter.setRowFilter(dupFilter);
 				tableResults.setModel(subjectTableModel);
 				tableResults.setRowSorter(tableRowSorter);
+				setSubjectColumns();
 			} // if
 			break;
 		case BTN_SUMMARY_UNIQUE:
 			if (subjectTableModel.getRowCount() > 0) {
 				// -----------------------------------------
 				RowFilter<Object, Object> dupFilter = new RowFilter<Object, Object>() {
+
 					public boolean include(Entry<? extends Object, ? extends Object> entry) {
 						return !((boolean) entry.getValue(4));
 					}// include
 				};
+
 				// -------------------------------------------
 				TableRowSorter tableRowSorter = new TableRowSorter(subjectTableModel);
 				tableRowSorter.setRowFilter(dupFilter);
 				tableResults.setModel(subjectTableModel);
 				tableResults.setRowSorter(tableRowSorter);
 
+				setSubjectColumns();
 			} // if
 			break;
 		case BTN_SUMMARY_DUPLICATES:
@@ -962,8 +980,10 @@ public class Identic {
 				TableRowSorter tableRowSorter = new TableRowSorter(subjectTableModel);
 				tableRowSorter.setRowFilter(dupFilter);
 				tableResults.setRowSorter(tableRowSorter);
-
 				tableResults.setModel(subjectTableModel);
+
+				setSubjectColumns();
+
 			} // if
 
 			break;
@@ -974,6 +994,140 @@ public class Identic {
 
 	}// doShowResults
 
+	private void setSubjectColumns() {
+		tableResults.setAutoResizeMode(JTable.AUTO_RESIZE_NEXT_COLUMN);
+		for (int i = 0; i < tableResults.getColumnModel().getColumnCount(); i++) {
+			TableColumn tc = tableResults.getColumnModel().getColumn(i);
+			switch (i) {
+			case 0: // Name
+				break;
+			case 1: // Directory
+				break;
+			case 2: // Size
+				// tc.setMaxWidth(460);
+				tc.setPreferredWidth(40);
+				break;
+			case 3: // Date
+				// tc.setMaxWidth(100);
+				tc.setPreferredWidth(40);
+
+				break;
+			case 4: // Dup
+				tc.setMaxWidth(40);
+				break;
+			case 5: // ID
+				tc.setMaxWidth(40);
+				break;
+			}// switch
+				// tc.setPreferredWidth(20);
+				// tc.sizeWidthToFit();
+		} // for each column
+	}// setSubjectColumns
+
+	private void doPrintResults() {
+		String reportType = bgSummary.getSelection().getActionCommand();
+		MessageFormat headerFormat = new MessageFormat(reportType);
+		String ff = MessageFormat.format("{0,time} - {0,date}    Page  ", new Date());
+		MessageFormat footerFormat = new MessageFormat(ff + "{0}");
+		try {
+			tableResults.print(JTable.PrintMode.FIT_WIDTH, headerFormat, footerFormat);
+		} catch (PrinterException e) {
+			log.addError("[failed Print]" + e.getMessage());
+			e.printStackTrace();
+		} // try
+	}// doPrintResults
+
+	private void doActionCopy() {
+		if (!doesFolderExist()) {
+			return;
+		} // if
+		String lcd = getLeastCommonDirectory(tableResults, COLUMN_DIRECTORY);
+		String targetBaseString = lblSourceFolder.getText();
+		String sourcePathString = "";
+		String targetPathString = "";
+		String sourceName = "";
+
+		for (int row = 0; row < tableResults.getRowCount(); row++) {
+			sourcePathString = (String) tableResults.getValueAt(row, COLUMN_DIRECTORY);
+			sourceName = (String) tableResults.getValueAt(row, COLUMN_NAME);
+			targetPathString = sourcePathString.replace(lcd, targetBaseString);
+			if (!Files.exists(Paths.get(targetPathString))) {
+				try {
+					Files.createDirectory(Paths.get(targetPathString));
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+			} // if
+
+			try {
+				Files.copy(Paths.get(sourcePathString, sourceName), Paths.get(targetPathString, sourceName));
+				String msg = String.format("[doActionCopy] copied : %s, %s",targetPathString, sourceName);
+				log.addInfo(msg);	
+			} catch (FileAlreadyExistsException ex) {
+				String msg = String.format("[doActionCopy] File Already Exists: %s, %s",targetPathString, sourceName);
+				log.addInfo(msg);
+			} catch (IOException e) {
+				String msg = String.format("[doActionCopy] Failed Copy: %s, %s",targetPathString, sourceName);
+				log.addError(msg,e.getMessage());
+			} // try
+		} //
+
+	}// doActionCopy
+
+	private void doActionMove() {
+		if (!doesFolderExist()) {
+			return;
+		} // if
+
+	}// doActionMove
+
+	private void doActionDelete() {
+
+	}// doActionDelete
+
+	private boolean doesFolderExist() {
+		if (Files.exists(Paths.get(lblSourceFolder.getText()), LinkOption.NOFOLLOW_LINKS)) {
+			return true;
+		} else {
+			log.addWarning(String.format("Source Folder %s does not exist", lblSourceFolder.getText()));
+			return false;
+		} // if
+	}// doesSourceFolderExist
+
+	private String getLeastCommonDirectory(JTable table, int column) {
+		String[] fullPathParts = new String[] {};
+		String regexString = System.getProperty("file.separator").equals("\\") ? "\\\\"
+				: System.getProperty("file.separator");
+
+		String fullPath = (String) table.getValueAt(0, column);
+		String[] baseParts = fullPath.split(regexString);
+		int matchCount = baseParts.length;
+
+		for (int i = 1; i < tableResults.getRowCount(); i++) {
+			int matchCountTemp = 0;
+			fullPath = (String) tableResults.getValueAt(i, 1);
+			fullPathParts = fullPath.split(regexString);
+			matchCount = Math.min(matchCount, fullPathParts.length);
+
+			// System.out.printf(": row %2d, %s%n", i, fullPath);
+			for (int mc = 0; mc < matchCount; mc++) {
+				if (baseParts[mc].equals(fullPathParts[mc])) {
+					matchCountTemp++;
+				} else {
+					break;
+				} // if
+			} // for mc
+			matchCount = matchCountTemp;
+		} // for - outer
+
+		StringJoiner sj = new StringJoiner(System.getProperty("file.separator"));
+		for (int i = 0; i < matchCount; i++) {
+			sj.add(fullPathParts[i]);
+		} // for
+
+		return sj.toString();
+	}// getLeastCommonDirectory
 
 	// Swing code ///////////////////////////////////////////////////////////////
 
@@ -1006,8 +1160,8 @@ public class Identic {
 		workingDirectory = getApplcationWorkingDirectory();
 
 		Preferences myPrefs = Preferences.userNodeForPackage(Identic.class).node(this.getClass().getSimpleName());
-		frmIdentic.setSize(916, 749);
-		// frmIdentic.setSize(myPrefs.getInt("Width", 886), myPrefs.getInt("Height", 779));
+		// frmIdentic.setSize(916, 749);
+		frmIdentic.setSize(myPrefs.getInt("Width", 916), myPrefs.getInt("Height", 749));
 
 		frmIdentic.setLocation(myPrefs.getInt("LocX", 100), myPrefs.getInt("LocY", 100));
 		lblSourceFolder.setText(myPrefs.get("SourceFolder", EMPTY_STRING));
@@ -1086,6 +1240,9 @@ public class Identic {
 
 		doCatalogLoad();
 		loadTargetList();
+		TableColumnManager tcmResults = new TableColumnManager(tableResults);
+		// TableColumnManager tcmResults = new TableColumnManager(tableResults);
+
 		// tpMain.addChangeListener(identicAdapter);
 	}// appInit
 
@@ -1137,32 +1294,33 @@ public class Identic {
 		gbl_panelForTabbedPane.rowWeights = new double[] { 0.0, 1.0, Double.MIN_VALUE };
 		panelForTabbedPane.setLayout(gbl_panelForTabbedPane);
 
-		JPanel panel = new JPanel();
-		GridBagConstraints gbc_panel = new GridBagConstraints();
-		gbc_panel.fill = GridBagConstraints.BOTH;
-		gbc_panel.insets = new Insets(0, 0, 5, 0);
-		gbc_panel.gridx = 0;
-		gbc_panel.gridy = 0;
-		panelForTabbedPane.add(panel, gbc_panel);
-		GridBagLayout gbl_panel = new GridBagLayout();
-		gbl_panel.columnWidths = new int[] { 120, 72, 0 };
-		gbl_panel.rowHeights = new int[] { 0, 0 };
-		gbl_panel.columnWeights = new double[] { 0.0, Double.MIN_VALUE };
-		gbl_panel.rowWeights = new double[] { 0.0, Double.MIN_VALUE };
-		panel.setLayout(gbl_panel);
+		JPanel panelTop = new JPanel();
+		GridBagConstraints gbc_panelTop = new GridBagConstraints();
+		gbc_panelTop.anchor = GridBagConstraints.NORTH;
+		gbc_panelTop.fill = GridBagConstraints.HORIZONTAL;
+		gbc_panelTop.insets = new Insets(0, 0, 5, 0);
+		gbc_panelTop.gridx = 0;
+		gbc_panelTop.gridy = 0;
+		panelForTabbedPane.add(panelTop, gbc_panelTop);
+		GridBagLayout gbl_panelTop = new GridBagLayout();
+		gbl_panelTop.columnWidths = new int[] { 120, 72, 0 };
+		gbl_panelTop.rowHeights = new int[] { 0, 0 };
+		gbl_panelTop.columnWeights = new double[] { 0.0, Double.MIN_VALUE };
+		gbl_panelTop.rowWeights = new double[] { 0.0, Double.MIN_VALUE };
+		panelTop.setLayout(gbl_panelTop);
 
-		JButton btnSourceFolder = new JButton("Source Folder...");
+		JButton btnSourceFolder = new JButton(" Folder...");
 		btnSourceFolder.setName(BTN_SOURCE_FOLDER);
 		btnSourceFolder.addActionListener(identicAdapter);
 		btnSourceFolder.setHorizontalAlignment(SwingConstants.LEFT);
 		btnSourceFolder.setForeground(Color.BLACK);
 		btnSourceFolder.setFont(new Font("Tahoma", Font.PLAIN, 14));
 		GridBagConstraints gbc_btnSourceFolder = new GridBagConstraints();
-		gbc_btnSourceFolder.anchor = GridBagConstraints.WEST;
+		gbc_btnSourceFolder.anchor = GridBagConstraints.NORTHWEST;
 		gbc_btnSourceFolder.insets = new Insets(0, 0, 0, 5);
 		gbc_btnSourceFolder.gridx = 0;
 		gbc_btnSourceFolder.gridy = 0;
-		panel.add(btnSourceFolder, gbc_btnSourceFolder);
+		panelTop.add(btnSourceFolder, gbc_btnSourceFolder);
 
 		lblSourceFolder = new JLabel("");
 		GridBagConstraints gbc_lblSourceFolder = new GridBagConstraints();
@@ -1170,7 +1328,7 @@ public class Identic {
 		gbc_lblSourceFolder.insets = new Insets(0, 0, 0, 5);
 		gbc_lblSourceFolder.gridx = 1;
 		gbc_lblSourceFolder.gridy = 0;
-		panel.add(lblSourceFolder, gbc_lblSourceFolder);
+		panelTop.add(lblSourceFolder, gbc_lblSourceFolder);
 		lblSourceFolder.setHorizontalAlignment(SwingConstants.CENTER);
 		lblSourceFolder.setForeground(new Color(0, 0, 205));
 		lblSourceFolder.setFont(new Font("Tahoma", Font.BOLD, 14));
@@ -1201,114 +1359,198 @@ public class Identic {
 		tabSummary.add(splitPaneSummary, gbc_splitPaneSummary);
 
 		JPanel panelLeftSummary = new JPanel();
+		panelLeftSummary.setBorder(new BevelBorder(BevelBorder.RAISED, null, null, null, null));
 		splitPaneSummary.setLeftComponent(panelLeftSummary);
 		GridBagLayout gbl_panelLeftSummary = new GridBagLayout();
-		gbl_panelLeftSummary.columnWidths = new int[] { 0, 70, 0 };
-		gbl_panelLeftSummary.rowHeights = new int[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-		gbl_panelLeftSummary.columnWeights = new double[] { 0.0, 1.0, Double.MIN_VALUE };
-		gbl_panelLeftSummary.rowWeights = new double[] { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-				0.0, 0.0, 0.0, Double.MIN_VALUE };
+		gbl_panelLeftSummary.columnWidths = new int[] { 70, 0 };
+		gbl_panelLeftSummary.rowHeights = new int[] { 0, 0, 0 };
+		gbl_panelLeftSummary.columnWeights = new double[] { 1.0, Double.MIN_VALUE };
+		gbl_panelLeftSummary.rowWeights = new double[] { 0.0, 1.0, Double.MIN_VALUE };
 		panelLeftSummary.setLayout(gbl_panelLeftSummary);
+
+		JPanel panelResults = new JPanel();
+		panelResults.setBorder(new TitledBorder(new BevelBorder(BevelBorder.LOWERED, null, null, null, null), "Results",
+				TitledBorder.CENTER, TitledBorder.TOP, null, new Color(0, 0, 0)));
+		GridBagConstraints gbc_panelResults = new GridBagConstraints();
+		gbc_panelResults.insets = new Insets(0, 0, 5, 0);
+		gbc_panelResults.fill = GridBagConstraints.BOTH;
+		gbc_panelResults.gridx = 0;
+		gbc_panelResults.gridy = 0;
+		panelLeftSummary.add(panelResults, gbc_panelResults);
+		GridBagLayout gbl_panelResults = new GridBagLayout();
+		gbl_panelResults.columnWidths = new int[] { 0, 0 };
+		gbl_panelResults.rowHeights = new int[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+		gbl_panelResults.columnWeights = new double[] { 1.0, Double.MIN_VALUE };
+		gbl_panelResults.rowWeights = new double[] { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+				0.0, Double.MIN_VALUE };
+		panelResults.setLayout(gbl_panelResults);
 
 		Component verticalStrut_9 = Box.createVerticalStrut(20);
 		GridBagConstraints gbc_verticalStrut_9 = new GridBagConstraints();
 		gbc_verticalStrut_9.insets = new Insets(0, 0, 5, 0);
-		gbc_verticalStrut_9.gridx = 1;
+		gbc_verticalStrut_9.gridx = 0;
 		gbc_verticalStrut_9.gridy = 0;
-		panelLeftSummary.add(verticalStrut_9, gbc_verticalStrut_9);
+		panelResults.add(verticalStrut_9, gbc_verticalStrut_9);
+
+		lblTotalFiles = new JLabel("Total Files");
+		lblTotalFiles.setFont(new Font("Tahoma", Font.PLAIN, 10));
+		GridBagConstraints gbc_lblTotalFiles = new GridBagConstraints();
+		gbc_lblTotalFiles.insets = new Insets(0, 0, 5, 0);
+		gbc_lblTotalFiles.gridx = 0;
+		gbc_lblTotalFiles.gridy = 1;
+		panelResults.add(lblTotalFiles, gbc_lblTotalFiles);
+
+		Component verticalStrut_11 = Box.createVerticalStrut(5);
+		GridBagConstraints gbc_verticalStrut_11 = new GridBagConstraints();
+		gbc_verticalStrut_11.insets = new Insets(0, 0, 5, 0);
+		gbc_verticalStrut_11.gridx = 0;
+		gbc_verticalStrut_11.gridy = 2;
+		panelResults.add(verticalStrut_11, gbc_verticalStrut_11);
 
 		btnSummaryTargets = new JToggleButton("Target Files");
-		btnSummaryTargets.setHorizontalAlignment(SwingConstants.LEFT);
-		btnSummaryTargets.setName(BTN_SUMMARY_TARGETS);
-		btnSummaryTargets.addActionListener(identicAdapter);
+		btnSummaryTargets.setFont(new Font("Tahoma", Font.BOLD, 11));
 		GridBagConstraints gbc_btnSummaryTargets = new GridBagConstraints();
 		gbc_btnSummaryTargets.fill = GridBagConstraints.HORIZONTAL;
-		gbc_btnSummaryTargets.anchor = GridBagConstraints.NORTH;
 		gbc_btnSummaryTargets.insets = new Insets(0, 0, 5, 0);
-		gbc_btnSummaryTargets.gridx = 1;
-		gbc_btnSummaryTargets.gridy = 1;
-		panelLeftSummary.add(btnSummaryTargets, gbc_btnSummaryTargets);
+		gbc_btnSummaryTargets.gridx = 0;
+		gbc_btnSummaryTargets.gridy = 3;
+		panelResults.add(btnSummaryTargets, gbc_btnSummaryTargets);
+		btnSummaryTargets.setName(BTN_SUMMARY_TARGETS);
+		btnSummaryTargets.setActionCommand(BTN_AC_TARGETS);
+
+		Component verticalStrut_12 = Box.createVerticalStrut(5);
+		GridBagConstraints gbc_verticalStrut_12 = new GridBagConstraints();
+		gbc_verticalStrut_12.insets = new Insets(0, 0, 5, 0);
+		gbc_verticalStrut_12.gridx = 0;
+		gbc_verticalStrut_12.gridy = 4;
+		panelResults.add(verticalStrut_12, gbc_verticalStrut_12);
 
 		btnSummaryDistinct = new JToggleButton("Distinct Files");
-		btnSummaryDistinct.setHorizontalAlignment(SwingConstants.LEFT);
-		btnSummaryDistinct.setName(BTN_SUMMARY_DISTINCT);
-		btnSummaryDistinct.addActionListener(identicAdapter);
+		btnSummaryDistinct.setFont(new Font("Tahoma", Font.BOLD, 11));
 		GridBagConstraints gbc_btnSummaryDistinct = new GridBagConstraints();
 		gbc_btnSummaryDistinct.fill = GridBagConstraints.HORIZONTAL;
-		gbc_btnSummaryDistinct.anchor = GridBagConstraints.NORTH;
 		gbc_btnSummaryDistinct.insets = new Insets(0, 0, 5, 0);
-		gbc_btnSummaryDistinct.gridx = 1;
-		gbc_btnSummaryDistinct.gridy = 3;
-		panelLeftSummary.add(btnSummaryDistinct, gbc_btnSummaryDistinct);
+		gbc_btnSummaryDistinct.gridx = 0;
+		gbc_btnSummaryDistinct.gridy = 5;
+		panelResults.add(btnSummaryDistinct, gbc_btnSummaryDistinct);
+		btnSummaryDistinct.setName(BTN_SUMMARY_DISTINCT);
+		btnSummaryDistinct.setActionCommand(BTN_AC_DISTINCT);
+
+		Component verticalStrut_13 = Box.createVerticalStrut(5);
+		GridBagConstraints gbc_verticalStrut_13 = new GridBagConstraints();
+		gbc_verticalStrut_13.insets = new Insets(0, 0, 5, 0);
+		gbc_verticalStrut_13.gridx = 0;
+		gbc_verticalStrut_13.gridy = 6;
+		panelResults.add(verticalStrut_13, gbc_verticalStrut_13);
 
 		btnSummaryUnique = new JToggleButton("Unique Files");
-		btnSummaryUnique.setHorizontalAlignment(SwingConstants.LEFT);
-		btnSummaryUnique.setName(BTN_SUMMARY_UNIQUE);
-		btnSummaryUnique.addActionListener(identicAdapter);
+		btnSummaryUnique.setFont(new Font("Tahoma", Font.BOLD, 11));
 		GridBagConstraints gbc_btnSummaryUnique = new GridBagConstraints();
 		gbc_btnSummaryUnique.fill = GridBagConstraints.HORIZONTAL;
 		gbc_btnSummaryUnique.insets = new Insets(0, 0, 5, 0);
-		gbc_btnSummaryUnique.gridx = 1;
-		gbc_btnSummaryUnique.gridy = 5;
-		panelLeftSummary.add(btnSummaryUnique, gbc_btnSummaryUnique);
+		gbc_btnSummaryUnique.gridx = 0;
+		gbc_btnSummaryUnique.gridy = 7;
+		panelResults.add(btnSummaryUnique, gbc_btnSummaryUnique);
+		btnSummaryUnique.setName(BTN_SUMMARY_UNIQUE);
+		btnSummaryUnique.setActionCommand(BTN_AC_UNIQUE);
+
+		Component verticalStrut_14 = Box.createVerticalStrut(5);
+		GridBagConstraints gbc_verticalStrut_14 = new GridBagConstraints();
+		gbc_verticalStrut_14.insets = new Insets(0, 0, 5, 0);
+		gbc_verticalStrut_14.gridx = 0;
+		gbc_verticalStrut_14.gridy = 8;
+		panelResults.add(verticalStrut_14, gbc_verticalStrut_14);
 
 		btnSummaryDuplicates = new JToggleButton("Have Duplicates");
-		btnSummaryDuplicates.setHorizontalAlignment(SwingConstants.LEFT);
-		btnSummaryDuplicates.setName(BTN_SUMMARY_DUPLICATES);
-		btnSummaryDuplicates.addActionListener(identicAdapter);
+		btnSummaryDuplicates.setFont(new Font("Tahoma", Font.BOLD, 11));
 		GridBagConstraints gbc_btnSummaryDuplicates = new GridBagConstraints();
-		gbc_btnSummaryDuplicates.insets = new Insets(0, 0, 5, 0);
 		gbc_btnSummaryDuplicates.fill = GridBagConstraints.HORIZONTAL;
-		gbc_btnSummaryDuplicates.gridx = 1;
-		gbc_btnSummaryDuplicates.gridy = 7;
-		panelLeftSummary.add(btnSummaryDuplicates, gbc_btnSummaryDuplicates);
+		gbc_btnSummaryDuplicates.insets = new Insets(0, 0, 5, 0);
+		gbc_btnSummaryDuplicates.gridx = 0;
+		gbc_btnSummaryDuplicates.gridy = 9;
+		panelResults.add(btnSummaryDuplicates, gbc_btnSummaryDuplicates);
+		btnSummaryDuplicates.setName(BTN_SUMMARY_DUPLICATES);
+		btnSummaryDuplicates.setActionCommand(BTN_AC_DUPLICATES);
+
+		Component verticalStrut_15 = Box.createVerticalStrut(10);
+		GridBagConstraints gbc_verticalStrut_15 = new GridBagConstraints();
+		gbc_verticalStrut_15.insets = new Insets(0, 0, 5, 0);
+		gbc_verticalStrut_15.gridx = 0;
+		gbc_verticalStrut_15.gridy = 10;
+		panelResults.add(verticalStrut_15, gbc_verticalStrut_15);
 
 		btnSummaryExcluded = new JToggleButton("Total Excluded");
-		btnSummaryExcluded.setHorizontalAlignment(SwingConstants.LEFT);
-		btnSummaryExcluded.setName(BTN_SUMMARY_EXCLUDED);
-		btnSummaryExcluded.addActionListener(identicAdapter);
-
-		Component verticalStrut_10 = Box.createVerticalStrut(20);
-		GridBagConstraints gbc_verticalStrut_10 = new GridBagConstraints();
-		gbc_verticalStrut_10.insets = new Insets(0, 0, 5, 0);
-		gbc_verticalStrut_10.gridx = 1;
-		gbc_verticalStrut_10.gridy = 8;
-		panelLeftSummary.add(verticalStrut_10, gbc_verticalStrut_10);
+		btnSummaryExcluded.setFont(new Font("Tahoma", Font.BOLD, 11));
 		GridBagConstraints gbc_btnSummaryExcluded = new GridBagConstraints();
-		gbc_btnSummaryExcluded.fill = GridBagConstraints.HORIZONTAL;
-		gbc_btnSummaryExcluded.anchor = GridBagConstraints.NORTH;
 		gbc_btnSummaryExcluded.insets = new Insets(0, 0, 5, 0);
-		gbc_btnSummaryExcluded.gridx = 1;
-		gbc_btnSummaryExcluded.gridy = 9;
-		panelLeftSummary.add(btnSummaryExcluded, gbc_btnSummaryExcluded);
+		gbc_btnSummaryExcluded.fill = GridBagConstraints.HORIZONTAL;
+		gbc_btnSummaryExcluded.gridx = 0;
+		gbc_btnSummaryExcluded.gridy = 11;
+		panelResults.add(btnSummaryExcluded, gbc_btnSummaryExcluded);
+		btnSummaryExcluded.setName(BTN_SUMMARY_EXCLUDED);
+		btnSummaryExcluded.setActionCommand(BTN_AC_EXCLUDED);
 
-		Component verticalStrut_11 = Box.createVerticalStrut(20);
-		GridBagConstraints gbc_verticalStrut_11 = new GridBagConstraints();
-		gbc_verticalStrut_11.insets = new Insets(0, 0, 5, 0);
-		gbc_verticalStrut_11.gridx = 1;
-		gbc_verticalStrut_11.gridy = 10;
-		panelLeftSummary.add(verticalStrut_11, gbc_verticalStrut_11);
+		Component verticalStrut_16 = Box.createVerticalStrut(10);
+		GridBagConstraints gbc_verticalStrut_16 = new GridBagConstraints();
+		gbc_verticalStrut_16.insets = new Insets(0, 0, 5, 0);
+		gbc_verticalStrut_16.gridx = 0;
+		gbc_verticalStrut_16.gridy = 12;
+		panelResults.add(verticalStrut_16, gbc_verticalStrut_16);
 
-		JPanel panel_2 = new JPanel();
-		GridBagConstraints gbc_panel_2 = new GridBagConstraints();
-		gbc_panel_2.insets = new Insets(0, 0, 5, 0);
-		gbc_panel_2.fill = GridBagConstraints.VERTICAL;
-		gbc_panel_2.gridx = 1;
-		gbc_panel_2.gridy = 11;
-		panelLeftSummary.add(panel_2, gbc_panel_2);
-		GridBagLayout gbl_panel_2 = new GridBagLayout();
-		gbl_panel_2.columnWidths = new int[] { 0, 0 };
-		gbl_panel_2.rowHeights = new int[] { 0, 0 };
-		gbl_panel_2.columnWeights = new double[] { 0.0, Double.MIN_VALUE };
-		gbl_panel_2.rowWeights = new double[] { 0.0, Double.MIN_VALUE };
-		panel_2.setLayout(gbl_panel_2);
+		btnPrintResults = new JButton("Print Results");
+		btnPrintResults.setName(BTN_PRINT_RESULTS);
+		btnPrintResults.addActionListener(identicAdapter);
+		GridBagConstraints gbc_btnPrintResults = new GridBagConstraints();
+		gbc_btnPrintResults.gridx = 0;
+		gbc_btnPrintResults.gridy = 13;
+		panelResults.add(btnPrintResults, gbc_btnPrintResults);
 
-		lblTotalFiles = new JLabel("Total Files");
-		GridBagConstraints gbc_lblTotalFiles = new GridBagConstraints();
-		gbc_lblTotalFiles.anchor = GridBagConstraints.SOUTHWEST;
-		gbc_lblTotalFiles.gridx = 0;
-		gbc_lblTotalFiles.gridy = 0;
-		panel_2.add(lblTotalFiles, gbc_lblTotalFiles);
+		JPanel panel = new JPanel();
+		panel.setBorder(new TitledBorder(new BevelBorder(BevelBorder.LOWERED, null, null, null, null), "Actions",
+				TitledBorder.CENTER, TitledBorder.TOP, null, new Color(0, 0, 0)));
+		GridBagConstraints gbc_panel = new GridBagConstraints();
+		gbc_panel.fill = GridBagConstraints.BOTH;
+		gbc_panel.gridx = 0;
+		gbc_panel.gridy = 1;
+		panelLeftSummary.add(panel, gbc_panel);
+		GridBagLayout gbl_panel = new GridBagLayout();
+		gbl_panel.columnWidths = new int[] { 0, 0 };
+		gbl_panel.rowHeights = new int[] { 0, 0, 0, 0, 0, 0, 0 };
+		gbl_panel.columnWeights = new double[] { 1.0, Double.MIN_VALUE };
+		gbl_panel.rowWeights = new double[] { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, Double.MIN_VALUE };
+		panel.setLayout(gbl_panel);
+
+		JButton btnActionCopy = new JButton("Copy");
+		btnActionCopy.setName(BTN_ACTION_COPY);
+		btnActionCopy.addActionListener(identicAdapter);
+		GridBagConstraints gbc_btnActionCopy = new GridBagConstraints();
+		gbc_btnActionCopy.insets = new Insets(0, 0, 5, 0);
+		gbc_btnActionCopy.gridx = 0;
+		gbc_btnActionCopy.gridy = 1;
+		panel.add(btnActionCopy, gbc_btnActionCopy);
+
+		JButton btnActionMove = new JButton("Move");
+		btnActionMove.setName(BTN_ACTION_MOVE);
+		btnActionMove.addActionListener(identicAdapter);
+		GridBagConstraints gbc_btnActionMove = new GridBagConstraints();
+		gbc_btnActionMove.insets = new Insets(0, 0, 5, 0);
+		gbc_btnActionMove.gridx = 0;
+		gbc_btnActionMove.gridy = 3;
+		panel.add(btnActionMove, gbc_btnActionMove);
+
+		JButton btnActionDelete = new JButton("Delete");
+		btnActionDelete.setName(BTN_ACTION_DELETE);
+		btnActionDelete.addActionListener(identicAdapter);
+		GridBagConstraints gbc_btnActionDelete = new GridBagConstraints();
+		gbc_btnActionDelete.gridx = 0;
+		gbc_btnActionDelete.gridy = 5;
+		panel.add(btnActionDelete, gbc_btnActionDelete);
+
+		btnSummaryExcluded.addActionListener(identicAdapter);
+		btnSummaryDuplicates.addActionListener(identicAdapter);
+		btnSummaryUnique.addActionListener(identicAdapter);
+		btnSummaryDistinct.addActionListener(identicAdapter);
+		btnSummaryTargets.addActionListener(identicAdapter);
 
 		JPanel panelRightSummary = new JPanel();
 		splitPaneSummary.setRightComponent(panelRightSummary);
@@ -1887,9 +2129,10 @@ public class Identic {
 		splitPaneMain.setLeftComponent(panelLeft);
 		GridBagLayout gbl_panelLeft = new GridBagLayout();
 		gbl_panelLeft.columnWidths = new int[] { 0, 0, 0, 0 };
-		gbl_panelLeft.rowHeights = new int[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+		gbl_panelLeft.rowHeights = new int[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 		gbl_panelLeft.columnWeights = new double[] { 0.0, 1.0, 0.0, Double.MIN_VALUE };
-		gbl_panelLeft.rowWeights = new double[] { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, Double.MIN_VALUE };
+		gbl_panelLeft.rowWeights = new double[] { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+				Double.MIN_VALUE };
 		panelLeft.setLayout(gbl_panelLeft);
 
 		Component verticalStrut_6 = Box.createVerticalStrut(60);
@@ -1973,10 +2216,34 @@ public class Identic {
 		GridBagConstraints gbc_btnStart = new GridBagConstraints();
 		gbc_btnStart.fill = GridBagConstraints.HORIZONTAL;
 		gbc_btnStart.anchor = GridBagConstraints.NORTH;
-		gbc_btnStart.insets = new Insets(0, 0, 0, 5);
+		gbc_btnStart.insets = new Insets(0, 0, 5, 5);
 		gbc_btnStart.gridx = 1;
 		gbc_btnStart.gridy = 8;
 		panelLeft.add(btnStart, gbc_btnStart);
+
+		JButton btnTest = new JButton("test");
+		btnTest.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent arg0) {
+				String lcd = getLeastCommonDirectory(tableResults, COLUMN_DIRECTORY);
+				System.out.printf("%n  LCD = %s%n", lcd);
+
+				String originalPath = "";
+				String targetPath = "D:\\newFolder";
+				String newPath = "";
+				for (int row = 1; row < tableResults.getRowCount(); row++) {
+					originalPath = (String) tableResults.getValueAt(row, COLUMN_DIRECTORY);
+					log.addInfo("Original ", originalPath);
+					newPath = originalPath.replace(lcd, targetPath);
+					log.addInfo("New      ", newPath);
+				} // for
+
+			}// actionPerformed
+		});
+		GridBagConstraints gbc_btnTest = new GridBagConstraints();
+		gbc_btnTest.insets = new Insets(0, 0, 0, 5);
+		gbc_btnTest.gridx = 1;
+		gbc_btnTest.gridy = 10;
+		panelLeft.add(btnTest, gbc_btnTest);
 		splitPaneMain.setDividerLocation(150);
 
 		JPanel panelStatus = new JPanel();
@@ -2020,6 +2287,9 @@ public class Identic {
 	private static final String EMPTY_STRING = "";
 	private static final String NONE = "<none>";
 
+	private static final int COLUMN_DIRECTORY = 1;
+	private static final int COLUMN_NAME = 0;
+
 	private static final String TAB_SUMMARY = "tabSummary";
 	private static final String TAB_CATALOGS = "tabCatalogs";
 	private static final String TAB_TYPES = "tabTypes";
@@ -2027,6 +2297,7 @@ public class Identic {
 
 	private static final String MNU_FILE_EXIT = "mnuFileExit";
 	private static final String BTN_SOURCE_FOLDER = "btnSourceFolder";
+	private static final String BTN_TARGET_FOLDER = "btnTargetFolder";
 
 	private static final String RB_CATALOG_NO = "rbNoCatalog";
 	private static final String RB_CATALOG_WITH = "rbWithCatalog";
@@ -2066,13 +2337,23 @@ public class Identic {
 	private static final String CATALOG_SUFFIX = "catalog";
 	private static final String CATALOG_SUFFIX_DOT = "." + CATALOG_SUFFIX;
 
-//	private static final String BTN_SUMMARY_TOTAL = "btnSummaryTotal";
 	private static final String BTN_SUMMARY_EXCLUDED = "btnSummaryExcluded";
-//	private static final String BTN_SUMMARY_EXCLUDED_TYPES = "btnSummaryExcludedTypes";
 	private static final String BTN_SUMMARY_TARGETS = "btnSummaryTargets";
 	private static final String BTN_SUMMARY_DISTINCT = "btnSummaryDistinct";
 	private static final String BTN_SUMMARY_UNIQUE = "btnSummaryUnique";
 	private static final String BTN_SUMMARY_DUPLICATES = "btnSummaryDuplicates";
+
+	private static final String BTN_AC_EXCLUDED = "Excluded Files";
+	private static final String BTN_AC_TARGETS = "Target Files";
+	private static final String BTN_AC_DISTINCT = "Distinct Files";
+	private static final String BTN_AC_UNIQUE = "Unique Files";
+	private static final String BTN_AC_DUPLICATES = "Duplicate Files";
+
+	private static final String BTN_PRINT_RESULTS = "btnPrintResults";
+
+	private static final String BTN_ACTION_COPY = "btnActionCopy";
+	private static final String BTN_ACTION_MOVE = "btnActionMove";
+	private static final String BTN_ACTION_DELETE = "btnActionDelete";
 
 	// members
 	private JFrame frmIdentic;
@@ -2107,6 +2388,7 @@ public class Identic {
 	private JSplitPane splitPaneSummary;
 	private JLabel lblSummaryLegend;
 	private JLabel lblTotalFiles;
+	private JButton btnPrintResults;
 	// private JList lstCatalogInUse;
 	// private JList lstCatalogAvailable;
 
@@ -2503,6 +2785,22 @@ public class Identic {
 			case BTN_SUMMARY_UNIQUE:
 			case BTN_SUMMARY_DUPLICATES:
 				doShowResults(name);
+				break;
+
+			case BTN_PRINT_RESULTS:
+				doPrintResults();
+				break;
+
+			case BTN_ACTION_COPY:
+				doActionCopy();
+				break;
+
+			case BTN_ACTION_MOVE:
+				doActionMove();
+				break;
+
+			case BTN_ACTION_DELETE:
+				doActionDelete();
 				break;
 
 			}// switch - name
