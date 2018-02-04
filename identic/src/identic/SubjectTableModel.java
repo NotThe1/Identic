@@ -32,9 +32,20 @@ public class SubjectTableModel extends AbstractTableModel {
 		} // for
 		return ans;
 	}// sun
+	
+	public int findColumn(String columnName) {
+		int result = -1;
+		for (result = columns-1; result >=0 ; result --) {
+			if (headers[result].equalsIgnoreCase(columnName)) {
+				break;
+			};
+			
+		}//for
+		return result;
+	}//findColumn
 
 	@Override
-	public int getColumnCount() {
+	public int getColumnCount() { // want to ignore the HASH column
 		return columns - 1;
 	}// getColumnCount
 
@@ -148,8 +159,6 @@ public class SubjectTableModel extends AbstractTableModel {
 	public static final String DIRECTORY = "Directory";
 	public static final String SIZE = "Size";
 	public static final String DATE = "ModifiedDate";
-//	public static final String DUP = "isDup";
-//	public static final String ID = "FileID";
 	public static final String DUP = "Dup";
 	public static final String ID = "ID";
 	public static final String HASH_KEY = "HashKey";

@@ -35,6 +35,7 @@ import java.nio.file.FileVisitResult;
 import java.nio.file.FileVisitor;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
@@ -91,6 +92,7 @@ import javax.swing.border.TitledBorder;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 import javax.swing.filechooser.FileNameExtensionFilter;
+import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableColumn;
 import javax.swing.table.TableRowSorter;
 
@@ -104,6 +106,7 @@ public class Identic {
 
 	private ButtonGroup bgFindType = new ButtonGroup();
 	private ButtonGroup bgSummary = new ButtonGroup();
+	private ButtonGroup bgActions = new ButtonGroup();
 
 	// Find
 	private LinkedBlockingQueue<FileStat> qSubjects = new LinkedBlockingQueue<FileStat>();
@@ -112,13 +115,19 @@ public class Identic {
 	private HashMap<String, Integer> excludedFileTypes = new HashMap<>();
 
 	private SubjectTableModel subjectTableModel = new SubjectTableModel();
+	private ActionTableModel actionTableModel = new ActionTableModel();
+
 	private RejectTableModel rejectTableModel = new RejectTableModel();
 	private DefaultListModel<String> excludeModel = new DefaultListModel<>();
 
-	private JTable tableResults = new JTable() {
-		public boolean isCellEditable(int roe, int column) {
-			return column == 4;
-		}
+	private JTable tableResults = new JTable();
+
+	private JTable tableActions = new JTable() {
+		private static final long serialVersionUID = 1L;
+
+		public boolean isCellEditable(int row, int column) {
+			return column == 0;
+		}// isCellEditable
 	};
 
 	private HashMap<String, Integer> hashCounts = new HashMap<String, Integer>();;
@@ -819,9 +828,14 @@ public class Identic {
 		excludeModel.clear();
 		hashCounts.clear();
 		subjectTableModel.clear();
+		actionTableModel.clear();
 		rejectTableModel.clear();
 		hashIDs.clear();
 		hashCounts.clear();
+
+		tableResults.setModel(new DefaultTableModel());
+		;
+		tableActions.setModel(new DefaultTableModel());
 
 	}// initialiseFind
 
@@ -1024,6 +1038,39 @@ public class Identic {
 		} // for each column
 	}// setSubjectColumns
 
+	private void setActionColumns() {
+		tableActions.setAutoResizeMode(JTable.AUTO_RESIZE_NEXT_COLUMN);
+		for (int i = 0; i < tableActions.getColumnModel().getColumnCount(); i++) {
+			TableColumn tc = tableActions.getColumnModel().getColumn(i);
+			switch (i) {
+			case 0: // Action
+				tc.setMaxWidth(40);
+				tc.setPreferredWidth(40);
+				break;
+			case 1: // Name
+				break;
+			case 2: // Directory
+				break;
+			case 3: // Size
+				// tc.setMaxWidth(460);
+				tc.setPreferredWidth(40);
+				break;
+			case 4: // Date
+				// tc.setMaxWidth(100);
+				tc.setPreferredWidth(40);
+				break;
+			case 5: // Dup
+				tc.setMaxWidth(40);
+				break;
+			case 6: // ID
+				tc.setMaxWidth(40);
+				break;
+			}// switch
+				// tc.setPreferredWidth(20);
+				// tc.sizeWidthToFit();
+		} // for each column
+	}// setSubjectColumns
+
 	private void doPrintResults() {
 		String reportType = bgSummary.getSelection().getActionCommand();
 		MessageFormat headerFormat = new MessageFormat(reportType);
@@ -1037,19 +1084,76 @@ public class Identic {
 		} // try
 	}// doPrintResults
 
+	private void doActionLoadResults() {
+		Object[] subjectRow;
+		actionTableModel.clear();
+		tableActions.setModel(actionTableModel);
+
+		switch (bgActions.getSelection().getActionCommand()) {
+		case RB_AC_TARGETS:
+			for (int row = 0; row < subjectTableModel.getRowCount(); row++) {
+				subjectRow = subjectTableModel.getRow(row);
+				actionTableModel.addRowForAction(subjectRow);
+			} // for rows
+			break;
+		case RB_AC_DISTINCT:
+			AbstractSet<Integer> hashIDs = new HashSet();
+			Integer hashID;
+			for (int row = 0; row < subjectTableModel.getRowCount(); row++) {
+				subjectRow = subjectTableModel.getRow(row);
+
+				hashID = (Integer) subjectRow[COLUMN_ID_SUBJECT];
+				if (!hashIDs.contains(hashID)) {
+					actionTableModel.addRowForAction(subjectRow);
+					hashIDs.add(hashID);
+				} // if
+			} // for rows
+
+			break;
+		case RB_AC_UNIQUE:
+			for (int row = 0; row < subjectTableModel.getRowCount(); row++) {
+				subjectRow = subjectTableModel.getRow(row);// COLUMN_DIRECTORY_DUP
+				if (!(boolean) subjectRow[COLUMN_DIRECTORY_DUP]) {
+					actionTableModel.addRowForAction(subjectRow);
+				} // if no duplicate
+			} // for rows
+
+			break;
+		case RB_AC_DUPLICATES:
+			for (int row = 0; row < subjectTableModel.getRowCount(); row++) {
+				subjectRow = subjectTableModel.getRow(row);// COLUMN_DIRECTORY_DUP
+				if ((boolean) subjectRow[COLUMN_DIRECTORY_DUP]) {
+					actionTableModel.addRowForAction(subjectRow);
+				} // if has duplicate
+			} // for rows
+
+			break;
+		default:
+			log.addError("[doActionLoadResults] unknown action: " + bgActions.getSelection().getActionCommand());
+		}// switch
+		tableActions.setRowSorter(new TableRowSorter(actionTableModel));
+
+		setActionColumns();
+		tableActions.updateUI();
+
+	}// doActionLoadResults
+
 	private void doActionCopy() {
 		if (!doesFolderExist()) {
 			return;
 		} // if
-		String lcd = getLeastCommonDirectory(tableResults, COLUMN_DIRECTORY);
+		String lcd = getLeastCommonDirectory(tableActions, COLUMN_DIRECTORY_ACTION);
 		String targetBaseString = lblSourceFolder.getText();
 		String sourcePathString = "";
 		String targetPathString = "";
 		String sourceName = "";
 
-		for (int row = 0; row < tableResults.getRowCount(); row++) {
-			sourcePathString = (String) tableResults.getValueAt(row, COLUMN_DIRECTORY);
-			sourceName = (String) tableResults.getValueAt(row, COLUMN_NAME);
+		for (int row = 0; row < tableActions.getRowCount(); row++) {
+			if (!(boolean) tableActions.getValueAt(row, COLUMN_ACTION_ACTION)) {
+				continue; // skip this row
+			} //
+			sourcePathString = (String) tableActions.getValueAt(row, COLUMN_DIRECTORY_ACTION);
+			sourceName = (String) tableActions.getValueAt(row, COLUMN_NAME_ACTION);
 			targetPathString = sourcePathString.replace(lcd, targetBaseString);
 			if (!Files.exists(Paths.get(targetPathString))) {
 				try {
@@ -1057,33 +1161,101 @@ public class Identic {
 				} catch (IOException e) {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
-				}
-			} // if
+				} // try
+			} // if directory does not exist
 
 			try {
 				Files.copy(Paths.get(sourcePathString, sourceName), Paths.get(targetPathString, sourceName));
-				String msg = String.format("[doActionCopy] copied : %s, %s",targetPathString, sourceName);
-				log.addInfo(msg);	
+				String msg = String.format("[doActionCopy] copied : %s, %s", targetPathString, sourceName);
+				log.addInfo(msg);
 			} catch (FileAlreadyExistsException ex) {
-				String msg = String.format("[doActionCopy] File Already Exists: %s, %s",targetPathString, sourceName);
+				String msg = String.format("[doActionCopy] File Already Exists: %s, %s", targetPathString, sourceName);
 				log.addInfo(msg);
 			} catch (IOException e) {
-				String msg = String.format("[doActionCopy] Failed Copy: %s, %s",targetPathString, sourceName);
-				log.addError(msg,e.getMessage());
+				String msg = String.format("[doActionCopy] Failed Copy: %s, %s", targetPathString, sourceName);
+				log.addError(msg, e.getMessage());
 			} // try
 		} //
 
 	}// doActionCopy
 
-	private void doActionMove() {
+	private void doActionMoveCopy(String action) {
 		if (!doesFolderExist()) {
 			return;
 		} // if
+		String msgAction = action.equals(BTN_ACTION_COPY)?"Copy":"Move";
+		String lcd = getLeastCommonDirectory(tableActions, COLUMN_DIRECTORY_ACTION);
+		String targetBaseString = lblSourceFolder.getText();
+		String sourcePathString = "";
+		String targetPathString = "";
+		String sourceName = "";
+
+		for (int row = 0; row < tableActions.getRowCount(); row++) {
+			if (!(boolean) tableActions.getValueAt(row, COLUMN_ACTION_ACTION)) {
+				continue; // skip this row
+			} //
+			sourcePathString = (String) tableActions.getValueAt(row, COLUMN_DIRECTORY_ACTION);
+			sourceName = (String) tableActions.getValueAt(row, COLUMN_NAME_ACTION);
+			targetPathString = sourcePathString.replace(lcd, targetBaseString);
+			if (!Files.exists(Paths.get(targetPathString))) {
+				try {
+					Files.createDirectory(Paths.get(targetPathString));
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				} // try
+			} // if directory does not exist
+			
+
+			try {
+				if(action.equals(BTN_ACTION_COPY)) {
+					Files.copy(Paths.get(sourcePathString, sourceName), Paths.get(targetPathString, sourceName));
+				}else {
+					Files.move(Paths.get(sourcePathString, sourceName), Paths.get(targetPathString, sourceName));
+				}
+				String msg = String.format("[doActionMoveCopy] File %s : %s, %s",msgAction, targetPathString, sourceName);
+				log.addInfo(msg);
+			} catch (FileAlreadyExistsException ex) {
+				String msg = String.format("[doActionMoveCopy] File Already Exists: %s, %s", targetPathString, sourceName);
+				log.addInfo(msg);
+			} catch (IOException e) {
+				String msg = String.format("[doActionMoveCopy] Failed %s: %s, %s",msgAction, targetPathString, sourceName);
+				log.addError(msg, e.getMessage());
+			} // try
+		} //
 
 	}// doActionMove
+	
+
 
 	private void doActionDelete() {
+		String sourcePathString = "";
+		String sourceName = "";
 
+		for (int row = 0; row < tableActions.getRowCount(); row++) {
+			if (!(boolean) tableActions.getValueAt(row, COLUMN_ACTION_ACTION)) {
+				continue; // skip this row
+			} //
+
+
+			sourcePathString = (String) tableActions.getValueAt(row, COLUMN_DIRECTORY_ACTION);
+			sourceName = (String) tableActions.getValueAt(row, COLUMN_NAME_ACTION);
+			try {
+				Files.delete(Paths.get(sourcePathString, sourceName));
+				String msg = String.format("[doActionDelete] File Deleted: %s, %s", sourcePathString,
+						sourceName);
+				log.addInfo(msg);
+
+			} catch (NoSuchFileException ne) {
+				String msg = String.format("[doActionDelete] File Does Not Exist : %s, %s", sourcePathString,
+						sourceName);
+				log.addInfo(msg);
+			} catch (IOException e) {
+				String msg = String.format("[doActionDelete] Failed Delete: %s, %s", sourcePathString, sourceName);
+				log.addError(msg, e.getMessage());
+			} // try delete
+
+		} // for
 	}// doActionDelete
 
 	private boolean doesFolderExist() {
@@ -1227,6 +1399,12 @@ public class Identic {
 		bgSummary.add(btnSummaryDistinct);
 		bgSummary.add(btnSummaryUnique);
 		bgSummary.add(btnSummaryDuplicates);
+
+		bgActions.add(rbLoadTargetFiles);
+		bgActions.add(rbLoadDistinctFiles);
+		bgActions.add(rbLoadUniqueFiles);
+		bgActions.add(rbLoadHaveDuplicates);
+		rbLoadTargetFiles.setSelected(true);
 
 		availableCatalogItemModel.clear();
 		lstCatalogAvailable.setDragEnabled(true);
@@ -1505,47 +1683,6 @@ public class Identic {
 		gbc_btnPrintResults.gridy = 13;
 		panelResults.add(btnPrintResults, gbc_btnPrintResults);
 
-		JPanel panel = new JPanel();
-		panel.setBorder(new TitledBorder(new BevelBorder(BevelBorder.LOWERED, null, null, null, null), "Actions",
-				TitledBorder.CENTER, TitledBorder.TOP, null, new Color(0, 0, 0)));
-		GridBagConstraints gbc_panel = new GridBagConstraints();
-		gbc_panel.fill = GridBagConstraints.BOTH;
-		gbc_panel.gridx = 0;
-		gbc_panel.gridy = 1;
-		panelLeftSummary.add(panel, gbc_panel);
-		GridBagLayout gbl_panel = new GridBagLayout();
-		gbl_panel.columnWidths = new int[] { 0, 0 };
-		gbl_panel.rowHeights = new int[] { 0, 0, 0, 0, 0, 0, 0 };
-		gbl_panel.columnWeights = new double[] { 1.0, Double.MIN_VALUE };
-		gbl_panel.rowWeights = new double[] { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, Double.MIN_VALUE };
-		panel.setLayout(gbl_panel);
-
-		JButton btnActionCopy = new JButton("Copy");
-		btnActionCopy.setName(BTN_ACTION_COPY);
-		btnActionCopy.addActionListener(identicAdapter);
-		GridBagConstraints gbc_btnActionCopy = new GridBagConstraints();
-		gbc_btnActionCopy.insets = new Insets(0, 0, 5, 0);
-		gbc_btnActionCopy.gridx = 0;
-		gbc_btnActionCopy.gridy = 1;
-		panel.add(btnActionCopy, gbc_btnActionCopy);
-
-		JButton btnActionMove = new JButton("Move");
-		btnActionMove.setName(BTN_ACTION_MOVE);
-		btnActionMove.addActionListener(identicAdapter);
-		GridBagConstraints gbc_btnActionMove = new GridBagConstraints();
-		gbc_btnActionMove.insets = new Insets(0, 0, 5, 0);
-		gbc_btnActionMove.gridx = 0;
-		gbc_btnActionMove.gridy = 3;
-		panel.add(btnActionMove, gbc_btnActionMove);
-
-		JButton btnActionDelete = new JButton("Delete");
-		btnActionDelete.setName(BTN_ACTION_DELETE);
-		btnActionDelete.addActionListener(identicAdapter);
-		GridBagConstraints gbc_btnActionDelete = new GridBagConstraints();
-		gbc_btnActionDelete.gridx = 0;
-		gbc_btnActionDelete.gridy = 5;
-		panel.add(btnActionDelete, gbc_btnActionDelete);
-
 		btnSummaryExcluded.addActionListener(identicAdapter);
 		btnSummaryDuplicates.addActionListener(identicAdapter);
 		btnSummaryUnique.addActionListener(identicAdapter);
@@ -1575,6 +1712,143 @@ public class Identic {
 		lblSummaryLegend.setFont(new Font("Tahoma", Font.BOLD, 13));
 		scrollPaneSummary.setColumnHeaderView(lblSummaryLegend);
 		splitPaneSummary.setDividerLocation(200);
+
+		JSplitPane tabActions = new JSplitPane();
+		tpMain.addTab("Actions", null, tabActions, null);
+
+		JPanel panelLeftActions = new JPanel();
+		tabActions.setLeftComponent(panelLeftActions);
+		GridBagLayout gbl_panelLeftActions = new GridBagLayout();
+		gbl_panelLeftActions.columnWidths = new int[] { 0, 0 };
+		gbl_panelLeftActions.rowHeights = new int[] { 0, 0, 0, 0, 0 };
+		gbl_panelLeftActions.columnWeights = new double[] { 1.0, Double.MIN_VALUE };
+		gbl_panelLeftActions.rowWeights = new double[] { 0.0, 0.0, 1.0, 1.0, Double.MIN_VALUE };
+		panelLeftActions.setLayout(gbl_panelLeftActions);
+
+		Component verticalStrut_10 = Box.createVerticalStrut(20);
+		GridBagConstraints gbc_verticalStrut_10 = new GridBagConstraints();
+		gbc_verticalStrut_10.insets = new Insets(0, 0, 5, 0);
+		gbc_verticalStrut_10.gridx = 0;
+		gbc_verticalStrut_10.gridy = 0;
+		panelLeftActions.add(verticalStrut_10, gbc_verticalStrut_10);
+
+		JPanel panelLoadResults = new JPanel();
+		panelLoadResults.setBorder(new BevelBorder(BevelBorder.LOWERED, null, null, null, null));
+		GridBagConstraints gbc_panelLoadResults = new GridBagConstraints();
+		gbc_panelLoadResults.insets = new Insets(0, 0, 5, 0);
+		gbc_panelLoadResults.fill = GridBagConstraints.BOTH;
+		gbc_panelLoadResults.gridx = 0;
+		gbc_panelLoadResults.gridy = 1;
+		panelLeftActions.add(panelLoadResults, gbc_panelLoadResults);
+		GridBagLayout gbl_panelLoadResults = new GridBagLayout();
+		gbl_panelLoadResults.columnWidths = new int[] { 0, 0 };
+		gbl_panelLoadResults.rowHeights = new int[] { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+		gbl_panelLoadResults.columnWeights = new double[] { 1.0, Double.MIN_VALUE };
+		gbl_panelLoadResults.rowWeights = new double[] { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, Double.MIN_VALUE };
+		panelLoadResults.setLayout(gbl_panelLoadResults);
+
+		JButton btnActionLoadResults = new JButton("Load Results");
+		btnActionLoadResults.setName(BTN_ACTION_LOAD_RESULTS);
+		btnActionLoadResults.addActionListener(identicAdapter);
+		GridBagConstraints gbc_btnActionLoadResults = new GridBagConstraints();
+		gbc_btnActionLoadResults.insets = new Insets(0, 0, 5, 0);
+		gbc_btnActionLoadResults.fill = GridBagConstraints.HORIZONTAL;
+		gbc_btnActionLoadResults.gridx = 0;
+		gbc_btnActionLoadResults.gridy = 1;
+		panelLoadResults.add(btnActionLoadResults, gbc_btnActionLoadResults);
+
+		rbLoadTargetFiles = new JRadioButton("Target Files");
+		rbLoadTargetFiles.setActionCommand(RB_AC_TARGETS);
+		GridBagConstraints gbc_rbLoadTargetFiles = new GridBagConstraints();
+		gbc_rbLoadTargetFiles.insets = new Insets(0, 0, 5, 0);
+		gbc_rbLoadTargetFiles.gridx = 0;
+		gbc_rbLoadTargetFiles.gridy = 3;
+		panelLoadResults.add(rbLoadTargetFiles, gbc_rbLoadTargetFiles);
+
+		rbLoadDistinctFiles = new JRadioButton("Distinct Files");
+		rbLoadDistinctFiles.setActionCommand(RB_AC_DISTINCT);
+		GridBagConstraints gbc_rbLoadDistinctFiles = new GridBagConstraints();
+		gbc_rbLoadDistinctFiles.insets = new Insets(0, 0, 5, 0);
+		gbc_rbLoadDistinctFiles.gridx = 0;
+		gbc_rbLoadDistinctFiles.gridy = 4;
+		panelLoadResults.add(rbLoadDistinctFiles, gbc_rbLoadDistinctFiles);
+
+		rbLoadUniqueFiles = new JRadioButton("Unique Files");
+		rbLoadUniqueFiles.setActionCommand(RB_AC_UNIQUE);
+		GridBagConstraints gbc_rbLoadUniqueFiles = new GridBagConstraints();
+		gbc_rbLoadUniqueFiles.insets = new Insets(0, 0, 5, 0);
+		gbc_rbLoadUniqueFiles.anchor = GridBagConstraints.BASELINE;
+		gbc_rbLoadUniqueFiles.gridx = 0;
+		gbc_rbLoadUniqueFiles.gridy = 5;
+		panelLoadResults.add(rbLoadUniqueFiles, gbc_rbLoadUniqueFiles);
+
+		rbLoadHaveDuplicates = new JRadioButton("Have Duplicates");
+		rbLoadHaveDuplicates.setActionCommand(RB_AC_DUPLICATES);
+		GridBagConstraints gbc_rbLoadHaveDuplicates = new GridBagConstraints();
+		gbc_rbLoadHaveDuplicates.insets = new Insets(0, 0, 5, 0);
+		gbc_rbLoadHaveDuplicates.gridx = 0;
+		gbc_rbLoadHaveDuplicates.gridy = 6;
+		panelLoadResults.add(rbLoadHaveDuplicates, gbc_rbLoadHaveDuplicates);
+
+		JPanel panel_2 = new JPanel();
+		panel_2.setBorder(new TitledBorder(new BevelBorder(BevelBorder.LOWERED, null, null, null, null), "Actions",
+
+				TitledBorder.CENTER, TitledBorder.TOP, null, new Color(0, 0, 0)));
+		GridBagConstraints gbc_panel_2 = new GridBagConstraints();
+		gbc_panel_2.fill = GridBagConstraints.BOTH;
+		gbc_panel_2.gridx = 0;
+		gbc_panel_2.gridy = 3;
+		panelLeftActions.add(panel_2, gbc_panel_2);
+		GridBagLayout gbl_panel_2 = new GridBagLayout();
+		gbl_panel_2.columnWidths = new int[] { 0, 0 };
+		gbl_panel_2.rowHeights = new int[] { 0, 0, 0, 0, 0, 0, 0 };
+		gbl_panel_2.columnWeights = new double[] { 1.0, Double.MIN_VALUE };
+		gbl_panel_2.rowWeights = new double[] { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, Double.MIN_VALUE };
+		panel_2.setLayout(gbl_panel_2);
+
+		JButton btnActionCopy = new JButton("Copy");
+		btnActionCopy.setName(BTN_ACTION_COPY);
+		btnActionCopy.addActionListener(identicAdapter);
+		GridBagConstraints gbc_btnActionCopy = new GridBagConstraints();
+		gbc_btnActionCopy.insets = new Insets(0, 0, 5, 0);
+		gbc_btnActionCopy.gridx = 0;
+		gbc_btnActionCopy.gridy = 1;
+		panel_2.add(btnActionCopy, gbc_btnActionCopy);
+
+		JButton btnActionMove = new JButton("Move");
+		btnActionMove.setName(BTN_ACTION_MOVE);
+		btnActionMove.addActionListener(identicAdapter);
+		GridBagConstraints gbc_btnActionMove = new GridBagConstraints();
+		gbc_btnActionMove.insets = new Insets(0, 0, 5, 0);
+		gbc_btnActionMove.gridx = 0;
+		gbc_btnActionMove.gridy = 3;
+		panel_2.add(btnActionMove, gbc_btnActionMove);
+
+		JButton btnActionDelete = new JButton("Delete");
+		btnActionDelete.setName(BTN_ACTION_DELETE);
+		btnActionDelete.addActionListener(identicAdapter);
+		GridBagConstraints gbc_btnActionDelete = new GridBagConstraints();
+		gbc_btnActionDelete.gridx = 0;
+		gbc_btnActionDelete.gridy = 5;
+		panel_2.add(btnActionDelete, gbc_btnActionDelete);
+
+		JPanel panelRightActions = new JPanel();
+		tabActions.setRightComponent(panelRightActions);
+		GridBagLayout gbl_panelRightActions = new GridBagLayout();
+		gbl_panelRightActions.columnWidths = new int[] { 0, 0 };
+		gbl_panelRightActions.rowHeights = new int[] { 0, 0 };
+		gbl_panelRightActions.columnWeights = new double[] { 1.0, Double.MIN_VALUE };
+		gbl_panelRightActions.rowWeights = new double[] { 1.0, Double.MIN_VALUE };
+		panelRightActions.setLayout(gbl_panelRightActions);
+
+		JScrollPane scrollPaneActions = new JScrollPane();
+		scrollPaneActions.setViewportView(tableActions);
+		GridBagConstraints gbc_scrollPaneActions = new GridBagConstraints();
+		gbc_scrollPaneActions.fill = GridBagConstraints.BOTH;
+		gbc_scrollPaneActions.gridx = 0;
+		gbc_scrollPaneActions.gridy = 0;
+		panelRightActions.add(scrollPaneActions, gbc_scrollPaneActions);
+		tabActions.setDividerLocation(200);
 
 		JPanel tabTypes = new JPanel();
 		tabTypes.setName(TAB_TYPES);
@@ -2224,19 +2498,20 @@ public class Identic {
 		JButton btnTest = new JButton("test");
 		btnTest.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent arg0) {
-				String lcd = getLeastCommonDirectory(tableResults, COLUMN_DIRECTORY);
-				System.out.printf("%n  LCD = %s%n", lcd);
+				// String lcd = getLeastCommonDirectory(tableResults, COLUMN_DIRECTORY);
+				// System.out.printf("%n LCD = %s%n", lcd);
+				//
+				// String originalPath = "";
+				// String targetPath = "D:\\newFolder";
+				// String newPath = "";
+				// for (int row = 1; row < tableResults.getRowCount(); row++) {
+				// originalPath = (String) tableResults.getValueAt(row, COLUMN_DIRECTORY);
+				// log.addInfo("Original ", originalPath);
+				// newPath = originalPath.replace(lcd, targetPath);
+				// log.addInfo("New ", newPath);
+				// } // for
 
-				String originalPath = "";
-				String targetPath = "D:\\newFolder";
-				String newPath = "";
-				for (int row = 1; row < tableResults.getRowCount(); row++) {
-					originalPath = (String) tableResults.getValueAt(row, COLUMN_DIRECTORY);
-					log.addInfo("Original ", originalPath);
-					newPath = originalPath.replace(lcd, targetPath);
-					log.addInfo("New      ", newPath);
-				} // for
-
+				System.out.printf("[tableResults] Directory is Column %d%n", subjectTableModel.findColumn("Fred"));
 			}// actionPerformed
 		});
 		GridBagConstraints gbc_btnTest = new GridBagConstraints();
@@ -2287,8 +2562,14 @@ public class Identic {
 	private static final String EMPTY_STRING = "";
 	private static final String NONE = "<none>";
 
-	private static final int COLUMN_DIRECTORY = 1;
-	private static final int COLUMN_NAME = 0;
+	private static final int COLUMN_NAME_SUBJECT = 0;
+	private static final int COLUMN_DIRECTORY_SUBJECT = 1;
+	private static final int COLUMN_DIRECTORY_DUP = 4;
+	private static final int COLUMN_ID_SUBJECT = 5;
+
+	private static final int COLUMN_ACTION_ACTION = 0;
+	private static final int COLUMN_NAME_ACTION = 1;
+	private static final int COLUMN_DIRECTORY_ACTION = 2;
 
 	private static final String TAB_SUMMARY = "tabSummary";
 	private static final String TAB_CATALOGS = "tabCatalogs";
@@ -2351,9 +2632,15 @@ public class Identic {
 
 	private static final String BTN_PRINT_RESULTS = "btnPrintResults";
 
+	private static final String BTN_ACTION_LOAD_RESULTS = "btnActionLoadResults";
 	private static final String BTN_ACTION_COPY = "btnActionCopy";
 	private static final String BTN_ACTION_MOVE = "btnActionMove";
 	private static final String BTN_ACTION_DELETE = "btnActionDelete";
+
+	private static final String RB_AC_TARGETS = "Target Files";
+	private static final String RB_AC_DISTINCT = "Distinct Files";
+	private static final String RB_AC_UNIQUE = "Unique Files";
+	private static final String RB_AC_DUPLICATES = "Duplicate Files";
 
 	// members
 	private JFrame frmIdentic;
@@ -2389,6 +2676,10 @@ public class Identic {
 	private JLabel lblSummaryLegend;
 	private JLabel lblTotalFiles;
 	private JButton btnPrintResults;
+	private JRadioButton rbLoadTargetFiles;
+	private JRadioButton rbLoadDistinctFiles;
+	private JRadioButton rbLoadUniqueFiles;
+	private JRadioButton rbLoadHaveDuplicates;
 	// private JList lstCatalogInUse;
 	// private JList lstCatalogAvailable;
 
@@ -2445,7 +2736,7 @@ public class Identic {
 				String fileType = matcher.find() ? matcher.group(1).toLowerCase() : NONE;
 
 				matcher = patternSubjects.matcher(fileType);
-				if (matcher.find()) {
+				if (matcher.matches()) {//find
 					qSubjects.add(new FileStat(fileName, fileSize, lastModifieTime));
 				} else {
 					keepSuffixCount(fileType);
@@ -2791,12 +3082,13 @@ public class Identic {
 				doPrintResults();
 				break;
 
-			case BTN_ACTION_COPY:
-				doActionCopy();
+			case BTN_ACTION_LOAD_RESULTS:
+				doActionLoadResults();
 				break;
 
+			case BTN_ACTION_COPY:
 			case BTN_ACTION_MOVE:
-				doActionMove();
+				doActionMoveCopy(name);
 				break;
 
 			case BTN_ACTION_DELETE:
