@@ -92,6 +92,7 @@ import javax.swing.border.TitledBorder;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 import javax.swing.filechooser.FileNameExtensionFilter;
+import javax.swing.table.AbstractTableModel;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableColumn;
 import javax.swing.table.TableRowSorter;
@@ -1138,64 +1139,73 @@ public class Identic {
 
 	}// doActionLoadResults
 
-	private void doActionCopy() {
-		if (!doesFolderExist()) {
-			return;
-		} // if
-		String lcd = getLeastCommonDirectory(tableActions, COLUMN_DIRECTORY_ACTION);
-		String targetBaseString = lblSourceFolder.getText();
-		String sourcePathString = "";
-		String targetPathString = "";
-		String sourceName = "";
-
-		for (int row = 0; row < tableActions.getRowCount(); row++) {
-			if (!(boolean) tableActions.getValueAt(row, COLUMN_ACTION_ACTION)) {
-				continue; // skip this row
-			} //
-			sourcePathString = (String) tableActions.getValueAt(row, COLUMN_DIRECTORY_ACTION);
-			sourceName = (String) tableActions.getValueAt(row, COLUMN_NAME_ACTION);
-			targetPathString = sourcePathString.replace(lcd, targetBaseString);
-			if (!Files.exists(Paths.get(targetPathString))) {
-				try {
-					Files.createDirectory(Paths.get(targetPathString));
-				} catch (IOException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				} // try
-			} // if directory does not exist
-
-			try {
-				Files.copy(Paths.get(sourcePathString, sourceName), Paths.get(targetPathString, sourceName));
-				String msg = String.format("[doActionCopy] copied : %s, %s", targetPathString, sourceName);
-				log.addInfo(msg);
-			} catch (FileAlreadyExistsException ex) {
-				String msg = String.format("[doActionCopy] File Already Exists: %s, %s", targetPathString, sourceName);
-				log.addInfo(msg);
-			} catch (IOException e) {
-				String msg = String.format("[doActionCopy] Failed Copy: %s, %s", targetPathString, sourceName);
-				log.addError(msg, e.getMessage());
-			} // try
-		} //
-
-	}// doActionCopy
+//	private void doActionCopy() {
+//		if (!doesFolderExist()) {
+//			return;
+//		} // if
+//		String lcd = getLeastCommonDirectory(actionTableModel);
+//		String targetBaseString = lblSourceFolder.getText();
+//		String sourcePathString = "";
+//		String targetPathString = "";
+//		String sourceName = "";
+//		
+//		int actionColumn = actionTableModel.findColumn(ActionTableModel.ACTION);
+//		int directoryColumn = actionTableModel.findColumn(ActionTableModel.DIRECTORY);
+//		int nameColumn = actionTableModel.findColumn(ActionTableModel.NAME);
+//
+//		for (int row = 0; row < actionTableModel.getRowCount(); row++) {
+//			if (!(boolean) actionTableModel.getValueAt(row, actionColumn)) {
+//				continue; // skip this row
+//			} //
+//			sourcePathString = (String) actionTableModel.getValueAt(row, directoryColumn);
+//			sourceName = (String) actionTableModel.getValueAt(row, nameColumn);
+//			targetPathString = sourcePathString.replace(lcd, targetBaseString);
+//			if (!Files.exists(Paths.get(targetPathString))) {
+//				try {
+//					Files.createDirectory(Paths.get(targetPathString));
+//				} catch (IOException e) {
+//					// TODO Auto-generated catch block
+//					e.printStackTrace();
+//				} // try
+//			} // if directory does not exist
+//			
+//			try {
+//				Files.copy(Paths.get(sourcePathString, sourceName), Paths.get(targetPathString, sourceName));
+//				String msg = String.format("[doActionCopy] copied : %s, %s", targetPathString, sourceName);
+//				log.addInfo(msg);
+//			} catch (FileAlreadyExistsException ex) {
+//				String msg = String.format("[doActionCopy] File Already Exists: %s, %s", targetPathString, sourceName);
+//				log.addInfo(msg);
+//			} catch (IOException e) {
+//				String msg = String.format("[doActionCopy] Failed Copy: %s, %s", targetPathString, sourceName);
+//				log.addError(msg, e.getMessage());
+//			} // try
+//		} //
+//
+//	}// doActionCopy
 
 	private void doActionMoveCopy(String action) {
 		if (!doesFolderExist()) {
 			return;
 		} // if
 		String msgAction = action.equals(BTN_ACTION_COPY)?"Copy":"Move";
-		String lcd = getLeastCommonDirectory(tableActions, COLUMN_DIRECTORY_ACTION);
+		String lcd = getLeastCommonDirectory(actionTableModel);
 		String targetBaseString = lblSourceFolder.getText();
 		String sourcePathString = "";
 		String targetPathString = "";
 		String sourceName = "";
+		
+		int actionColumn = actionTableModel.findColumn(ActionTableModel.ACTION);
+		int directoryColumn = actionTableModel.findColumn(ActionTableModel.DIRECTORY);
+		int nameColumn = actionTableModel.findColumn(ActionTableModel.NAME);
 
-		for (int row = 0; row < tableActions.getRowCount(); row++) {
-			if (!(boolean) tableActions.getValueAt(row, COLUMN_ACTION_ACTION)) {
+
+		for (int row = 0; row < actionTableModel.getRowCount(); row++) {
+			if (!(boolean) actionTableModel.getValueAt(row, actionColumn)) {
 				continue; // skip this row
 			} //
-			sourcePathString = (String) tableActions.getValueAt(row, COLUMN_DIRECTORY_ACTION);
-			sourceName = (String) tableActions.getValueAt(row, COLUMN_NAME_ACTION);
+			sourcePathString = (String) actionTableModel.getValueAt(row, directoryColumn);
+			sourceName = (String) actionTableModel.getValueAt(row, nameColumn);
 			targetPathString = sourcePathString.replace(lcd, targetBaseString);
 			if (!Files.exists(Paths.get(targetPathString))) {
 				try {
@@ -1231,15 +1241,21 @@ public class Identic {
 	private void doActionDelete() {
 		String sourcePathString = "";
 		String sourceName = "";
+		
+		int actionColumn = actionTableModel.findColumn(ActionTableModel.ACTION);
+		int directoryColumn = actionTableModel.findColumn(ActionTableModel.DIRECTORY);
+		int nameColumn = actionTableModel.findColumn(ActionTableModel.NAME);
 
-		for (int row = 0; row < tableActions.getRowCount(); row++) {
-			if (!(boolean) tableActions.getValueAt(row, COLUMN_ACTION_ACTION)) {
+
+		for (int row = 0; row < actionTableModel.getRowCount(); row++) {
+			if (!(boolean) actionTableModel.getValueAt(row, actionColumn)) {
 				continue; // skip this row
 			} //
+			
 
 
-			sourcePathString = (String) tableActions.getValueAt(row, COLUMN_DIRECTORY_ACTION);
-			sourceName = (String) tableActions.getValueAt(row, COLUMN_NAME_ACTION);
+			sourcePathString = (String) actionTableModel.getValueAt(row, directoryColumn);
+			sourceName = (String) actionTableModel.getValueAt(row, nameColumn);
 			try {
 				Files.delete(Paths.get(sourcePathString, sourceName));
 				String msg = String.format("[doActionDelete] File Deleted: %s, %s", sourcePathString,
@@ -1267,6 +1283,41 @@ public class Identic {
 		} // if
 	}// doesSourceFolderExist
 
+	private String getLeastCommonDirectory(AbstractTableModel tableModel) {
+		int directoryColumn = tableModel.findColumn(ActionTableModel.DIRECTORY);
+		
+		String[] fullPathParts = new String[] {};
+		String regexString = System.getProperty("file.separator").equals("\\") ? "\\\\"
+				: System.getProperty("file.separator");
+
+		String fullPath = (String) tableModel.getValueAt(0, directoryColumn);
+		String[] baseParts = fullPath.split(regexString);
+		int matchCount = baseParts.length;
+
+		for (int i = 1; i < tableModel.getRowCount(); i++) {
+			int matchCountTemp = 0;
+			fullPath = (String) tableModel.getValueAt(i, directoryColumn);
+			fullPathParts = fullPath.split(regexString);
+			matchCount = Math.min(matchCount, fullPathParts.length);
+
+			// System.out.printf(": row %2d, %s%n", i, fullPath);
+			for (int mc = 0; mc < matchCount; mc++) {
+				if (baseParts[mc].equals(fullPathParts[mc])) {
+					matchCountTemp++;
+				} else {
+					break;
+				} // if
+			} // for mc
+			matchCount = matchCountTemp;
+		} // for - outer
+
+		StringJoiner sj = new StringJoiner(System.getProperty("file.separator"));
+		for (int i = 0; i < matchCount; i++) {
+			sj.add(fullPathParts[i]);
+		} // for
+
+		return sj.toString();
+	}// getLeastCommonDirectory
 	private String getLeastCommonDirectory(JTable table, int column) {
 		String[] fullPathParts = new String[] {};
 		String regexString = System.getProperty("file.separator").equals("\\") ? "\\\\"
@@ -2510,8 +2561,10 @@ public class Identic {
 				// newPath = originalPath.replace(lcd, targetPath);
 				// log.addInfo("New ", newPath);
 				// } // for
+				int spsColumn = actionTableModel.findColumn("Directory");
 
-				System.out.printf("[tableResults] Directory is Column %d%n", subjectTableModel.findColumn("Fred"));
+
+				System.out.printf("[testButton] Directory is Column %d%n", spsColumn);
 			}// actionPerformed
 		});
 		GridBagConstraints gbc_btnTest = new GridBagConstraints();
