@@ -11,7 +11,7 @@ import javax.swing.table.AbstractTableModel;
 	 * 
 	 *
 	 */
-	public class ActionTableModel extends AbstractTableModel {
+	public class ActionTableModel extends AbstractTableModel{ //DefaultTableModel 
 		private static final long serialVersionUID = 1L;
 		private Map<Point, Object> lookup = new HashMap<Point, Object>();
 		private int rows = 0;
@@ -59,6 +59,31 @@ import javax.swing.table.AbstractTableModel;
 			} // for
 			return row;
 		}// getRow
+		
+		public synchronized void removeRow(int row) {
+			if ( row > rows|| row < 0) {
+				return;
+			}// if row we have
+			
+			if (row ==rows-1) {
+				rows--;
+				return;
+			}// if last row
+			
+			/* move data down a row */
+			for (int r = row ;r < rows-1; r++) {
+				for (int i = 0; i < columns ; i++) {
+					lookup.put(new Point(r, i), lookup.get(new Point(r+1, i)));
+				} // for
+			}// for r
+			
+			/* remove the last row */
+			for (int i = 0; i < columns ; i++) {
+				 lookup.remove(rows,columns);
+			} // for
+			
+			rows--;
+		}//removeRow
 
 		public void addRow(Object[] values) {
 			rows++;
