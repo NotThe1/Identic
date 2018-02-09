@@ -239,7 +239,7 @@ public class Identic {
 		lstCatalogInUse.updateUI();
 	}// doCatalogLoad
 
-	private void doCatalogNew() {
+	private void doCatalogSave() {
 		if (subjectTableModel.getRowCount() == 0) {
 			JOptionPane.showMessageDialog(frmIdentic, "No Catalog has been created, by FIND");
 			return;
@@ -285,59 +285,59 @@ public class Identic {
 		return result;
 	}
 
-	private void doCatalogCombine() {
-		List<CatalogItem> catalogItems = new ArrayList<CatalogItem>();
-		try {
-			catalogItems.addAll(lstCatalogInUse.getSelectedValuesList());
-			catalogItems.addAll(lstCatalogAvailable.getSelectedValuesList());
-		} catch (Exception e) {
-			log.addError("[doCatalogCombine] failed to combine catalogs");
-		}
-		if (catalogItems.size() < 2) {
-			JOptionPane.showMessageDialog(frmIdentic, "At least Two Catalog Items need to be selected",
-					"Combine Catalog Items", JOptionPane.ERROR_MESSAGE);
-			return;
-		} // if less than two
-
-		CatalogDialog catalogDialog = CatalogDialog.makeNewCatalogDialog();
-		if (catalogDialog.showDialog() != JOptionPane.OK_OPTION) {
-			return;
-		} // if dialog OK
-
-		log.addInfo(String.format("[doCatalogCombine()] Name: %s", catalogDialog.getName()));
-		log.addInfo(String.format("Description: %s", catalogDialog.getDescription()));
-
-		ArrayList<FileStat> newCombinedFileStats = new ArrayList<FileStat>();
-
-		List<String> startingDirectorys = new ArrayList<String>(); // possibble future use
-
-		for (CatalogItem catalogItem : catalogItems) {
-			startingDirectorys.add(catalogItem.getEntryStartDirectory());// possibble future use
-			newCombinedFileStats.addAll(catalogItem.getFileStats());
-		} // for each catalogItem
-
-		CatalogItem combinedCatalogItem = new CatalogItem(catalogDialog.getName(), catalogDialog.getDescription(),
-				makeStartingDirectory(startingDirectorys), newCombinedFileStats);
-
-		try {
-			FileOutputStream fos = new FileOutputStream(
-					getApplcationWorkingDirectory() + catalogDialog.getName() + CATALOG_SUFFIX_DOT);
-			ObjectOutputStream oos = new ObjectOutputStream(fos);
-			oos.writeObject(combinedCatalogItem);
-			oos.close();
-			fos.close();
-		} catch (IOException e) {
-			String message = String.format(
-					"[Identic] doCatalogNew() failed writing catalog object%n" + "Name: %s%n Description : %n",
-					catalogDialog.getName(), catalogDialog.getDescription());
-			log.addError(message);
-			e.printStackTrace();
-		} // try
-
-		catalogDialog = null;
-		doCatalogLoad();
-
-	}// doCatalogCombine
+//	private void doCatalogCombine() {
+//		List<CatalogItem> catalogItems = new ArrayList<CatalogItem>();
+//		try {
+//			catalogItems.addAll(lstCatalogInUse.getSelectedValuesList());
+//			catalogItems.addAll(lstCatalogAvailable.getSelectedValuesList());
+//		} catch (Exception e) {
+//			log.addError("[doCatalogCombine] failed to combine catalogs");
+//		}
+//		if (catalogItems.size() < 2) {
+//			JOptionPane.showMessageDialog(frmIdentic, "At least Two Catalog Items need to be selected",
+//					"Combine Catalog Items", JOptionPane.ERROR_MESSAGE);
+//			return;
+//		} // if less than two
+//
+//		CatalogDialog catalogDialog = CatalogDialog.makeNewCatalogDialog();
+//		if (catalogDialog.showDialog() != JOptionPane.OK_OPTION) {
+//			return;
+//		} // if dialog OK
+//
+//		log.addInfo(String.format("[doCatalogCombine()] Name: %s", catalogDialog.getName()));
+//		log.addInfo(String.format("Description: %s", catalogDialog.getDescription()));
+//
+//		ArrayList<FileStat> newCombinedFileStats = new ArrayList<FileStat>();
+//
+//		List<String> startingDirectorys = new ArrayList<String>(); // possibble future use
+//
+//		for (CatalogItem catalogItem : catalogItems) {
+//			startingDirectorys.add(catalogItem.getEntryStartDirectory());// possibble future use
+//			newCombinedFileStats.addAll(catalogItem.getFileStats());
+//		} // for each catalogItem
+//
+//		CatalogItem combinedCatalogItem = new CatalogItem(catalogDialog.getName(), catalogDialog.getDescription(),
+//				makeStartingDirectory(startingDirectorys), newCombinedFileStats);
+//
+//		try {
+//			FileOutputStream fos = new FileOutputStream(
+//					getApplcationWorkingDirectory() + catalogDialog.getName() + CATALOG_SUFFIX_DOT);
+//			ObjectOutputStream oos = new ObjectOutputStream(fos);
+//			oos.writeObject(combinedCatalogItem);
+//			oos.close();
+//			fos.close();
+//		} catch (IOException e) {
+//			String message = String.format(
+//					"[Identic] doCatalogNew() failed writing catalog object%n" + "Name: %s%n Description : %n",
+//					catalogDialog.getName(), catalogDialog.getDescription());
+//			log.addError(message);
+//			e.printStackTrace();
+//		} // try
+//
+//		catalogDialog = null;
+//		doCatalogLoad();
+//
+//	}// doCatalogCombine
 
 	private String makeStartingDirectory(List<String> startingDirectorys) {// possibble future use
 		String result = "";
@@ -1409,7 +1409,7 @@ public class Identic {
 	}// doFileExit
 
 	private void appClose() {
-		Preferences myPrefs = Preferences.userNodeForPackage(Identic0.class).node(this.getClass().getSimpleName());
+		Preferences myPrefs = Preferences.userNodeForPackage(Identic.class).node(this.getClass().getSimpleName());
 		Dimension dim = frmIdentic.getSize();
 		myPrefs.putInt("Height", dim.height);
 		myPrefs.putInt("Width", dim.width);
@@ -2298,8 +2298,8 @@ public class Identic {
 		gbc_btnCatalogReload.gridy = 1;
 		panelCatalogButtons.add(btnCatalogReload, gbc_btnCatalogReload);
 
-		JButton btnCatalogNew = new JButton("New");
-		btnCatalogNew.setName(BTN_CATALOG_NEW);
+		JButton btnCatalogNew = new JButton("Save...");
+		btnCatalogNew.setName(BTN_CATALOG_SAVE);
 		btnCatalogNew.addActionListener(catalogAdapter);
 		GridBagConstraints gbc_btnCatalogNew = new GridBagConstraints();
 		gbc_btnCatalogNew.fill = GridBagConstraints.HORIZONTAL;
@@ -2308,15 +2308,15 @@ public class Identic {
 		gbc_btnCatalogNew.gridy = 3;
 		panelCatalogButtons.add(btnCatalogNew, gbc_btnCatalogNew);
 
-		JButton btnCatalogCombine = new JButton("Combine");
-		btnCatalogCombine.setName(BTN_CATALOG_COMBINE);
-		btnCatalogCombine.addActionListener(catalogAdapter);
-		GridBagConstraints gbc_btnCatalogCombine = new GridBagConstraints();
-		gbc_btnCatalogCombine.fill = GridBagConstraints.HORIZONTAL;
-		gbc_btnCatalogCombine.insets = new Insets(0, 0, 5, 0);
-		gbc_btnCatalogCombine.gridx = 1;
-		gbc_btnCatalogCombine.gridy = 5;
-		panelCatalogButtons.add(btnCatalogCombine, gbc_btnCatalogCombine);
+//		JButton btnCatalogCombine = new JButton("Combine");
+//		btnCatalogCombine.setName(BTN_CATALOG_COMBINE);
+//		btnCatalogCombine.addActionListener(catalogAdapter);
+//		GridBagConstraints gbc_btnCatalogCombine = new GridBagConstraints();
+//		gbc_btnCatalogCombine.fill = GridBagConstraints.HORIZONTAL;
+//		gbc_btnCatalogCombine.insets = new Insets(0, 0, 5, 0);
+//		gbc_btnCatalogCombine.gridx = 1;
+//		gbc_btnCatalogCombine.gridy = 5;
+//		panelCatalogButtons.add(btnCatalogCombine, gbc_btnCatalogCombine);
 
 		JButton btnCatalogImport = new JButton("Import");
 		btnCatalogImport.setName(BTN_CATALOG_IMPORT);
@@ -2705,8 +2705,8 @@ public class Identic {
 	// Catalog Constants
 	private static final String BTN_START = "btnStart";
 	private static final String BTN_CATALOG_RELOAD = "btnCatalogReload";
-	private static final String BTN_CATALOG_NEW = "btnCatalogNew";
-	private static final String BTN_CATALOG_COMBINE = "btnCatalogCombine";
+	private static final String BTN_CATALOG_SAVE = "btnCatalogSave";
+//	private static final String BTN_CATALOG_COMBINE = "btnCatalogCombine";
 	private static final String BTN_CATALOG_IMPORT = "btnCatalogImport";
 	private static final String BTN_CATALOG_EXPORT = "btnCatalogExport";
 	private static final String BTN_CATALOG_REMOVE = "btnCatalogRemove";
@@ -3325,12 +3325,12 @@ public class Identic {
 			case BTN_CATALOG_RELOAD:
 				doCatalogLoad();
 				break;
-			case BTN_CATALOG_NEW:
-				doCatalogNew();
+			case BTN_CATALOG_SAVE:
+				doCatalogSave();
 				break;
-			case BTN_CATALOG_COMBINE:
-				doCatalogCombine();
-				break;
+//			case BTN_CATALOG_COMBINE:
+//				doCatalogCombine();
+//				break;
 			case BTN_CATALOG_IMPORT:
 				doCatalogImport();
 				break;
