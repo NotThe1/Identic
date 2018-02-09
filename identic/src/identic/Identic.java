@@ -17,6 +17,7 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.FocusEvent;
 import java.awt.event.FocusListener;
+import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 import java.awt.event.WindowAdapter;
@@ -51,7 +52,6 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
-import java.util.List;
 import java.util.Map.Entry;
 import java.util.NoSuchElementException;
 import java.util.Set;
@@ -77,6 +77,7 @@ import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.JPopupMenu;
 import javax.swing.JRadioButton;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
@@ -101,9 +102,10 @@ import javax.swing.table.TableRowSorter;
 
 public class Identic {
 
-	private IdenticAdapter identicAdapter = new IdenticAdapter();
-	private ManageListsAdapter manageListsAdapter = new ManageListsAdapter();
-	private CatalogAdapter catalogAdapter = new CatalogAdapter();
+	private AdapterIdentic identicAdapter = new AdapterIdentic();
+	private AdapterManageLists manageListsAdapter = new AdapterManageLists();
+	private AdapterCatalog catalogAdapter = new AdapterCatalog();
+	private AdapterAction actionAdaper = new AdapterAction();
 
 	private AppLogger log = AppLogger.getInstance();
 
@@ -122,7 +124,7 @@ public class Identic {
 
 	private RejectTableModel rejectTableModel = new RejectTableModel();
 	private DefaultListModel<String> excludeModel = new DefaultListModel<>();
-
+	
 	private JTable resultsTable = new JTable();
 
 	private JTable actionTable = new JTable() {
@@ -176,21 +178,6 @@ public class Identic {
 		return folder;
 	}// getApplcationWorkingDirectory
 
-	// private void doTabSummary() {
-	// log.addInfo("doTabSummary()");
-	// }//doTabSummary
-	//
-	// private void doTabCatalogs() {
-	// log.addInfo("doTabCatalogs()");
-	// }// doTabCatalogs
-	//
-	// private void doTabTypes() {
-	// log.addInfo("doTabTypes()");
-	// }// doTabTypes
-	//
-	// private void doTabLog() {
-	// log.addInfo("doTabLog()");
-	// }// doTabLog
 
 	// Tab Catalog Code /////////////////////////////////////////////////////////
 	private void doCatalogLoad() {
@@ -227,10 +214,6 @@ public class Identic {
 				availableCatalogItemModel.add(catalogItem);
 				ois.close();
 				fis.close();
-				// System.out.printf("Name: %s, Desc:
-				// %s%n",catalogItem.getEntryName(),catalogItem.getEntryDescription());
-				// System.out.printf("Directory %s, %n",catalogItem.getEntryStartDirectory());
-				// System.out.printf("RowCount %s, %n",catalogItem.getSubjectTableModel().getRowCount());
 			} catch (Exception e) {
 				log.addError("[doCatalogLoad()] unable to load Catalog");
 			} // try
@@ -274,7 +257,6 @@ public class Identic {
 		} // if
 		catalogDialog = null;
 		doCatalogLoad();
-
 	}// doCatalogNew
 
 	private ArrayList<FileStat> collectFileInfo(SubjectTableModel subjectTableModel) {
@@ -283,68 +265,8 @@ public class Identic {
 			result.add(subjectTableModel.getFileStat(row));
 		} // for - row
 		return result;
-	}
+	}//collectFileInfo
 
-//	private void doCatalogCombine() {
-//		List<CatalogItem> catalogItems = new ArrayList<CatalogItem>();
-//		try {
-//			catalogItems.addAll(lstCatalogInUse.getSelectedValuesList());
-//			catalogItems.addAll(lstCatalogAvailable.getSelectedValuesList());
-//		} catch (Exception e) {
-//			log.addError("[doCatalogCombine] failed to combine catalogs");
-//		}
-//		if (catalogItems.size() < 2) {
-//			JOptionPane.showMessageDialog(frmIdentic, "At least Two Catalog Items need to be selected",
-//					"Combine Catalog Items", JOptionPane.ERROR_MESSAGE);
-//			return;
-//		} // if less than two
-//
-//		CatalogDialog catalogDialog = CatalogDialog.makeNewCatalogDialog();
-//		if (catalogDialog.showDialog() != JOptionPane.OK_OPTION) {
-//			return;
-//		} // if dialog OK
-//
-//		log.addInfo(String.format("[doCatalogCombine()] Name: %s", catalogDialog.getName()));
-//		log.addInfo(String.format("Description: %s", catalogDialog.getDescription()));
-//
-//		ArrayList<FileStat> newCombinedFileStats = new ArrayList<FileStat>();
-//
-//		List<String> startingDirectorys = new ArrayList<String>(); // possibble future use
-//
-//		for (CatalogItem catalogItem : catalogItems) {
-//			startingDirectorys.add(catalogItem.getEntryStartDirectory());// possibble future use
-//			newCombinedFileStats.addAll(catalogItem.getFileStats());
-//		} // for each catalogItem
-//
-//		CatalogItem combinedCatalogItem = new CatalogItem(catalogDialog.getName(), catalogDialog.getDescription(),
-//				makeStartingDirectory(startingDirectorys), newCombinedFileStats);
-//
-//		try {
-//			FileOutputStream fos = new FileOutputStream(
-//					getApplcationWorkingDirectory() + catalogDialog.getName() + CATALOG_SUFFIX_DOT);
-//			ObjectOutputStream oos = new ObjectOutputStream(fos);
-//			oos.writeObject(combinedCatalogItem);
-//			oos.close();
-//			fos.close();
-//		} catch (IOException e) {
-//			String message = String.format(
-//					"[Identic] doCatalogNew() failed writing catalog object%n" + "Name: %s%n Description : %n",
-//					catalogDialog.getName(), catalogDialog.getDescription());
-//			log.addError(message);
-//			e.printStackTrace();
-//		} // try
-//
-//		catalogDialog = null;
-//		doCatalogLoad();
-//
-//	}// doCatalogCombine
-
-	private String makeStartingDirectory(List<String> startingDirectorys) {// possibble future use
-		String result = "";
-		result = startingDirectorys.get(0);
-
-		return result;
-	}// makeStartingDirectory
 
 	private void doCatalogImport() {
 		JFileChooser chooser = new JFileChooser();
@@ -405,12 +327,6 @@ public class Identic {
 			e.printStackTrace();
 		} // try
 		catalogItem.entryName = oldName;
-
-		// System.out.println("You chose to open this file: " + chooser.getSelectedFile().getName());
-		// System.out.println("I chose to open this file: " + absolutePath);
-		// System.out.printf("lstCatAvailable.getSelectedValue() =
-		// %s%n",lstCatAvailable.getSelectedValue().getEntryName());
-
 	}// doCatalogExport
 
 	private void doCatalogRemove() {
@@ -677,18 +593,6 @@ public class Identic {
 			availableListsModel.addElement(file.getName().replace(LIST_SUFFIX_DOT, EMPTY_STRING));
 		} // for - file
 
-		// lblStatusTypeList.setText(arg0);
-
-		// cboTypeLists.setModel(typeListModel);
-
-		// Preferences myPrefs = Preferences.userNodeForPackage(Identic.class).node(this.getClass().getSimpleName());
-		// cboTypeLists.setSelectedItem(myPrefs.get("ActiveList", "Pictures"));
-		// listFileTypes.setModel(typeListModel);
-		// myPrefs = null;
-
-		// cboTypeLists.
-
-		// lblStatus.setText(url.getPath());
 	}// initFileTypes
 
 	private void doSourceFolder() {
@@ -705,8 +609,6 @@ public class Identic {
 
 	private void doStart() {
 		initialiseFind();
-		// btnSummaryExcluded.setVisble(cbSaveExcludedFiles.isSelected());
-
 		Date startTime = log.addTimeStamp("Start :");
 
 		if (rbNoCatalog.isSelected()) {
@@ -824,10 +726,6 @@ public class Identic {
 		qSubjects.clear();
 		qRejects.clear();
 
-		// fileCount = 0;
-		// folderCount = 0;
-		// subjectCount = 0;
-		// rejectCount = 0;
 		excludeModel.clear();
 		hashCounts.clear();
 		subjectTableModel.clear();
@@ -870,10 +768,8 @@ public class Identic {
 		} // for - entry
 
 		int totalFileCount = totalCountOfExcludedFiles + subjectTableModel.getRowCount();
-		// setButtonLabel(btnSummaryTotal, totalFileCount);
 		lblTotalFiles.setText(String.format("%,d  Total Files", totalFileCount));
 		setButtonLabel(btnSummaryExcluded, totalCountOfExcludedFiles);
-		// setButtonLabel(btnSummaryExcludedTypes, excludedFileTypes.size());
 		setButtonLabel(btnSummaryTargets, subjectTableModel.getRowCount());
 
 		int filesWithNoDups = 0;
@@ -1002,10 +898,8 @@ public class Identic {
 				setSubjectColumns();
 
 			} // if
-
 			break;
 		default:
-
 			log.addError("[doShowResults] Bad button name - " + buttonName);
 		}// switch - button name
 
@@ -1036,8 +930,6 @@ public class Identic {
 				tc.setMaxWidth(40);
 				break;
 			}// switch
-				// tc.setPreferredWidth(20);
-				// tc.sizeWidthToFit();
 		} // for each column
 	}// setSubjectColumns
 
@@ -1069,8 +961,6 @@ public class Identic {
 				tc.setMaxWidth(40);
 				break;
 			}// switch
-				// tc.setPreferredWidth(20);
-				// tc.sizeWidthToFit();
 		} // for each column
 	}// setSubjectColumns
 
@@ -1141,50 +1031,6 @@ public class Identic {
 
 	}// doActionLoadResults
 
-	// private void doActionCopy() {
-	// if (!doesFolderExist()) {
-	// return;
-	// } // if
-	// String lcd = getLeastCommonDirectory(actionTableModel);
-	// String targetBaseString = lblSourceFolder.getText();
-	// String sourcePathString = "";
-	// String targetPathString = "";
-	// String sourceName = "";
-	//
-	// int actionColumn = actionTableModel.findColumn(ActionTableModel.ACTION);
-	// int directoryColumn = actionTableModel.findColumn(ActionTableModel.DIRECTORY);
-	// int nameColumn = actionTableModel.findColumn(ActionTableModel.NAME);
-	//
-	// for (int row = 0; row < actionTableModel.getRowCount(); row++) {
-	// if (!(boolean) actionTableModel.getValueAt(row, actionColumn)) {
-	// continue; // skip this row
-	// } //
-	// sourcePathString = (String) actionTableModel.getValueAt(row, directoryColumn);
-	// sourceName = (String) actionTableModel.getValueAt(row, nameColumn);
-	// targetPathString = sourcePathString.replace(lcd, targetBaseString);
-	// if (!Files.exists(Paths.get(targetPathString))) {
-	// try {
-	// Files.createDirectory(Paths.get(targetPathString));
-	// } catch (IOException e) {
-	// // TODO Auto-generated catch block
-	// e.printStackTrace();
-	// } // try
-	// } // if directory does not exist
-	//
-	// try {
-	// Files.copy(Paths.get(sourcePathString, sourceName), Paths.get(targetPathString, sourceName));
-	// String msg = String.format("[doActionCopy] copied : %s, %s", targetPathString, sourceName);
-	// log.addInfo(msg);
-	// } catch (FileAlreadyExistsException ex) {
-	// String msg = String.format("[doActionCopy] File Already Exists: %s, %s", targetPathString, sourceName);
-	// log.addInfo(msg);
-	// } catch (IOException e) {
-	// String msg = String.format("[doActionCopy] Failed Copy: %s, %s", targetPathString, sourceName);
-	// log.addError(msg, e.getMessage());
-	// } // try
-	// } //
-	//
-	// }// doActionCopy
 
 	private void makeFolder(Path path) {
 		if (path.equals(path.getRoot())) {
@@ -1208,6 +1054,24 @@ public class Identic {
 
 		return;
 	}// makeFolder
+	
+	private void doActionMultiSelect() {
+		doActionBulkSelection(true);
+	}//doActionMultiSelect
+	
+	private void doActionMultiDeselect() {
+		doActionBulkSelection(false);
+	}//doActionMultiSelect
+	
+	private void doActionBulkSelection(boolean state) {
+		int[] selectedRows = actionTable.getSelectedRows();
+		int column = actionTableModel.findColumn("Action");
+		for (int row = 0; row < selectedRows.length;row++) {
+			actionTable.setValueAt(state, selectedRows[row], column);
+		}//for each selected row
+//		actionTable.clearSelection();
+		actionTable.updateUI();
+	}//doActionBulkSelection
 
 	private void doActionMoveCopy(String action) {
 		if (!doesFolderExist()) {
@@ -1300,7 +1164,6 @@ public class Identic {
 			} // try delete
 		} // for rows
 		removeRows(rowsToRemove, actionTable,actionTableModel);
-//		actionTable.updateUI();
 	}// doActionDelete
 
 	private void removeRows(LinkedList<Integer> rows,JTable table, ActionTableModel tableModel) {
@@ -1367,39 +1230,39 @@ public class Identic {
 		return sj.toString();
 	}// getLeastCommonDirectory
 
-	private String getLeastCommonDirectory(JTable table, int column) {
-		String[] fullPathParts = new String[] {};
-		String regexString = System.getProperty("file.separator").equals("\\") ? "\\\\"
-				: System.getProperty("file.separator");
-
-		String fullPath = (String) table.getValueAt(0, column);
-		String[] baseParts = fullPath.split(regexString);
-		int matchCount = baseParts.length;
-
-		for (int i = 1; i < resultsTable.getRowCount(); i++) {
-			int matchCountTemp = 0;
-			fullPath = (String) resultsTable.getValueAt(i, 1);
-			fullPathParts = fullPath.split(regexString);
-			matchCount = Math.min(matchCount, fullPathParts.length);
-
-			// System.out.printf(": row %2d, %s%n", i, fullPath);
-			for (int mc = 0; mc < matchCount; mc++) {
-				if (baseParts[mc].equals(fullPathParts[mc])) {
-					matchCountTemp++;
-				} else {
-					break;
-				} // if
-			} // for mc
-			matchCount = matchCountTemp;
-		} // for - outer
-
-		StringJoiner sj = new StringJoiner(System.getProperty("file.separator"));
-		for (int i = 0; i < matchCount; i++) {
-			sj.add(fullPathParts[i]);
-		} // for
-
-		return sj.toString();
-	}// getLeastCommonDirectory
+//	private String getLeastCommonDirectory(JTable table, int column) {
+//		String[] fullPathParts = new String[] {};
+//		String regexString = System.getProperty("file.separator").equals("\\") ? "\\\\"
+//				: System.getProperty("file.separator");
+//
+//		String fullPath = (String) table.getValueAt(0, column);
+//		String[] baseParts = fullPath.split(regexString);
+//		int matchCount = baseParts.length;
+//
+//		for (int i = 1; i < resultsTable.getRowCount(); i++) {
+//			int matchCountTemp = 0;
+//			fullPath = (String) resultsTable.getValueAt(i, 1);
+//			fullPathParts = fullPath.split(regexString);
+//			matchCount = Math.min(matchCount, fullPathParts.length);
+//
+//			// System.out.printf(": row %2d, %s%n", i, fullPath);
+//			for (int mc = 0; mc < matchCount; mc++) {
+//				if (baseParts[mc].equals(fullPathParts[mc])) {
+//					matchCountTemp++;
+//				} else {
+//					break;
+//				} // if
+//			} // for mc
+//			matchCount = matchCountTemp;
+//		} // for - outer
+//
+//		StringJoiner sj = new StringJoiner(System.getProperty("file.separator"));
+//		for (int i = 0; i < matchCount; i++) {
+//			sj.add(fullPathParts[i]);
+//		} // for
+//
+//		return sj.toString();
+//	}// getLeastCommonDirectory
 
 	// Swing code ///////////////////////////////////////////////////////////////
 
@@ -1520,7 +1383,8 @@ public class Identic {
 		loadTargetList();
 		TableColumnManager tcmResults = new TableColumnManager(resultsTable);
 		
-//		actionTable.setRowSelectionAllowed(true);
+//		actionSelectionModel =	actionTable.getSelectionModel();
+//		actionSelectionModel.addListSelectionListener(actionAdaper);
 
 		// TableColumnManager tcmResults = new TableColumnManager(tableResults);
 
@@ -1945,12 +1809,32 @@ public class Identic {
 		panelRightActions.setLayout(gbl_panelRightActions);
 
 		JScrollPane scrollPaneActions = new JScrollPane();
+		
+		
 		scrollPaneActions.setViewportView(actionTable);
 		GridBagConstraints gbc_scrollPaneActions = new GridBagConstraints();
 		gbc_scrollPaneActions.fill = GridBagConstraints.BOTH;
 		gbc_scrollPaneActions.gridx = 0;
 		gbc_scrollPaneActions.gridy = 0;
 		panelRightActions.add(scrollPaneActions, gbc_scrollPaneActions);
+		popupActions = new JPopupMenu();
+		addPopup(actionTable, popupActions);
+
+		
+		JMenuItem mnuPopupActionsSelect = new JMenuItem("Select");
+		mnuPopupActionsSelect.setName(PUM_SELECT);
+		mnuPopupActionsSelect.setActionCommand(PUM_SELECT);
+		mnuPopupActionsSelect.addActionListener(actionAdaper);
+		popupActions.add(mnuPopupActionsSelect);
+		
+		JMenuItem mnuPopupActionsDeselect = new JMenuItem("Deselect");
+		mnuPopupActionsDeselect.setName(PUM_DESELECT);
+		mnuPopupActionsDeselect.setActionCommand(PUM_DESELECT);
+		mnuPopupActionsDeselect.addActionListener(actionAdaper);
+		popupActions.add(mnuPopupActionsDeselect);
+		
+		
+		
 		tabActions.setDividerLocation(200);
 
 		JPanel tabTypes = new JPanel();
@@ -2673,6 +2557,7 @@ public class Identic {
 	private static final String TAB_LOG = "tabLog";
 
 	private static final String MNU_FILE_EXIT = "mnuFileExit";
+	
 	private static final String BTN_SOURCE_FOLDER = "btnSourceFolder";
 	private static final String BTN_TARGET_FOLDER = "btnTargetFolder";
 
@@ -2738,6 +2623,11 @@ public class Identic {
 	private static final String RB_AC_UNIQUE = "Unique Files";
 	private static final String RB_AC_DUPLICATES = "Duplicate Files";
 
+	private static final String PUM_SELECT = "popupActionsSelect";
+	private static final String PUM_DESELECT = "popupActionsDeselect";
+
+	
+
 	// members
 	private JFrame frmIdentic;
 	private JSplitPane splitPaneMain;
@@ -2776,6 +2666,7 @@ public class Identic {
 	private JRadioButton rbLoadDistinctFiles;
 	private JRadioButton rbLoadUniqueFiles;
 	private JRadioButton rbLoadHaveDuplicates;
+	private JPopupMenu popupActions;
 	// private JList lstCatalogInUse;
 	// private JList lstCatalogAvailable;
 
@@ -3147,7 +3038,7 @@ public class Identic {
 		////////////////////////////////////////// ]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]
 
 	// Classes of Adapters ////////////////////////////////////////////////////////////////
-	class IdenticAdapter implements ActionListener {// , ListSelectionListener , ChangeListener
+	class AdapterIdentic implements ActionListener {// , ListSelectionListener , ChangeListener
 
 		@Override
 		public void actionPerformed(ActionEvent actionEvent) {
@@ -3227,7 +3118,7 @@ public class Identic {
 
 	////////////////////////////////////////////////////////////////
 
-	class ManageListsAdapter implements ActionListener, MouseListener, FocusListener, ListSelectionListener {
+	class AdapterManageLists implements ActionListener, MouseListener, FocusListener, ListSelectionListener {
 
 		@Override
 		public void actionPerformed(ActionEvent actionEvent) {
@@ -3317,7 +3208,7 @@ public class Identic {
 
 	////////////////////////////////////////////////////////////////
 
-	class CatalogAdapter implements ActionListener, ListSelectionListener {
+	class AdapterCatalog implements ActionListener, ListSelectionListener {
 		@Override
 		public void actionPerformed(ActionEvent actionEvent) {
 			String name = ((Component) actionEvent.getSource()).getName();
@@ -3349,5 +3240,47 @@ public class Identic {
 		}// valueChanged
 
 	}// class CatalogAdapter
+	
+	////////////////////////////////////////////////////////////////
 
+	class AdapterAction implements ActionListener{// , ListSelectionListener
+
+
+		@Override
+		public void actionPerformed(ActionEvent actionEvent) {
+			String name = ((Component) actionEvent.getSource()).getName();
+			switch(name){
+				case PUM_SELECT:
+					doActionMultiSelect();
+					break;
+				case PUM_DESELECT:
+					doActionMultiDeselect();
+					break;
+			}//switch
+			
+		}//actionPerformed
+		
+	}//class AdapterAction
+	
+
+	
+	private static void addPopup(Component component, final JPopupMenu popup) {
+		component.addMouseListener(new MouseAdapter() {
+			public void mousePressed(MouseEvent e) {
+				if (e.isPopupTrigger()) {
+					showMenu(e);
+				}// if popup Trigger
+			}
+			public void mouseReleased(MouseEvent e) {
+				if (e.isPopupTrigger()) {
+					showMenu(e);
+				}
+			}
+			private void showMenu(MouseEvent e) {
+				popup.show(e.getComponent(), e.getX(), e.getY());
+			}
+		});
+	}//addPopup
+	
+	
 }// class Identic
