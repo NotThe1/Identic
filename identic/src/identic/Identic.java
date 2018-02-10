@@ -2699,7 +2699,8 @@ public class Identic {
 
 		class MyWalker implements FileVisitor<Path> {
 			Pattern patternSubjects = Pattern.compile(targetListRegex);
-			Pattern patternFileType = Pattern.compile("\\.(.+$)");
+//			Pattern patternFileType = Pattern.compile("\\.(.+$)");
+			Pattern patternFileType = Pattern.compile("\\.([^.]+$)");
 			Matcher matcher;
 
 			@Override
@@ -2805,7 +2806,7 @@ public class Identic {
 				while ((bytesRead = inputStream.read(bytesBuffer)) != -1) {
 					digest.update(bytesBuffer, 0, bytesRead);
 				} // while
-
+				inputStream.close();
 				byte[] hashedBytes = digest.digest();
 
 				return convertByteArrayToHexString(hashedBytes);
