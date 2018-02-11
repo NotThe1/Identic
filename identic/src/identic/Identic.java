@@ -48,6 +48,7 @@ import java.security.NoSuchAlgorithmException;
 import java.text.MessageFormat;
 import java.util.AbstractSet;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -55,7 +56,9 @@ import java.util.LinkedList;
 import java.util.Map.Entry;
 import java.util.NoSuchElementException;
 import java.util.Set;
+import java.util.SortedSet;
 import java.util.StringJoiner;
+import java.util.TreeSet;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.prefs.Preferences;
 import java.util.regex.Matcher;
@@ -124,7 +127,7 @@ public class Identic {
 
 	private RejectTableModel rejectTableModel = new RejectTableModel();
 	private DefaultListModel<String> excludeModel = new DefaultListModel<>();
-	
+
 	private JTable resultsTable = new JTable();
 
 	private JTable actionTable = new JTable() {
@@ -177,7 +180,6 @@ public class Identic {
 		folder = folder.replace("Temp", "Identic");
 		return folder;
 	}// getApplcationWorkingDirectory
-
 
 	// Tab Catalog Code /////////////////////////////////////////////////////////
 	private void doCatalogLoad() {
@@ -265,8 +267,7 @@ public class Identic {
 			result.add(subjectTableModel.getFileStat(row));
 		} // for - row
 		return result;
-	}//collectFileInfo
-
+	}// collectFileInfo
 
 	private void doCatalogImport() {
 		JFileChooser chooser = new JFileChooser();
@@ -609,25 +610,24 @@ public class Identic {
 
 	private void doStart() {
 		initialiseFind();
+		log.addNL();
 		Date startTime = log.addTimeStamp("Start :");
 
 		if (rbNoCatalog.isSelected()) {
-			log.addInfo(" doStartNoCatalogs()");
-			log.addInfo(lblSourceFolder.getText());
+			log.addInfo("Start - No Catalogs");
 			doStartNoCatalog();
 		} else if (rbWithCatalog.isSelected()) {
 			if (!isCatalogSelected()) {
 				return;
 			} // if catalog selected
-			log.addInfo(" doStartWithCatalogs()");
-			log.addInfo(lblSourceFolder.getText());
+			log.addInfo("Start - With Catalogs");
 			doStartOnlyCatalogs();
 			doStartNoCatalog();
 		} else if (rbOnlyCatalogs.isSelected()) {
 			if (!isCatalogSelected()) {
 				return;
 			} // if catalog selected
-			log.addInfo(" doStartNoCatalogs()");
+			log.addInfo("Start - OnlyCatalogs");
 			cbSaveExcludedFiles.setSelected(false);
 			doStartOnlyCatalogs();
 		} // if start type
@@ -660,6 +660,9 @@ public class Identic {
 					JOptionPane.DEFAULT_OPTION, JOptionPane.ERROR_MESSAGE);
 			return;
 		} // if starting folder not there
+		
+		log.addInfo("Starting Folder:");
+		log.addInfo("     " + lblSourceFolder.getText());
 
 		IdentifySubjects identifySubjects = new IdentifySubjects();
 		Thread threadIdentify = new Thread(identifySubjects);
@@ -691,6 +694,15 @@ public class Identic {
 	}// doStartNoCatalog
 
 	private void doStartOnlyCatalogs() {
+		log.addInfo("Catalogs:");
+		CatalogItem catalogItem;
+		for (int i = 0; i < inUseCatalogItemModel.getSize(); i++) {
+			 catalogItem = inUseCatalogItemModel.get(i);
+			 log.addInfo("     " + catalogItem.getEntryName());
+			System.out.println(catalogItem.getEntryName());
+		} // for - each catalog Item
+
+		
 		GatherFromCatalogs gatherFromCatalogs = new GatherFromCatalogs();
 		Thread threadGather = new Thread(gatherFromCatalogs);
 		threadGather.start();
@@ -1031,7 +1043,6 @@ public class Identic {
 
 	}// doActionLoadResults
 
-
 	private void makeFolder(Path path) {
 		if (path.equals(path.getRoot())) {
 			return;
@@ -1054,24 +1065,24 @@ public class Identic {
 
 		return;
 	}// makeFolder
-	
+
 	private void doActionMultiSelect() {
 		doActionBulkSelection(true);
-	}//doActionMultiSelect
-	
+	}// doActionMultiSelect
+
 	private void doActionMultiDeselect() {
 		doActionBulkSelection(false);
-	}//doActionMultiSelect
-	
+	}// doActionMultiSelect
+
 	private void doActionBulkSelection(boolean state) {
 		int[] selectedRows = actionTable.getSelectedRows();
 		int column = actionTableModel.findColumn("Action");
-		for (int row = 0; row < selectedRows.length;row++) {
+		for (int row = 0; row < selectedRows.length; row++) {
 			actionTable.setValueAt(state, selectedRows[row], column);
-		}//for each selected row
-//		actionTable.clearSelection();
+		} // for each selected row
+		// actionTable.clearSelection();
 		actionTable.updateUI();
-	}//doActionBulkSelection
+	}// doActionBulkSelection
 
 	private void doActionMoveCopy(String action) {
 		if (!doesFolderExist()) {
@@ -1122,7 +1133,7 @@ public class Identic {
 			} // try
 		} // for row
 		if (action.equals(BTN_ACTION_MOVE)) {
-			removeRows(rowsToRemove, actionTable,actionTableModel);
+			removeRows(rowsToRemove, actionTable, actionTableModel);
 			actionTable.updateUI();
 		} // if move
 
@@ -1131,6 +1142,7 @@ public class Identic {
 	private void doActionDelete() {
 		String sourcePathString = "";
 		String sourceName = "";
+		SortedSet<String> targetFolders = new TreeSet<String>(Collections.reverseOrder());
 
 		int actionColumn = actionTableModel.findColumn(ActionTableModel.ACTION);
 		int directoryColumn = actionTableModel.findColumn(ActionTableModel.DIRECTORY);
@@ -1146,6 +1158,7 @@ public class Identic {
 			sourceName = (String) actionTableModel.getValueAt(row, nameColumn);
 			try {
 				Files.delete(Paths.get(sourcePathString, sourceName));
+				targetFolders.add(sourcePathString);
 				String msg = String.format("[doActionDelete] File Deleted: %s, %s", sourcePathString, sourceName);
 				rowsToRemove.addFirst(row);
 				log.addInfo(msg);
@@ -1163,24 +1176,43 @@ public class Identic {
 				e.printStackTrace();
 			} // try delete
 		} // for rows
-		removeRows(rowsToRemove, actionTable,actionTableModel);
+		removeRows(rowsToRemove, actionTable, actionTableModel);
+		removeEmptyFolders(targetFolders);
 	}// doActionDelete
 
-	private void removeRows(LinkedList<Integer> rows,JTable table, ActionTableModel tableModel) {
+	private void removeEmptyFolders(SortedSet<String> targetFolders) {
+		java.io.File target;
+		for (String folder : targetFolders) {
+
+			target = new File(folder);
+			if (!target.exists() || !target.isDirectory()) {
+				continue;
+			} // if only want directories that really are there
+
+			if (target.list().length == 0) {
+				log.addInfo("Remove " + folder);
+				target.delete();
+			} // if empty remove
+		} // for
+
+	}// removeEmptyFolders
+
+	private void removeRows(LinkedList<Integer> rows, JTable table, ActionTableModel tableModel) {
 		int row;
 		String msg;
-		msg= String.format("[Before] Table: %d, Model %d",actionTable.getRowCount(),tableModel.getRowCount());
+		msg = String.format("[Before] Table: %d, Model %d", actionTable.getRowCount(), tableModel.getRowCount());
 		log.addSpecial(msg);
 		while (!rows.isEmpty()) {
 			row = rows.poll();
 			tableModel.removeRow(row);
 		} // while
-		
+
 		table.setModel(new ActionTableModel());
-		table.setModel(actionTableModel);	
+		table.setModel(actionTableModel);
+setActionColumns();
 		table.updateUI();
 
-		msg= String.format("[After] Table: %d, Model %d",actionTable.getRowCount(),tableModel.getRowCount());
+		msg = String.format("[After] Table: %d, Model %d", actionTable.getRowCount(), tableModel.getRowCount());
 		log.addSpecial(msg);
 
 	}// removeRows
@@ -1230,39 +1262,39 @@ public class Identic {
 		return sj.toString();
 	}// getLeastCommonDirectory
 
-//	private String getLeastCommonDirectory(JTable table, int column) {
-//		String[] fullPathParts = new String[] {};
-//		String regexString = System.getProperty("file.separator").equals("\\") ? "\\\\"
-//				: System.getProperty("file.separator");
-//
-//		String fullPath = (String) table.getValueAt(0, column);
-//		String[] baseParts = fullPath.split(regexString);
-//		int matchCount = baseParts.length;
-//
-//		for (int i = 1; i < resultsTable.getRowCount(); i++) {
-//			int matchCountTemp = 0;
-//			fullPath = (String) resultsTable.getValueAt(i, 1);
-//			fullPathParts = fullPath.split(regexString);
-//			matchCount = Math.min(matchCount, fullPathParts.length);
-//
-//			// System.out.printf(": row %2d, %s%n", i, fullPath);
-//			for (int mc = 0; mc < matchCount; mc++) {
-//				if (baseParts[mc].equals(fullPathParts[mc])) {
-//					matchCountTemp++;
-//				} else {
-//					break;
-//				} // if
-//			} // for mc
-//			matchCount = matchCountTemp;
-//		} // for - outer
-//
-//		StringJoiner sj = new StringJoiner(System.getProperty("file.separator"));
-//		for (int i = 0; i < matchCount; i++) {
-//			sj.add(fullPathParts[i]);
-//		} // for
-//
-//		return sj.toString();
-//	}// getLeastCommonDirectory
+	// private String getLeastCommonDirectory(JTable table, int column) {
+	// String[] fullPathParts = new String[] {};
+	// String regexString = System.getProperty("file.separator").equals("\\") ? "\\\\"
+	// : System.getProperty("file.separator");
+	//
+	// String fullPath = (String) table.getValueAt(0, column);
+	// String[] baseParts = fullPath.split(regexString);
+	// int matchCount = baseParts.length;
+	//
+	// for (int i = 1; i < resultsTable.getRowCount(); i++) {
+	// int matchCountTemp = 0;
+	// fullPath = (String) resultsTable.getValueAt(i, 1);
+	// fullPathParts = fullPath.split(regexString);
+	// matchCount = Math.min(matchCount, fullPathParts.length);
+	//
+	// // System.out.printf(": row %2d, %s%n", i, fullPath);
+	// for (int mc = 0; mc < matchCount; mc++) {
+	// if (baseParts[mc].equals(fullPathParts[mc])) {
+	// matchCountTemp++;
+	// } else {
+	// break;
+	// } // if
+	// } // for mc
+	// matchCount = matchCountTemp;
+	// } // for - outer
+	//
+	// StringJoiner sj = new StringJoiner(System.getProperty("file.separator"));
+	// for (int i = 0; i < matchCount; i++) {
+	// sj.add(fullPathParts[i]);
+	// } // for
+	//
+	// return sj.toString();
+	// }// getLeastCommonDirectory
 
 	// Swing code ///////////////////////////////////////////////////////////////
 
@@ -1382,9 +1414,9 @@ public class Identic {
 		doCatalogLoad();
 		loadTargetList();
 		TableColumnManager tcmResults = new TableColumnManager(resultsTable);
-		
-//		actionSelectionModel =	actionTable.getSelectionModel();
-//		actionSelectionModel.addListSelectionListener(actionAdaper);
+
+		// actionSelectionModel = actionTable.getSelectionModel();
+		// actionSelectionModel.addListSelectionListener(actionAdaper);
 
 		// TableColumnManager tcmResults = new TableColumnManager(tableResults);
 
@@ -1809,8 +1841,7 @@ public class Identic {
 		panelRightActions.setLayout(gbl_panelRightActions);
 
 		JScrollPane scrollPaneActions = new JScrollPane();
-		
-		
+
 		scrollPaneActions.setViewportView(actionTable);
 		GridBagConstraints gbc_scrollPaneActions = new GridBagConstraints();
 		gbc_scrollPaneActions.fill = GridBagConstraints.BOTH;
@@ -1820,21 +1851,18 @@ public class Identic {
 		popupActions = new JPopupMenu();
 		addPopup(actionTable, popupActions);
 
-		
 		JMenuItem mnuPopupActionsSelect = new JMenuItem("Select");
 		mnuPopupActionsSelect.setName(PUM_SELECT);
 		mnuPopupActionsSelect.setActionCommand(PUM_SELECT);
 		mnuPopupActionsSelect.addActionListener(actionAdaper);
 		popupActions.add(mnuPopupActionsSelect);
-		
+
 		JMenuItem mnuPopupActionsDeselect = new JMenuItem("Deselect");
 		mnuPopupActionsDeselect.setName(PUM_DESELECT);
 		mnuPopupActionsDeselect.setActionCommand(PUM_DESELECT);
 		mnuPopupActionsDeselect.addActionListener(actionAdaper);
 		popupActions.add(mnuPopupActionsDeselect);
-		
-		
-		
+
 		tabActions.setDividerLocation(200);
 
 		JPanel tabTypes = new JPanel();
@@ -2192,15 +2220,15 @@ public class Identic {
 		gbc_btnCatalogNew.gridy = 3;
 		panelCatalogButtons.add(btnCatalogNew, gbc_btnCatalogNew);
 
-//		JButton btnCatalogCombine = new JButton("Combine");
-//		btnCatalogCombine.setName(BTN_CATALOG_COMBINE);
-//		btnCatalogCombine.addActionListener(catalogAdapter);
-//		GridBagConstraints gbc_btnCatalogCombine = new GridBagConstraints();
-//		gbc_btnCatalogCombine.fill = GridBagConstraints.HORIZONTAL;
-//		gbc_btnCatalogCombine.insets = new Insets(0, 0, 5, 0);
-//		gbc_btnCatalogCombine.gridx = 1;
-//		gbc_btnCatalogCombine.gridy = 5;
-//		panelCatalogButtons.add(btnCatalogCombine, gbc_btnCatalogCombine);
+		// JButton btnCatalogCombine = new JButton("Combine");
+		// btnCatalogCombine.setName(BTN_CATALOG_COMBINE);
+		// btnCatalogCombine.addActionListener(catalogAdapter);
+		// GridBagConstraints gbc_btnCatalogCombine = new GridBagConstraints();
+		// gbc_btnCatalogCombine.fill = GridBagConstraints.HORIZONTAL;
+		// gbc_btnCatalogCombine.insets = new Insets(0, 0, 5, 0);
+		// gbc_btnCatalogCombine.gridx = 1;
+		// gbc_btnCatalogCombine.gridy = 5;
+		// panelCatalogButtons.add(btnCatalogCombine, gbc_btnCatalogCombine);
 
 		JButton btnCatalogImport = new JButton("Import");
 		btnCatalogImport.setName(BTN_CATALOG_IMPORT);
@@ -2557,7 +2585,7 @@ public class Identic {
 	private static final String TAB_LOG = "tabLog";
 
 	private static final String MNU_FILE_EXIT = "mnuFileExit";
-	
+
 	private static final String BTN_SOURCE_FOLDER = "btnSourceFolder";
 	private static final String BTN_TARGET_FOLDER = "btnTargetFolder";
 
@@ -2591,7 +2619,7 @@ public class Identic {
 	private static final String BTN_START = "btnStart";
 	private static final String BTN_CATALOG_RELOAD = "btnCatalogReload";
 	private static final String BTN_CATALOG_SAVE = "btnCatalogSave";
-//	private static final String BTN_CATALOG_COMBINE = "btnCatalogCombine";
+	// private static final String BTN_CATALOG_COMBINE = "btnCatalogCombine";
 	private static final String BTN_CATALOG_IMPORT = "btnCatalogImport";
 	private static final String BTN_CATALOG_EXPORT = "btnCatalogExport";
 	private static final String BTN_CATALOG_REMOVE = "btnCatalogRemove";
@@ -2625,8 +2653,6 @@ public class Identic {
 
 	private static final String PUM_SELECT = "popupActionsSelect";
 	private static final String PUM_DESELECT = "popupActionsDeselect";
-
-	
 
 	// members
 	private JFrame frmIdentic;
@@ -2699,7 +2725,7 @@ public class Identic {
 
 		class MyWalker implements FileVisitor<Path> {
 			Pattern patternSubjects = Pattern.compile(targetListRegex);
-//			Pattern patternFileType = Pattern.compile("\\.(.+$)");
+			// Pattern patternFileType = Pattern.compile("\\.(.+$)");
 			Pattern patternFileType = Pattern.compile("\\.([^.]+$)");
 			Matcher matcher;
 
@@ -2914,7 +2940,7 @@ public class Identic {
 			for (int i = 0; i < inUseCatalogItemModel.getSize(); i++) {
 				catalogItem = inUseCatalogItemModel.get(i);
 				qHashes.addAll(catalogItem.getFileStats());
-				System.out.println(catalogItem.getEntryName());
+//				System.out.println(catalogItem.getEntryName());
 			} // for - each catalog Item
 		}// run
 	}// class GatherFromCatalogs
@@ -3220,9 +3246,9 @@ public class Identic {
 			case BTN_CATALOG_SAVE:
 				doCatalogSave();
 				break;
-//			case BTN_CATALOG_COMBINE:
-//				doCatalogCombine();
-//				break;
+			// case BTN_CATALOG_COMBINE:
+			// doCatalogCombine();
+			// break;
 			case BTN_CATALOG_IMPORT:
 				doCatalogImport();
 				break;
@@ -3241,47 +3267,45 @@ public class Identic {
 		}// valueChanged
 
 	}// class CatalogAdapter
-	
+
 	////////////////////////////////////////////////////////////////
 
-	class AdapterAction implements ActionListener{// , ListSelectionListener
-
+	class AdapterAction implements ActionListener {// , ListSelectionListener
 
 		@Override
 		public void actionPerformed(ActionEvent actionEvent) {
 			String name = ((Component) actionEvent.getSource()).getName();
-			switch(name){
-				case PUM_SELECT:
-					doActionMultiSelect();
-					break;
-				case PUM_DESELECT:
-					doActionMultiDeselect();
-					break;
-			}//switch
-			
-		}//actionPerformed
-		
-	}//class AdapterAction
-	
+			switch (name) {
+			case PUM_SELECT:
+				doActionMultiSelect();
+				break;
+			case PUM_DESELECT:
+				doActionMultiDeselect();
+				break;
+			}// switch
 
-	
+		}// actionPerformed
+
+	}// class AdapterAction
+
 	private static void addPopup(Component component, final JPopupMenu popup) {
 		component.addMouseListener(new MouseAdapter() {
 			public void mousePressed(MouseEvent e) {
 				if (e.isPopupTrigger()) {
 					showMenu(e);
-				}// if popup Trigger
+				} // if popup Trigger
 			}
+
 			public void mouseReleased(MouseEvent e) {
 				if (e.isPopupTrigger()) {
 					showMenu(e);
 				}
 			}
+
 			private void showMenu(MouseEvent e) {
 				popup.show(e.getComponent(), e.getX(), e.getY());
 			}
 		});
-	}//addPopup
-	
-	
+	}// addPopup
+
 }// class Identic
