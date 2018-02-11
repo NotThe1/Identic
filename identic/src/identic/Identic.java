@@ -83,6 +83,7 @@ import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.JRadioButton;
 import javax.swing.JScrollPane;
+import javax.swing.JSeparator;
 import javax.swing.JSplitPane;
 import javax.swing.JTabbedPane;
 import javax.swing.JTable;
@@ -109,6 +110,7 @@ public class Identic {
 	private AdapterManageLists manageListsAdapter = new AdapterManageLists();
 	private AdapterCatalog catalogAdapter = new AdapterCatalog();
 	private AdapterAction actionAdaper = new AdapterAction();
+	private AdapterLog logAdaper = new AdapterLog();
 
 	private AppLogger log = AppLogger.getInstance();
 
@@ -1261,6 +1263,34 @@ setActionColumns();
 
 		return sj.toString();
 	}// getLeastCommonDirectory
+	
+	private void doLogClear() {
+		log.clear();
+	}//
+
+	private void doLogPrint() {
+//		try {
+//			txtLog.print();
+//			
+//		} catch (PrinterException e) {
+//			// TODO Auto-generated catch block
+//			e.printStackTrace();
+//		}
+		
+		Font originalFont = txtLog.getFont();
+		try {
+			// textPane.setFont(new Font("Courier New", Font.PLAIN, 8));
+			txtLog.setFont(originalFont.deriveFont(8.0f));
+			MessageFormat header = new MessageFormat("Identic Log");
+			MessageFormat footer = new MessageFormat(new Date().toString() + "           Page - {0}");
+			txtLog.print(header, footer);
+			// textPane.setFont(new Font("Courier New", Font.PLAIN, 14));
+			txtLog.setFont(originalFont);
+		} catch (PrinterException e) {
+			e.printStackTrace();
+		} // try
+		
+	}//doLogPrint
 
 	// private String getLeastCommonDirectory(JTable table, int column) {
 	// String[] fullPathParts = new String[] {};
@@ -1851,17 +1881,17 @@ setActionColumns();
 		popupActions = new JPopupMenu();
 		addPopup(actionTable, popupActions);
 
-		JMenuItem mnuPopupActionsSelect = new JMenuItem("Select");
-		mnuPopupActionsSelect.setName(PUM_SELECT);
-		mnuPopupActionsSelect.setActionCommand(PUM_SELECT);
-		mnuPopupActionsSelect.addActionListener(actionAdaper);
-		popupActions.add(mnuPopupActionsSelect);
+		JMenuItem popupActionsSelect = new JMenuItem("Select");
+		popupActionsSelect.setName(PUM_ACTION_SELECT);
+		popupActionsSelect.setActionCommand(PUM_ACTION_SELECT);
+		popupActionsSelect.addActionListener(actionAdaper);
+		popupActions.add(popupActionsSelect);
 
-		JMenuItem mnuPopupActionsDeselect = new JMenuItem("Deselect");
-		mnuPopupActionsDeselect.setName(PUM_DESELECT);
-		mnuPopupActionsDeselect.setActionCommand(PUM_DESELECT);
-		mnuPopupActionsDeselect.addActionListener(actionAdaper);
-		popupActions.add(mnuPopupActionsDeselect);
+		JMenuItem popupActionsDeselect = new JMenuItem("Deselect");
+		popupActionsDeselect.setName(PUM_ACTION_DESELECT);
+		popupActionsDeselect.setActionCommand(PUM_ACTION_DESELECT);
+		popupActionsDeselect.addActionListener(actionAdaper);
+		popupActions.add(popupActionsDeselect);
 
 		tabActions.setDividerLocation(200);
 
@@ -2413,6 +2443,22 @@ setActionColumns();
 		txtLog.setText("");
 		txtLog.setFont(new Font("Courier New", Font.PLAIN, 15));
 		scrollPaneAppLog.setViewportView(txtLog);
+		
+		popupLog = new JPopupMenu();
+		addPopup(txtLog, popupLog);
+		
+		JMenuItem popupLogClear = new JMenuItem("Clear Log");
+		popupLogClear.setName(PUM_LOG_CLEAR);
+		popupLogClear.addActionListener(logAdaper);
+		popupLog.add(popupLogClear);
+		
+		JSeparator separator = new JSeparator();
+		popupLog.add(separator);
+		
+		JMenuItem popupLogPrint = new JMenuItem("Print Log");
+		popupLogPrint.setName(PUM_LOG_PRINT);
+		popupLogPrint.addActionListener(logAdaper);
+		popupLog.add(popupLogPrint);
 
 		JPanel panelLeft = new JPanel();
 		splitPaneMain.setLeftComponent(panelLeft);
@@ -2651,8 +2697,11 @@ setActionColumns();
 	private static final String RB_AC_UNIQUE = "Unique Files";
 	private static final String RB_AC_DUPLICATES = "Duplicate Files";
 
-	private static final String PUM_SELECT = "popupActionsSelect";
-	private static final String PUM_DESELECT = "popupActionsDeselect";
+	private static final String PUM_ACTION_SELECT = "popupActionsSelect";
+	private static final String PUM_ACTION_DESELECT = "popupActionsDeselect";
+	
+	private static final String PUM_LOG_PRINT = "popupLogPrint";
+	private static final String PUM_LOG_CLEAR = "popupLogClear";
 
 	// members
 	private JFrame frmIdentic;
@@ -2693,6 +2742,7 @@ setActionColumns();
 	private JRadioButton rbLoadUniqueFiles;
 	private JRadioButton rbLoadHaveDuplicates;
 	private JPopupMenu popupActions;
+	private JPopupMenu popupLog;
 	// private JList lstCatalogInUse;
 	// private JList lstCatalogAvailable;
 
@@ -3271,21 +3321,33 @@ setActionColumns();
 	////////////////////////////////////////////////////////////////
 
 	class AdapterAction implements ActionListener {// , ListSelectionListener
-
 		@Override
 		public void actionPerformed(ActionEvent actionEvent) {
 			String name = ((Component) actionEvent.getSource()).getName();
 			switch (name) {
-			case PUM_SELECT:
+			case PUM_ACTION_SELECT:
 				doActionMultiSelect();
 				break;
-			case PUM_DESELECT:
+			case PUM_ACTION_DESELECT:
 				doActionMultiDeselect();
 				break;
 			}// switch
-
 		}// actionPerformed
+	}// class AdapterAction
 
+	class AdapterLog implements ActionListener {// , ListSelectionListener
+		@Override
+		public void actionPerformed(ActionEvent actionEvent) {
+			String name = ((Component) actionEvent.getSource()).getName();
+			switch (name) {
+			case PUM_LOG_PRINT:
+				doLogPrint();
+				break;
+			case PUM_LOG_CLEAR:
+				doLogClear();
+				break;
+			}// switch
+		}// actionPerformed
 	}// class AdapterAction
 
 	private static void addPopup(Component component, final JPopupMenu popup) {

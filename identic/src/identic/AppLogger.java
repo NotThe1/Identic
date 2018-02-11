@@ -34,6 +34,7 @@ public class AppLogger {
 		// ---------------------------------------------------------------------
 
 	public void clear() {
+		
 		try {
 			docLog.remove(0, docLog.getLength());
 		} catch (BadLocationException e) {
