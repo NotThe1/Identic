@@ -142,7 +142,6 @@ public class ManageLists extends JDialog {
 			Files.deleteIfExists(listPath);
 			Files.createFile(listPath);
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 
 		} //try
@@ -258,7 +257,8 @@ public class ManageLists extends JDialog {
 		File[] files = targetDirectory.listFiles(new ListFilter(LIST_SUFFIX_DOT));
 
 		// if files empty - initialize the directory
-		if (files.length == 0) {
+		
+		if (files==null|files.length == 0) {
 
 			String[] initalListFiles = new String[] { "/VB.typeList", "/Music.typeList", "/MusicAndPictures.typeList",
 					"/Pictures.typeList" };
@@ -378,7 +378,7 @@ public class ManageLists extends JDialog {
 		gbc_scrollPane.gridy = 0;
 		panelAvailable.add(scrollPane, gbc_scrollPane);
 
-		listAvailable = new JList();
+		listAvailable = new JList<String>();
 		listAvailable.addMouseListener(mla);
 		listAvailable.setName(LIST_AVAILABLE);
 		scrollPane.setViewportView(listAvailable);
@@ -538,7 +538,7 @@ public class ManageLists extends JDialog {
 		lblEdit.setFont(new Font("Arial", Font.BOLD, 14));
 		scrollPane_1.setColumnHeaderView(lblEdit);
 
-		listEdit = new JList();
+		listEdit = new JList<String>();
 		listEdit.addListSelectionListener(mla);
 		listEdit.setName(LIST_EDIT);
 		scrollPane_1.setViewportView(listEdit);
@@ -699,9 +699,9 @@ public class ManageLists extends JDialog {
 		// --------------------------------------------------------------------
 
 	private static final String NEW_LIST = "<NEW>";
-	private static final String NOT_SET = "<Not Set>";
+//	private static final String NOT_SET = "<Not Set>";
 	private static final String EMPTY_STRING = "";
-	private static final String LIST_SUFFIX = "typeList";
+//	private static final String LIST_SUFFIX = "typeList";
 	private static final String LIST_SUFFIX_DOT = ".typeList";
 
 	private static final String EDIT_ADD = "Add";
@@ -723,8 +723,8 @@ public class ManageLists extends JDialog {
 
 	private JTextField txtActive;
 	private JTextField txtEdit;
-	private JList listEdit;
-	private JList listAvailable;
+	private JList<String> listEdit;
+	private JList<String> listAvailable;
 	private JLabel lblEdit;
 	private JButton btnAddRemove;
 	private JButton btnLoad;

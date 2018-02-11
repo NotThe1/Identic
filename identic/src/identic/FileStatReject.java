@@ -2,6 +2,10 @@ package identic;
 
 public class FileStatReject extends FileStat{
 
+	/**
+	 * 
+	 */
+	private static final long serialVersionUID = 1L;
 	String reason;
 
 	public FileStatReject(String filePath, long fileSize, String fileTime,String reason) {

@@ -38,7 +38,6 @@ public class AppLogger {
 		try {
 			docLog.remove(0, docLog.getLength());
 		} catch (BadLocationException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} // try
 	}// clear
@@ -197,7 +196,7 @@ public class AppLogger {
 	public static final Integer ERROR = 2;
 	public static final Integer SPECIAL = 4;
 
-	private static final String EMPTY_STRING = "";
+//	private static final String EMPTY_STRING = "";
 	private static final String NL = System.lineSeparator();
 
 }// class AppLogger

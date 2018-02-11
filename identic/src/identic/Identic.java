@@ -840,7 +840,7 @@ public class Identic {
 			// rejectTableModel
 			if (rejectTableModel.getRowCount() > 0) {
 				resultsTable.setModel(rejectTableModel);
-				resultsTable.setRowSorter(new TableRowSorter(rejectTableModel));
+				resultsTable.setRowSorter(new TableRowSorter<RejectTableModel>(rejectTableModel));
 			} // if
 
 			break;
@@ -848,7 +848,7 @@ public class Identic {
 		case BTN_SUMMARY_TARGETS:
 			if (subjectTableModel.getRowCount() > 0) {
 				resultsTable.setModel(subjectTableModel);
-				resultsTable.setRowSorter(new TableRowSorter(subjectTableModel));
+				resultsTable.setRowSorter(new TableRowSorter<SubjectTableModel>(subjectTableModel));
 				setSubjectColumns();
 			} // if
 			break;
@@ -857,7 +857,7 @@ public class Identic {
 			if (subjectTableModel.getRowCount() > 0) {
 				// -----------------------------------------
 				RowFilter<Object, Object> dupFilter = new RowFilter<Object, Object>() {
-					AbstractSet<String> hashIDs = new HashSet();
+					AbstractSet<String> hashIDs = new HashSet<String>();
 
 					public boolean include(Entry<? extends Object, ? extends Object> entry) {
 						String hashID = (String) entry.getValue(6);
@@ -869,7 +869,7 @@ public class Identic {
 					}// include
 				};
 				// -------------------------------------------
-				TableRowSorter tableRowSorter = new TableRowSorter(subjectTableModel);
+				TableRowSorter<SubjectTableModel> tableRowSorter = new TableRowSorter<SubjectTableModel>(subjectTableModel);
 				tableRowSorter.setRowFilter(dupFilter);
 				resultsTable.setModel(subjectTableModel);
 				resultsTable.setRowSorter(tableRowSorter);
@@ -887,7 +887,7 @@ public class Identic {
 				};
 
 				// -------------------------------------------
-				TableRowSorter tableRowSorter = new TableRowSorter(subjectTableModel);
+				TableRowSorter<SubjectTableModel> tableRowSorter = new TableRowSorter<SubjectTableModel>(subjectTableModel);
 				tableRowSorter.setRowFilter(dupFilter);
 				resultsTable.setModel(subjectTableModel);
 				resultsTable.setRowSorter(tableRowSorter);
@@ -904,7 +904,7 @@ public class Identic {
 					}// include
 				};
 
-				TableRowSorter tableRowSorter = new TableRowSorter(subjectTableModel);
+				TableRowSorter<SubjectTableModel> tableRowSorter = new TableRowSorter<SubjectTableModel>(subjectTableModel);
 				tableRowSorter.setRowFilter(dupFilter);
 				resultsTable.setRowSorter(tableRowSorter);
 				resultsTable.setModel(subjectTableModel);
@@ -1004,7 +1004,7 @@ public class Identic {
 			} // for rows
 			break;
 		case RB_AC_DISTINCT:
-			AbstractSet<Integer> hashIDs = new HashSet();
+			AbstractSet<Integer> hashIDs = new HashSet<Integer>();
 			Integer hashID;
 			for (int row = 0; row < subjectTableModel.getRowCount(); row++) {
 				subjectRow = subjectTableModel.getRow(row);
@@ -1038,7 +1038,7 @@ public class Identic {
 		default:
 			log.addError("[doActionLoadResults] unknown action: " + bgActions.getSelection().getActionCommand());
 		}// switch
-		actionTable.setRowSorter(new TableRowSorter(actionTableModel));
+		actionTable.setRowSorter(new TableRowSorter<ActionTableModel>(actionTableModel));
 
 		setActionColumns();
 		actionTable.updateUI();
@@ -1062,6 +1062,7 @@ public class Identic {
 			return;
 		} catch (IOException e) {
 			String msg = String.format("[makeFolder] failed to create: %s %n   message: %s", path, e.getMessage());
+			log.addError(msg);
 			e.printStackTrace();
 		} // try
 
@@ -1266,17 +1267,10 @@ setActionColumns();
 	
 	private void doLogClear() {
 		log.clear();
-	}//
+	}//doLogClear
 
 	private void doLogPrint() {
-//		try {
-//			txtLog.print();
-//			
-//		} catch (PrinterException e) {
-//			// TODO Auto-generated catch block
-//			e.printStackTrace();
-//		}
-		
+	
 		Font originalFont = txtLog.getFont();
 		try {
 			// textPane.setFont(new Font("Courier New", Font.PLAIN, 8));
@@ -1291,40 +1285,6 @@ setActionColumns();
 		} // try
 		
 	}//doLogPrint
-
-	// private String getLeastCommonDirectory(JTable table, int column) {
-	// String[] fullPathParts = new String[] {};
-	// String regexString = System.getProperty("file.separator").equals("\\") ? "\\\\"
-	// : System.getProperty("file.separator");
-	//
-	// String fullPath = (String) table.getValueAt(0, column);
-	// String[] baseParts = fullPath.split(regexString);
-	// int matchCount = baseParts.length;
-	//
-	// for (int i = 1; i < resultsTable.getRowCount(); i++) {
-	// int matchCountTemp = 0;
-	// fullPath = (String) resultsTable.getValueAt(i, 1);
-	// fullPathParts = fullPath.split(regexString);
-	// matchCount = Math.min(matchCount, fullPathParts.length);
-	//
-	// // System.out.printf(": row %2d, %s%n", i, fullPath);
-	// for (int mc = 0; mc < matchCount; mc++) {
-	// if (baseParts[mc].equals(fullPathParts[mc])) {
-	// matchCountTemp++;
-	// } else {
-	// break;
-	// } // if
-	// } // for mc
-	// matchCount = matchCountTemp;
-	// } // for - outer
-	//
-	// StringJoiner sj = new StringJoiner(System.getProperty("file.separator"));
-	// for (int i = 0; i < matchCount; i++) {
-	// sj.add(fullPathParts[i]);
-	// } // for
-	//
-	// return sj.toString();
-	// }// getLeastCommonDirectory
 
 	// Swing code ///////////////////////////////////////////////////////////////
 
@@ -1443,7 +1403,10 @@ setActionColumns();
 
 		doCatalogLoad();
 		loadTargetList();
+		
+		@SuppressWarnings("unused")
 		TableColumnManager tcmResults = new TableColumnManager(resultsTable);
+
 
 		// actionSelectionModel = actionTable.getSelectionModel();
 		// actionSelectionModel.addListSelectionListener(actionAdaper);
@@ -1932,7 +1895,7 @@ setActionColumns();
 		label_1.setFont(new Font("Arial", Font.BOLD, 14));
 		scrollListsAvailable.setColumnHeaderView(label_1);
 
-		listTypesAvailable = new JList();
+		listTypesAvailable = new JList<String>();
 		listTypesAvailable.addMouseListener(manageListsAdapter);
 		listTypesAvailable.setName(LIST_TYPES_AVAILABLE);
 
@@ -2096,7 +2059,7 @@ setActionColumns();
 		lblListEdit.setFont(new Font("Arial", Font.BOLD, 14));
 		scrollListContents.setColumnHeaderView(lblListEdit);
 
-		listTypesEdit = new JList();
+		listTypesEdit = new JList<String>();
 		listTypesEdit.addListSelectionListener(manageListsAdapter);
 
 		// listEdit.addMouseListener(manageListsAdapter);
@@ -2556,23 +2519,11 @@ setActionColumns();
 		gbc_btnStart.gridy = 8;
 		panelLeft.add(btnStart, gbc_btnStart);
 
-		JButton btnTest = new JButton("test");
-		btnTest.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent arg0) {
-				int x = actionTableModel.getRowCount();
-				actionTableModel.removeRow(1);
-				x = actionTableModel.getRowCount();
-				Object[] o0 = actionTableModel.getRow(0);
-				Object[] o1 = actionTableModel.getRow(1);
-				Object[] o2 = actionTableModel.getRow(2);
-				int a = 0;
-			}// actionPerformed
-		});
+		
 		GridBagConstraints gbc_btnTest = new GridBagConstraints();
 		gbc_btnTest.insets = new Insets(0, 0, 0, 5);
 		gbc_btnTest.gridx = 1;
 		gbc_btnTest.gridy = 10;
-		panelLeft.add(btnTest, gbc_btnTest);
 		splitPaneMain.setDividerLocation(150);
 
 		JPanel panelStatus = new JPanel();
@@ -2616,14 +2567,14 @@ setActionColumns();
 	private static final String EMPTY_STRING = "";
 	private static final String NONE = "<none>";
 
-	private static final int COLUMN_NAME_SUBJECT = 0;
-	private static final int COLUMN_DIRECTORY_SUBJECT = 1;
+//	private static final int COLUMN_NAME_SUBJECT = 0;
+//	private static final int COLUMN_DIRECTORY_SUBJECT = 1;
 	private static final int COLUMN_DIRECTORY_DUP = 4;
 	private static final int COLUMN_ID_SUBJECT = 5;
 
-	private static final int COLUMN_ACTION_ACTION = 0;
-	private static final int COLUMN_NAME_ACTION = 1;
-	private static final int COLUMN_DIRECTORY_ACTION = 2;
+//	private static final int COLUMN_ACTION_ACTION = 0;
+//	private static final int COLUMN_NAME_ACTION = 1;
+//	private static final int COLUMN_DIRECTORY_ACTION = 2;
 
 	private static final String TAB_SUMMARY = "tabSummary";
 	private static final String TAB_CATALOGS = "tabCatalogs";
@@ -2633,7 +2584,6 @@ setActionColumns();
 	private static final String MNU_FILE_EXIT = "mnuFileExit";
 
 	private static final String BTN_SOURCE_FOLDER = "btnSourceFolder";
-	private static final String BTN_TARGET_FOLDER = "btnTargetFolder";
 
 	private static final String RB_CATALOG_NO = "rbNoCatalog";
 	private static final String RB_CATALOG_WITH = "rbWithCatalog";
@@ -2709,8 +2659,8 @@ setActionColumns();
 	private JTextPane txtLog;
 	private JTabbedPane tpMain;
 	private JTextField txtActive;
-	private JList listTypesAvailable;
-	private JList listTypesEdit;
+	private JList<String> listTypesAvailable;
+	private JList<String> listTypesEdit;
 	private JLabel lblStatusTypeList;
 	private JTextField txtEdit;
 	private JLabel lblListEdit;
@@ -2846,14 +2796,14 @@ setActionColumns();
 		public void run() {
 			FileStat fileStat;
 
-			int count = 0;
+//			int count = 0;
 			String fileName = null;
 			String key = null;
 			while (true) {
 				try {
 					fileStat = qSubjects.remove();
 					fileName = fileStat.getFileName();
-					count++;
+//					count++;
 					try {
 						key = hashFile(fileStat.getFilePath(), algorithm);
 						fileStat.setHashKey(key);
@@ -3030,6 +2980,7 @@ setActionColumns();
 					&& support.isDataFlavorSupported(ListItemTransferable.LIST_ITEM_DATA_FLAVOR));
 		}// canImport
 
+		@SuppressWarnings("unchecked")
 		@Override
 		public boolean importData(TransferSupport support) {// support is target
 			if (!canImport(support)) {
@@ -3042,7 +2993,7 @@ setActionColumns();
 			try {
 				value = (CatalogItem) t.getTransferData(ListItemTransferable.LIST_ITEM_DATA_FLAVOR);
 			} catch (Exception e) {
-				// TODO: handle exception
+				e.printStackTrace();
 			} // try
 
 			JList<CatalogItem> targetList = (JList<CatalogItem>) support.getComponent();
@@ -3078,7 +3029,9 @@ setActionColumns();
 
 		@Override
 		protected void exportDone(JComponent source, Transferable data, int action) {
+			@SuppressWarnings("unchecked")
 			int index = ((JList<CatalogItem>) source).getSelectedIndex();
+			@SuppressWarnings("unchecked")
 			CatalogItemModel model = (CatalogItemModel) ((JList<CatalogItem>) source).getModel();
 			model.removeElementAt(index);
 			source.updateUI();

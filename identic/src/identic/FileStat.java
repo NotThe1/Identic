@@ -4,6 +4,10 @@ import java.io.Serializable;
 import java.nio.file.Paths;
 
 public class FileStat implements Serializable{
+	/**
+	 * 
+	 */
+	private static final long serialVersionUID = 1L;
 	private String filePath;
 	private long fileSize;
 	private String fileTime;
@@ -60,8 +64,7 @@ public class FileStat implements Serializable{
 
 
 	public String getFileName(){
-		return Paths.get(this.filePath).getFileName().toString();
-//		return filePath== null?"":this.filePath;
+		return filePath== null?"":Paths.get(this.filePath).getFileName().toString();
 	}//getFileName
 	
 	public String getDirectory(){
