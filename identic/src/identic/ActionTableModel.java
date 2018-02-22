@@ -85,13 +85,7 @@ import javax.swing.table.AbstractTableModel;
 			rows--;
 		}//removeRow
 
-		public void addRow(Object[] values) {
-			rows++;
-			for (int i = 0; i < columns - 1; i++) {
-				lookup.put(new Point(rows - 1, i), values[i]);
-			} // for
-		}// addRow
-		
+
 		public void addRowForAction(Object[] values) {
 			rows++;
 			lookup.put(new Point(rows - 1, 0), false);

@@ -95,6 +95,8 @@ import javax.swing.SwingConstants;
 import javax.swing.TransferHandler;
 import javax.swing.UIManager;
 import javax.swing.border.BevelBorder;
+import javax.swing.border.CompoundBorder;
+import javax.swing.border.LineBorder;
 import javax.swing.border.TitledBorder;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
@@ -123,12 +125,15 @@ public class Identic {
 	private LinkedBlockingQueue<FileStatReject> qRejects = new LinkedBlockingQueue<FileStatReject>();
 	private LinkedBlockingQueue<FileStat> qHashes = new LinkedBlockingQueue<FileStat>();
 	private HashMap<String, Integer> excludedFileTypes = new HashMap<>();
+	private HashMap<String, Integer> fileTypeCensus = new HashMap<>();
 
 	private SubjectTableModel subjectTableModel = new SubjectTableModel();
 	private ActionTableModel actionTableModel = new ActionTableModel();
 
 	private RejectTableModel rejectTableModel = new RejectTableModel();
 	private DefaultListModel<String> excludeModel = new DefaultListModel<>();
+
+	private UtilityCensusTableModel utilityCensusTableModel = new UtilityCensusTableModel();
 
 	private JTable resultsTable = new JTable();
 
@@ -662,7 +667,7 @@ public class Identic {
 					JOptionPane.DEFAULT_OPTION, JOptionPane.ERROR_MESSAGE);
 			return;
 		} // if starting folder not there
-		
+
 		log.addInfo("Starting Folder:");
 		log.addInfo("     " + lblSourceFolder.getText());
 
@@ -699,12 +704,11 @@ public class Identic {
 		log.addInfo("Catalogs:");
 		CatalogItem catalogItem;
 		for (int i = 0; i < inUseCatalogItemModel.getSize(); i++) {
-			 catalogItem = inUseCatalogItemModel.get(i);
-			 log.addInfo("     " + catalogItem.getEntryName());
+			catalogItem = inUseCatalogItemModel.get(i);
+			log.addInfo("     " + catalogItem.getEntryName());
 			System.out.println(catalogItem.getEntryName());
 		} // for - each catalog Item
 
-		
 		GatherFromCatalogs gatherFromCatalogs = new GatherFromCatalogs();
 		Thread threadGather = new Thread(gatherFromCatalogs);
 		threadGather.start();
@@ -869,7 +873,8 @@ public class Identic {
 					}// include
 				};
 				// -------------------------------------------
-				TableRowSorter<SubjectTableModel> tableRowSorter = new TableRowSorter<SubjectTableModel>(subjectTableModel);
+				TableRowSorter<SubjectTableModel> tableRowSorter = new TableRowSorter<SubjectTableModel>(
+						subjectTableModel);
 				tableRowSorter.setRowFilter(dupFilter);
 				resultsTable.setModel(subjectTableModel);
 				resultsTable.setRowSorter(tableRowSorter);
@@ -887,7 +892,8 @@ public class Identic {
 				};
 
 				// -------------------------------------------
-				TableRowSorter<SubjectTableModel> tableRowSorter = new TableRowSorter<SubjectTableModel>(subjectTableModel);
+				TableRowSorter<SubjectTableModel> tableRowSorter = new TableRowSorter<SubjectTableModel>(
+						subjectTableModel);
 				tableRowSorter.setRowFilter(dupFilter);
 				resultsTable.setModel(subjectTableModel);
 				resultsTable.setRowSorter(tableRowSorter);
@@ -904,7 +910,8 @@ public class Identic {
 					}// include
 				};
 
-				TableRowSorter<SubjectTableModel> tableRowSorter = new TableRowSorter<SubjectTableModel>(subjectTableModel);
+				TableRowSorter<SubjectTableModel> tableRowSorter = new TableRowSorter<SubjectTableModel>(
+						subjectTableModel);
 				tableRowSorter.setRowFilter(dupFilter);
 				resultsTable.setRowSorter(tableRowSorter);
 				resultsTable.setModel(subjectTableModel);
@@ -973,6 +980,21 @@ public class Identic {
 				break;
 			case 6: // ID
 				tc.setMaxWidth(40);
+				break;
+			}// switch
+		} // for each column
+	}// setSubjectColumns
+
+	private void setCensusColumns() {
+		tableUtility.setAutoResizeMode(JTable.AUTO_RESIZE_NEXT_COLUMN);
+		for (int i = 0; i < tableUtility.getColumnModel().getColumnCount(); i++) {
+			TableColumn tc = tableUtility.getColumnModel().getColumn(i);
+			switch (i) {
+			case 0: // count
+				tc.setMaxWidth(140);
+				tc.setPreferredWidth(100);
+				break;
+			case 1: // Directory
 				break;
 			}// switch
 		} // for each column
@@ -1083,7 +1105,7 @@ public class Identic {
 		for (int row = 0; row < selectedRows.length; row++) {
 			actionTable.setValueAt(state, selectedRows[row], column);
 		} // for each selected row
-		// actionTable.clearSelection();
+			// actionTable.clearSelection();
 		actionTable.updateUI();
 	}// doActionBulkSelection
 
@@ -1212,7 +1234,7 @@ public class Identic {
 
 		table.setModel(new ActionTableModel());
 		table.setModel(actionTableModel);
-setActionColumns();
+		setActionColumns();
 		table.updateUI();
 
 		msg = String.format("[After] Table: %d, Model %d", actionTable.getRowCount(), tableModel.getRowCount());
@@ -1264,13 +1286,13 @@ setActionColumns();
 
 		return sj.toString();
 	}// getLeastCommonDirectory
-	
+
 	private void doLogClear() {
 		log.clear();
-	}//doLogClear
+	}// doLogClear
 
 	private void doLogPrint() {
-	
+
 		Font originalFont = txtLog.getFont();
 		try {
 			// textPane.setFont(new Font("Courier New", Font.PLAIN, 8));
@@ -1283,8 +1305,43 @@ setActionColumns();
 		} catch (PrinterException e) {
 			e.printStackTrace();
 		} // try
+
+	}// doLogPrint
+	
+	private void doTest() {
+		log.addInfo("Testing ...");
 		
-	}//doLogPrint
+		Path startPath = Paths.get(lblSourceFolder.getText());
+		try {
+			Files.walkFileTree(startPath, new EmptyFolderWalker());
+		} catch (IOException e) {
+			e.printStackTrace();
+		} // try
+
+	}//doTest
+
+	private void doTakeCensus() {
+		log.addInfo("doFileTypeCensus ");
+		utilityCensusTableModel.clear();
+		tableUtility.setModel(utilityCensusTableModel);
+		fileTypeCensus.clear();
+		Path startPath = Paths.get(lblSourceFolder.getText());
+		try {
+			Files.walkFileTree(startPath, new CensusWalker());
+		} catch (IOException e) {
+			e.printStackTrace();
+		} // try
+		
+		Set<Entry<String, Integer>> fileTypeCensusSet = fileTypeCensus.entrySet();
+		for (Entry<String, Integer> entry : fileTypeCensusSet) {
+			utilityCensusTableModel.addRow(new Object[] {entry.getValue(),entry.getKey()});
+		} // for - entry		
+		setCensusColumns();
+		
+		tableUtility.setRowSorter(new TableRowSorter<UtilityCensusTableModel>(utilityCensusTableModel));
+
+		tableUtility.updateUI();
+	}// doTest
 
 	// Swing code ///////////////////////////////////////////////////////////////
 
@@ -1403,10 +1460,9 @@ setActionColumns();
 
 		doCatalogLoad();
 		loadTargetList();
-		
+
 		@SuppressWarnings("unused")
 		TableColumnManager tcmResults = new TableColumnManager(resultsTable);
-
 
 		// actionSelectionModel = actionTable.getSelectionModel();
 		// actionSelectionModel.addListSelectionListener(actionAdaper);
@@ -2379,6 +2435,150 @@ setActionColumns();
 		gbc_lblCatalogDirectory.gridy = 3;
 		panelCatalogInfo.add(lblCatalogDirectory, gbc_lblCatalogDirectory);
 
+		JPanel tabUtilities = new JPanel();
+		tpMain.addTab("Utilities", null, tabUtilities, null);
+		GridBagLayout gbl_tabUtilities = new GridBagLayout();
+		gbl_tabUtilities.columnWidths = new int[] { 0, 0 };
+		gbl_tabUtilities.rowHeights = new int[] { 0, 0 };
+		gbl_tabUtilities.columnWeights = new double[] { 1.0, Double.MIN_VALUE };
+		gbl_tabUtilities.rowWeights = new double[] { 1.0, Double.MIN_VALUE };
+		tabUtilities.setLayout(gbl_tabUtilities);
+
+		JSplitPane splitPaneUtilities = new JSplitPane();
+		GridBagConstraints gbc_splitPaneUtilities = new GridBagConstraints();
+		gbc_splitPaneUtilities.fill = GridBagConstraints.BOTH;
+		gbc_splitPaneUtilities.gridx = 0;
+		gbc_splitPaneUtilities.gridy = 0;
+		tabUtilities.add(splitPaneUtilities, gbc_splitPaneUtilities);
+
+		JPanel panelUtilityLeft = new JPanel();
+		panelUtilityLeft.setBorder(null);
+		splitPaneUtilities.setLeftComponent(panelUtilityLeft);
+		GridBagLayout gbl_panelUtilityLeft = new GridBagLayout();
+		gbl_panelUtilityLeft.columnWidths = new int[] { 0, 0 };
+		gbl_panelUtilityLeft.rowHeights = new int[] { 0, 0, 0, 0, 0, 0 };
+		gbl_panelUtilityLeft.columnWeights = new double[] { 1.0, Double.MIN_VALUE };
+		gbl_panelUtilityLeft.rowWeights = new double[] { 0.0, 0.0, 1.0, 0.0, 1.0, Double.MIN_VALUE };
+		panelUtilityLeft.setLayout(gbl_panelUtilityLeft);
+		
+		Component verticalStrut_18 = Box.createVerticalStrut(20);
+		verticalStrut_18.setPreferredSize(new Dimension(0, 50));
+		GridBagConstraints gbc_verticalStrut_18 = new GridBagConstraints();
+		gbc_verticalStrut_18.anchor = GridBagConstraints.WEST;
+		gbc_verticalStrut_18.insets = new Insets(0, 0, 5, 0);
+		gbc_verticalStrut_18.gridx = 0;
+		gbc_verticalStrut_18.gridy = 0;
+		panelUtilityLeft.add(verticalStrut_18, gbc_verticalStrut_18);
+
+		JPanel panelLeftUtility1 = new JPanel();
+		panelLeftUtility1.setBorder(new CompoundBorder(new BevelBorder(BevelBorder.LOWERED, null, null, null, null), new TitledBorder(new LineBorder(new Color(0, 0, 0), 1, true), "File Types", TitledBorder.CENTER, TitledBorder.ABOVE_TOP, null, new Color(0, 0, 0))));
+		GridBagConstraints gbc_panelLeftUtility1 = new GridBagConstraints();
+		gbc_panelLeftUtility1.insets = new Insets(0, 0, 5, 0);
+		gbc_panelLeftUtility1.fill = GridBagConstraints.BOTH;
+		gbc_panelLeftUtility1.gridx = 0;
+		gbc_panelLeftUtility1.gridy = 2;
+		panelUtilityLeft.add(panelLeftUtility1, gbc_panelLeftUtility1);
+		GridBagLayout gbl_panelLeftUtility1 = new GridBagLayout();
+		gbl_panelLeftUtility1.columnWidths = new int[] { 0, 0 };
+		gbl_panelLeftUtility1.rowHeights = new int[] { 0, 0, 0 };
+		gbl_panelLeftUtility1.columnWeights = new double[] { 1.0, Double.MIN_VALUE };
+		gbl_panelLeftUtility1.rowWeights = new double[] { 0.0, 0.0, Double.MIN_VALUE };
+		panelLeftUtility1.setLayout(gbl_panelLeftUtility1);
+		
+		JButton btnFileTypeCensus = new JButton("Take Census");
+		btnFileTypeCensus.setName(BTN_TAKE_CENSUS);
+		btnFileTypeCensus.addActionListener(identicAdapter);
+		
+		Component verticalStrut_19 = Box.createVerticalStrut(20);
+		verticalStrut_19.setPreferredSize(new Dimension(0, 40));
+		GridBagConstraints gbc_verticalStrut_19 = new GridBagConstraints();
+		gbc_verticalStrut_19.insets = new Insets(0, 0, 5, 0);
+		gbc_verticalStrut_19.gridx = 0;
+		gbc_verticalStrut_19.gridy = 0;
+		panelLeftUtility1.add(verticalStrut_19, gbc_verticalStrut_19);
+		GridBagConstraints gbc_btnFileTypeCensus = new GridBagConstraints();
+		gbc_btnFileTypeCensus.fill = GridBagConstraints.HORIZONTAL;
+		gbc_btnFileTypeCensus.gridx = 0;
+		gbc_btnFileTypeCensus.gridy = 1;
+		panelLeftUtility1.add(btnFileTypeCensus, gbc_btnFileTypeCensus);
+		
+		Component verticalStrut_20 = Box.createVerticalStrut(20);
+		verticalStrut_20.setPreferredSize(new Dimension(0, 100));
+		GridBagConstraints gbc_verticalStrut_20 = new GridBagConstraints();
+		gbc_verticalStrut_20.insets = new Insets(0, 0, 5, 0);
+		gbc_verticalStrut_20.gridx = 0;
+		gbc_verticalStrut_20.gridy = 3;
+		panelUtilityLeft.add(verticalStrut_20, gbc_verticalStrut_20);
+
+		JPanel panelLeftUtility2 = new JPanel();
+		panelLeftUtility2.setBorder(new CompoundBorder(new BevelBorder(BevelBorder.LOWERED, null, null, null, null), new TitledBorder(new LineBorder(new Color(0, 0, 0), 1, true), "Empty Folders", TitledBorder.CENTER, TitledBorder.ABOVE_TOP, null, new Color(0, 0, 0))));
+		GridBagConstraints gbc_panelLeftUtility2 = new GridBagConstraints();
+		gbc_panelLeftUtility2.fill = GridBagConstraints.BOTH;
+		gbc_panelLeftUtility2.gridx = 0;
+		gbc_panelLeftUtility2.gridy = 4;
+		panelUtilityLeft.add(panelLeftUtility2, gbc_panelLeftUtility2);
+		GridBagLayout gbl_panelLeftUtility2 = new GridBagLayout();
+		gbl_panelLeftUtility2.columnWidths = new int[] { 0, 0, 0 };
+		gbl_panelLeftUtility2.rowHeights = new int[] { 0, 0, 0, 0, 0, 0, 0 };
+		gbl_panelLeftUtility2.columnWeights = new double[] { 0.0, 1.0, Double.MIN_VALUE };
+		gbl_panelLeftUtility2.rowWeights = new double[] { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, Double.MIN_VALUE };
+		panelLeftUtility2.setLayout(gbl_panelLeftUtility2);
+		
+		Component verticalStrut_21 = Box.createVerticalStrut(20);
+		verticalStrut_21.setPreferredSize(new Dimension(0, 40));
+		GridBagConstraints gbc_verticalStrut_21 = new GridBagConstraints();
+		gbc_verticalStrut_21.insets = new Insets(0, 0, 5, 5);
+		gbc_verticalStrut_21.gridx = 0;
+		gbc_verticalStrut_21.gridy = 0;
+		panelLeftUtility2.add(verticalStrut_21, gbc_verticalStrut_21);
+		
+		JButton btnFindEmptyFolders = new JButton("Find");
+		GridBagConstraints gbc_btnFindEmptyFolders = new GridBagConstraints();
+		gbc_btnFindEmptyFolders.insets = new Insets(0, 0, 5, 0);
+		gbc_btnFindEmptyFolders.fill = GridBagConstraints.HORIZONTAL;
+		gbc_btnFindEmptyFolders.gridx = 1;
+		gbc_btnFindEmptyFolders.gridy = 1;
+		panelLeftUtility2.add(btnFindEmptyFolders, gbc_btnFindEmptyFolders);
+		
+		Component verticalStrut_22 = Box.createVerticalStrut(20);
+		GridBagConstraints gbc_verticalStrut_22 = new GridBagConstraints();
+		gbc_verticalStrut_22.insets = new Insets(0, 0, 5, 0);
+		gbc_verticalStrut_22.gridx = 1;
+		gbc_verticalStrut_22.gridy = 2;
+		panelLeftUtility2.add(verticalStrut_22, gbc_verticalStrut_22);
+		
+		JButton btnRemoveOnlyEmptyFolders = new JButton("Remove Folders");
+		btnRemoveOnlyEmptyFolders.setToolTipText("Remove only folders that are selected");
+		GridBagConstraints gbc_btnRemoveOnlyEmptyFolders = new GridBagConstraints();
+		gbc_btnRemoveOnlyEmptyFolders.fill = GridBagConstraints.HORIZONTAL;
+		gbc_btnRemoveOnlyEmptyFolders.insets = new Insets(0, 0, 5, 0);
+		gbc_btnRemoveOnlyEmptyFolders.gridx = 1;
+		gbc_btnRemoveOnlyEmptyFolders.gridy = 3;
+		panelLeftUtility2.add(btnRemoveOnlyEmptyFolders, gbc_btnRemoveOnlyEmptyFolders);
+		
+		Component verticalStrut_23 = Box.createVerticalStrut(20);
+		verticalStrut_23.setPreferredSize(new Dimension(0, 10));
+		GridBagConstraints gbc_verticalStrut_23 = new GridBagConstraints();
+		gbc_verticalStrut_23.insets = new Insets(0, 0, 5, 0);
+		gbc_verticalStrut_23.gridx = 1;
+		gbc_verticalStrut_23.gridy = 4;
+		panelLeftUtility2.add(verticalStrut_23, gbc_verticalStrut_23);
+		
+		JButton btnRemoveEmptyFolderTree = new JButton("Remove Folders & Trees");
+		btnRemoveEmptyFolderTree.setToolTipText("Remove selected folderd and any parents that become empty by this removal");
+		GridBagConstraints gbc_btnRemoveEmptyFolderTree = new GridBagConstraints();
+		gbc_btnRemoveEmptyFolderTree.fill = GridBagConstraints.HORIZONTAL;
+		gbc_btnRemoveEmptyFolderTree.gridx = 1;
+		gbc_btnRemoveEmptyFolderTree.gridy = 5;
+		panelLeftUtility2.add(btnRemoveEmptyFolderTree, gbc_btnRemoveEmptyFolderTree);
+
+		JScrollPane scrollPaneUtilities = new JScrollPane();
+		splitPaneUtilities.setRightComponent(scrollPaneUtilities);
+
+		tableUtility = new JTable();
+		scrollPaneUtilities.setViewportView(tableUtility);
+		splitPaneUtilities.setDividerLocation(200);
+
 		JPanel tabLog = new JPanel();
 		tabLog.setName(TAB_LOG);
 		tpMain.addTab("App Log", null, tabLog, null);
@@ -2406,18 +2606,18 @@ setActionColumns();
 		txtLog.setText("");
 		txtLog.setFont(new Font("Courier New", Font.PLAIN, 15));
 		scrollPaneAppLog.setViewportView(txtLog);
-		
+
 		popupLog = new JPopupMenu();
 		addPopup(txtLog, popupLog);
-		
+
 		JMenuItem popupLogClear = new JMenuItem("Clear Log");
 		popupLogClear.setName(PUM_LOG_CLEAR);
 		popupLogClear.addActionListener(logAdaper);
 		popupLog.add(popupLogClear);
-		
+
 		JSeparator separator = new JSeparator();
 		popupLog.add(separator);
-		
+
 		JMenuItem popupLogPrint = new JMenuItem("Print Log");
 		popupLogPrint.setName(PUM_LOG_PRINT);
 		popupLogPrint.addActionListener(logAdaper);
@@ -2519,11 +2719,26 @@ setActionColumns();
 		gbc_btnStart.gridy = 8;
 		panelLeft.add(btnStart, gbc_btnStart);
 
-		
+		Component verticalStrut_17 = Box.createVerticalStrut(20);
+		verticalStrut_17.setPreferredSize(new Dimension(0, 40));
+		GridBagConstraints gbc_verticalStrut_17 = new GridBagConstraints();
+		gbc_verticalStrut_17.insets = new Insets(0, 0, 5, 5);
+		gbc_verticalStrut_17.gridx = 1;
+		gbc_verticalStrut_17.gridy = 9;
+		panelLeft.add(verticalStrut_17, gbc_verticalStrut_17);
+
+		JButton btnTest = new JButton("Test");
+		btnTest.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent arg0) {
+				doTest();
+			}
+		});
 		GridBagConstraints gbc_btnTest = new GridBagConstraints();
 		gbc_btnTest.insets = new Insets(0, 0, 0, 5);
 		gbc_btnTest.gridx = 1;
 		gbc_btnTest.gridy = 10;
+		panelLeft.add(btnTest, gbc_btnTest);
+
 		splitPaneMain.setDividerLocation(150);
 
 		JPanel panelStatus = new JPanel();
@@ -2567,14 +2782,14 @@ setActionColumns();
 	private static final String EMPTY_STRING = "";
 	private static final String NONE = "<none>";
 
-//	private static final int COLUMN_NAME_SUBJECT = 0;
-//	private static final int COLUMN_DIRECTORY_SUBJECT = 1;
+	// private static final int COLUMN_NAME_SUBJECT = 0;
+	// private static final int COLUMN_DIRECTORY_SUBJECT = 1;
 	private static final int COLUMN_DIRECTORY_DUP = 4;
 	private static final int COLUMN_ID_SUBJECT = 5;
 
-//	private static final int COLUMN_ACTION_ACTION = 0;
-//	private static final int COLUMN_NAME_ACTION = 1;
-//	private static final int COLUMN_DIRECTORY_ACTION = 2;
+	// private static final int COLUMN_ACTION_ACTION = 0;
+	// private static final int COLUMN_NAME_ACTION = 1;
+	// private static final int COLUMN_DIRECTORY_ACTION = 2;
 
 	private static final String TAB_SUMMARY = "tabSummary";
 	private static final String TAB_CATALOGS = "tabCatalogs";
@@ -2649,9 +2864,11 @@ setActionColumns();
 
 	private static final String PUM_ACTION_SELECT = "popupActionsSelect";
 	private static final String PUM_ACTION_DESELECT = "popupActionsDeselect";
-	
+
 	private static final String PUM_LOG_PRINT = "popupLogPrint";
 	private static final String PUM_LOG_CLEAR = "popupLogClear";
+	
+	private static final String BTN_TAKE_CENSUS = "btnTakeCensus";
 
 	// members
 	private JFrame frmIdentic;
@@ -2693,6 +2910,7 @@ setActionColumns();
 	private JRadioButton rbLoadHaveDuplicates;
 	private JPopupMenu popupActions;
 	private JPopupMenu popupLog;
+	private JTable tableUtility;
 	// private JList lstCatalogInUse;
 	// private JList lstCatalogAvailable;
 
@@ -2713,7 +2931,7 @@ setActionColumns();
 		@Override
 		public void run() {
 			excludedFileTypes.clear();
-			MyWalker myWalker = new MyWalker();
+			IdentifyWalker myWalker = new IdentifyWalker();
 			Path startPath = Paths.get(lblSourceFolder.getText());
 			try {
 				Files.walkFileTree(startPath, myWalker);
@@ -2723,7 +2941,7 @@ setActionColumns();
 				// logSummary();
 		}// run
 
-		class MyWalker implements FileVisitor<Path> {
+		class IdentifyWalker implements FileVisitor<Path> {
 			Pattern patternSubjects = Pattern.compile(targetListRegex);
 			// Pattern patternFileType = Pattern.compile("\\.(.+$)");
 			Pattern patternFileType = Pattern.compile("\\.([^.]+$)");
@@ -2742,7 +2960,9 @@ setActionColumns();
 
 			@Override
 			public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-				String fileName = file.toString();
+//				String fileName = file.toString();
+				String fileName = file.getFileName().toString();
+
 				String lastModifieTime = Files.getLastModifiedTime(file).toString();
 				long fileSize = Files.size(file);
 
@@ -2796,14 +3016,14 @@ setActionColumns();
 		public void run() {
 			FileStat fileStat;
 
-//			int count = 0;
+			// int count = 0;
 			String fileName = null;
 			String key = null;
 			while (true) {
 				try {
 					fileStat = qSubjects.remove();
 					fileName = fileStat.getFileName();
-//					count++;
+					// count++;
 					try {
 						key = hashFile(fileStat.getFilePath(), algorithm);
 						fileStat.setHashKey(key);
@@ -2940,7 +3160,7 @@ setActionColumns();
 			for (int i = 0; i < inUseCatalogItemModel.getSize(); i++) {
 				catalogItem = inUseCatalogItemModel.get(i);
 				qHashes.addAll(catalogItem.getFileStats());
-//				System.out.println(catalogItem.getEntryName());
+				// System.out.println(catalogItem.getEntryName());
 			} // for - each catalog Item
 		}// run
 	}// class GatherFromCatalogs
@@ -2969,6 +3189,112 @@ setActionColumns();
 
 	// -------------------------------------------------------------------
 
+	class CensusWalker implements FileVisitor<Path>{
+		Pattern patternFileType = Pattern.compile("\\.([^.]+$)");
+		Matcher matcher;
+		
+		public CensusWalker() {
+		}//Constructor
+		
+		@Override
+		public FileVisitResult visitFile(Path file, BasicFileAttributes arg1) throws IOException {
+//			String fileName = file.toString();
+			String fileName = file.getFileName().toString();
+			matcher = patternFileType.matcher(fileName);
+			String fileType = matcher.find() ? matcher.group(1).toLowerCase() : NONE;
+			if (!fileType.equals(NONE)) {
+				Integer occurances = fileTypeCensus.get(fileType);
+				if (occurances == null) {
+					fileTypeCensus.put(fileType, 1);
+				} else {
+					fileTypeCensus.put(fileType, occurances + 1);
+				} // if unique	
+			}//if type found
+			return FileVisitResult.CONTINUE;
+		}//visitFile
+
+		@Override
+		public FileVisitResult postVisitDirectory(Path arg0, IOException arg1) throws IOException {
+			return FileVisitResult.CONTINUE;
+		}//postVisitDirectory
+
+		@Override
+		public FileVisitResult preVisitDirectory(Path file, BasicFileAttributes arg1) throws IOException {
+			return FileVisitResult.CONTINUE;
+		}//preVisitDirectory
+
+		@Override
+		public FileVisitResult visitFileFailed(Path file, IOException arg1) throws IOException {
+			log.addError("Failed to visit " + file.toString());
+			return FileVisitResult.CONTINUE;
+		}//visitFileFailed
+		
+	}//class CensusWalker
+	
+	class EmptyFolderWalker implements FileVisitor<Path>{
+		Pattern patternFileType = Pattern.compile("\\.([^.]+$)");
+		Matcher matcher;
+		
+		public EmptyFolderWalker() {
+		}//Constructor
+		
+		@Override
+		public FileVisitResult visitFile(Path file, BasicFileAttributes arg1) throws IOException {
+//			String fileName = file.getFileName().toString();
+//			matcher = patternFileType.matcher(fileName);
+//			String fileType = matcher.find() ? matcher.group(1).toLowerCase() : NONE;
+//			if (!fileType.equals(NONE)) {
+//				Integer occurances = fileTypeCensus.get(fileType);
+//				if (occurances == null) {
+//					fileTypeCensus.put(fileType, 1);
+//				} else {
+//					fileTypeCensus.put(fileType, occurances + 1);
+//				} // if unique	
+//			}//if type found
+			return FileVisitResult.CONTINUE;
+		}//visitFile
+
+		@Override
+		public FileVisitResult postVisitDirectory(Path folder, IOException arg1) throws IOException {
+			File f = new java.io.File(folder.toAbsolutePath().toString());
+			String[] contents = f.list();
+			int count = contents.length;
+			int nameCount = folder.getNameCount();
+			String msg = String.format("nameCount: %2d, count: %,5d   %s",nameCount, count,folder.toAbsolutePath().toString());
+			log.addInfo(msg);
+			if (count==0) {
+				log.addSpecial("delete " + msg);
+			}//
+			System.out.println("Identic.EmptyFolderWalker.postVisitDirectory()");
+			return FileVisitResult.CONTINUE;
+		}//postVisitDirectory
+
+		@Override
+		public FileVisitResult preVisitDirectory(Path folder, BasicFileAttributes arg1) throws IOException {
+//			File f = new java.io.File(folder.toAbsolutePath().toString());
+//			String[] contents = f.list();
+//			int count = contents.length;
+//			String msg = String.format("%,5d  : %s", count,folder.toAbsolutePath().toString());
+//			log.addInfo(msg);
+
+			return FileVisitResult.CONTINUE;
+		}//preVisitDirectory
+
+		@Override
+		public FileVisitResult visitFileFailed(Path file, IOException arg1) throws IOException {
+			log.addError("Failed to visit " + file.toString());
+			return FileVisitResult.CONTINUE;
+		}//visitFileFailed
+		
+	}//class EmptyFolderWalker
+	
+
+
+	
+	// -------------------------------------------------------------------
+
+
+	
 	//////////////////////////// [[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[
 
 	@SuppressWarnings("serial")
@@ -3110,6 +3436,10 @@ setActionColumns();
 
 			case BTN_ACTION_DELETE:
 				doActionDelete();
+				break;
+				
+			case BTN_TAKE_CENSUS:
+				doTakeCensus();
 				break;
 
 			}// switch - name
