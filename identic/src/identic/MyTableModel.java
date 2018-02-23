@@ -72,7 +72,7 @@ public class MyTableModel extends AbstractTableModel {
 			throw new IllegalArgumentException(msg);
 		} // if - out of bounds
 
-		Object[] row = new Object[this.getColumnCount()];
+		Object[] row = new Object[columnCount];
 		for (int i = 0; i < columnCount; i++) {
 			row[i] = data.get(new Point(rowNumber, i));
 		} // for
@@ -145,7 +145,7 @@ public class MyTableModel extends AbstractTableModel {
 //
 //	private static final String[] headers = new String[] { COLUMN_0, COLUMN_1, COLUMN_2, COLUMN_3, COLUMN_4, COLUMN_5 };
 	private   String[] headers;// = new String[0];
-	private  int columnCount;// = headers.length;
+	protected  int columnCount;// = headers.length;
 
 	public static final String EMPTY_STRING = "";
 	

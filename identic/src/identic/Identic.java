@@ -138,22 +138,8 @@ public class Identic {
 	private UtilityEmptyFolderTableModel utilityEmptyFolderTableModel = new UtilityEmptyFolderTableModel();
 
 	private JTable resultsTable = new JTable();
-
-	private JTable actionTable = new JTable() {
-		private static final long serialVersionUID = 1L;
-
-		public boolean isCellEditable(int row, int column) {
-			return column == 0;
-		}// isCellEditable
-	};
-	
-	private JTable utilityTable = new JTable(){
-		private static final long serialVersionUID = 1L;
-
-		public boolean isCellEditable(int row, int column) {
-			return column == 0;
-		}// isCellEditable
-	};
+	private JTable actionTable = new JTable();
+	private JTable utilityTable = new JTable();
 
 
 	private HashMap<String, Integer> hashCounts = new HashMap<String, Integer>();;
@@ -1267,7 +1253,7 @@ public class Identic {
 
 	}// removeEmptyFolders
 
-	private void removeRows(LinkedList<Integer> rows, JTable table, ActionTableModel tableModel) {
+	private void removeRows(LinkedList<Integer> rows, JTable table, MyTableModel tableModel) {
 		int row;
 		String msg;
 		msg = String.format("[Before] Table: %d, Model %d", actionTable.getRowCount(), tableModel.getRowCount());
@@ -3100,8 +3086,8 @@ public class Identic {
 
 			@Override
 			public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-//				String fileName = file.toString();
-				String fileName = file.getFileName().toString();
+				String fileName = file.toString();
+//				String fileName = file.getFileName().toString();
 
 				String lastModifieTime = Files.getLastModifiedTime(file).toString();
 				long fileSize = Files.size(file);
