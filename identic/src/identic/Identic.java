@@ -1533,6 +1533,9 @@ public class Identic {
 	}// appClose
 
 	private void appInit() {
+		txtLog.setText(EMPTY_STRING);
+		log.setDoc(txtLog.getStyledDocument());
+
 
 		workingDirectory = getApplcationWorkingDirectory();
 
@@ -1583,10 +1586,6 @@ public class Identic {
 		//
 		//// listFindDuplicatesActive.setModel(targetModel);
 		// listExcluded.setModel(excludeModel);
-		txtLog.setText(EMPTY_STRING);
-
-		log.setDoc(txtLog.getStyledDocument());
-
 		// cbSaveExcludedFiles.setSelected(false);
 		//
 		// bgShowResults.add(rbAllTheFiles);
