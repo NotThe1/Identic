@@ -45,7 +45,9 @@ import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.text.Format;
 import java.text.MessageFormat;
+import java.text.SimpleDateFormat;
 import java.util.AbstractSet;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -1648,7 +1650,7 @@ public class Identic {
 	 */
 	private void initialize() {
 		frmIdentic = new JFrame();
-		frmIdentic.setTitle("Identic 2.0");
+		frmIdentic.setTitle("Identic 2.1");
 		frmIdentic.setBounds(100, 100, 450, 621);
 
 		frmIdentic.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -3142,7 +3144,6 @@ public class Identic {
 
 		class IdentifyWalker implements FileVisitor<Path> {
 			Pattern patternSubjects = Pattern.compile(targetListRegex);
-			// Pattern patternFileType = Pattern.compile("\\.(.+$)");
 			Pattern patternFileType = Pattern.compile("\\.([^.]+$)");
 			Matcher matcher;
 
@@ -3153,18 +3154,21 @@ public class Identic {
 
 			@Override
 			public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
-				// folderCount++;
 				return FileVisitResult.CONTINUE;
 			}// FileVisitResult
 
 			@Override
-			public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-				String fileName = file.toString();
-				// String fileName = file.getFileName().toString();
+			public FileVisitResult visitFile(Path path, BasicFileAttributes attrs) throws IOException {
+				
+				File file = path.toFile();
+				Date date = new Date(file.lastModified());
+				Format myFormat = new SimpleDateFormat("yyyy-MM-dd  HH:mm:ss");		
+				String lastModifieTime =myFormat.format(date);
 
-				String lastModifieTime = Files.getLastModifiedTime(file).toString();
-				long fileSize = Files.size(file);
+				long fileSize = Files.size(path);
+//				long fileSize = file.length();
 
+				String fileName = path.toString();
 				matcher = patternFileType.matcher(fileName);
 				String fileType = matcher.find() ? matcher.group(1).toLowerCase() : NONE;
 
