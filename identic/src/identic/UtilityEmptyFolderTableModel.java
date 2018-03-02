@@ -1,5 +1,7 @@
 package identic;
 
+import java.nio.file.Path;
+
 public class UtilityEmptyFolderTableModel extends MyTableModel {
 	private static final long serialVersionUID = 1L;
 	
@@ -18,7 +20,7 @@ public class UtilityEmptyFolderTableModel extends MyTableModel {
 		case 0:// "Action"
 			return Boolean.class;
 		case 1:// "Folder"
-			return super.getColumnClass(columnIndex);
+			return Path.class;
 
 		default:
 			return super.getColumnClass(columnIndex);

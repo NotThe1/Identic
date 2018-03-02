@@ -141,7 +141,6 @@ public class Identic {
 	private JTable actionTable = new JTable();
 	private JTable utilityTable = new JTable();
 
-
 	private HashMap<String, Integer> hashCounts = new HashMap<String, Integer>();;
 	private HashMap<String, Integer> hashIDs = new HashMap<String, Integer>();
 
@@ -1104,35 +1103,35 @@ public class Identic {
 	}// makeFolder
 
 	private void doActionMultiSelect() {
-		doUtilityBulkSelection(actionTable,true);
+		doUtilityBulkSelection(actionTable, true);
 	}// doActionMultiSelect
 
 	private void doActionMultiDeselect() {
-		doUtilityBulkSelection(actionTable,false);
+		doUtilityBulkSelection(actionTable, false);
 	}// doActionMultiSelect
 
-//	private void doActionBulkSelection(boolean state) {
-//		int[] selectedRows = actionTable.getSelectedRows();
-//		int column = actionTableModel.findColumn("Action");
-//		for (int row = 0; row < selectedRows.length; row++) {
-//			actionTable.setValueAt(state, selectedRows[row], column);
-//		} // for each selected row
-//			// actionTable.clearSelection();
-//		actionTable.updateUI();
-//	}// doActionBulkSelection
+	// private void doActionBulkSelection(boolean state) {
+	// int[] selectedRows = actionTable.getSelectedRows();
+	// int column = actionTableModel.findColumn("Action");
+	// for (int row = 0; row < selectedRows.length; row++) {
+	// actionTable.setValueAt(state, selectedRows[row], column);
+	// } // for each selected row
+	// // actionTable.clearSelection();
+	// actionTable.updateUI();
+	// }// doActionBulkSelection
 
 	private void doUtilityMultiSelect() {
-		doUtilityBulkSelection(utilityTable,true);
+		doUtilityBulkSelection(utilityTable, true);
 	}// doUtilityMultiSelect
 
 	private void doUtilityMultiDeselect() {
-		doUtilityBulkSelection(utilityTable,false);
+		doUtilityBulkSelection(utilityTable, false);
 	}// doUtilittyMultiDeselect
 
-	private void doUtilityBulkSelection(JTable table,boolean state) {
+	private void doUtilityBulkSelection(JTable table, boolean state) {
 		int[] selectedRows = table.getSelectedRows();
-//		int column = actionTableModel.findColumn("Action");
-		int column = ((AbstractTableModel) table.getModel()).findColumn("Action");//actionTableModel.findColumn("Action");
+		// int column = actionTableModel.findColumn("Action");
+		int column = ((AbstractTableModel) table.getModel()).findColumn("Action");// actionTableModel.findColumn("Action");
 		for (int row = 0; row < selectedRows.length; row++) {
 			table.setValueAt(state, selectedRows[row], column);
 		} // for each selected row
@@ -1196,9 +1195,8 @@ public class Identic {
 	}// doActionMove
 
 	private void doActionDelete() {
-		String sourcePathString = "";
-		String sourceName = "";
-		SortedSet<String> targetFolders = new TreeSet<String>(Collections.reverseOrder());
+		Path sourcePath;
+		SortedSet<Path> targetFolders = new TreeSet<Path>(Collections.reverseOrder());
 
 		int actionColumn = actionTableModel.findColumn(ActionTableModel.ACTION);
 		int directoryColumn = actionTableModel.findColumn(ActionTableModel.DIRECTORY);
@@ -1210,48 +1208,44 @@ public class Identic {
 				continue; // skip this row
 			} //
 
-			sourcePathString = (String) actionTableModel.getValueAt(row, directoryColumn);
-			sourceName = (String) actionTableModel.getValueAt(row, nameColumn);
+			sourcePath = Paths.get((String) actionTableModel.getValueAt(row, directoryColumn),
+					(String) actionTableModel.getValueAt(row, nameColumn));
 			try {
-				Files.delete(Paths.get(sourcePathString, sourceName));
-				targetFolders.add(sourcePathString);
-				String msg = String.format("[doActionDelete] File Deleted: %s, %s", sourcePathString, sourceName);
+				Files.delete(sourcePath);
+				targetFolders.add(sourcePath);
+				String msg = String.format("[doActionDelete] File Deleted: %s", sourcePath);
 				rowsToRemove.addFirst(row);
 				log.addInfo(msg);
 
 			} catch (AccessDeniedException ade) {
-				String msg = String.format("[doActionDelete] Access Denied: %s, %s", sourcePathString, sourceName);
+				String msg = String.format("[doActionDelete] Access Denied: %s", sourcePath);
 				log.addInfo(msg);
 			} catch (NoSuchFileException ne) {
-				String msg = String.format("[doActionDelete] File Does Not Exist : %s, %s", sourcePathString,
-						sourceName);
+				String msg = String.format("[doActionDelete] File Does Not Exist : %s", sourcePath);
 				log.addInfo(msg);
 			} catch (IOException e) {
-				String msg = String.format("[doActionDelete] Failed Delete: %s, %s", sourcePathString, sourceName);
+				String msg = String.format("[doActionDelete] Failed Delete: %s", sourcePath);
 				log.addError(msg, e.getMessage());
 				e.printStackTrace();
 			} // try delete
 		} // for rows
 		removeRows(rowsToRemove, actionTable, actionTableModel);
-		removeEmptyFolders(targetFolders);
+		removeEmptyFolders(targetFolders,false);
 	}// doActionDelete
 
-	private void removeEmptyFolders(SortedSet<String> targetFolders) {
-		java.io.File target;
-		for (String folder : targetFolders) {
+	private ArrayList<Path> findAncestors(Path subject) {
+		// does not return the root
+		ArrayList<Path> answer = new ArrayList<>();
+		answer.add(subject);
+		Path root = subject.getRoot();
+		Path parent = subject.getParent();
+		while (!root.equals(parent)) {
+			answer.add(parent);
+			parent = parent.getParent();
+		} // while
 
-			target = new File(folder);
-			if (!target.exists() || !target.isDirectory()) {
-				continue;
-			} // if only want directories that really are there
-
-			if (target.list().length == 0) {
-				log.addInfo("Remove " + folder);
-				target.delete();
-			} // if empty remove
-		} // for
-
-	}// removeEmptyFolders
+		return answer;
+	}// findAncestor
 
 	private void removeRows(LinkedList<Integer> rows, JTable table, MyTableModel tableModel) {
 		int row;
@@ -1263,12 +1257,13 @@ public class Identic {
 			tableModel.removeRow(row);
 		} // while
 
-		table.setModel(new ActionTableModel());
-		table.setModel(actionTableModel);
+		// table.setModel(new MyTableModel());
+
+		table.setModel(tableModel);
 		setActionColumns();
 		table.updateUI();
 
-		msg = String.format("[After] Table: %d, Model %d", actionTable.getRowCount(), tableModel.getRowCount());
+		msg = String.format("[After] Table: %d, Model %d", table.getRowCount(), tableModel.getRowCount());
 		log.addSpecial(msg);
 
 	}// removeRows
@@ -1339,21 +1334,56 @@ public class Identic {
 
 	}// doLogPrint
 	
-	private void doTest() {
-		log.addInfo("Testing ...");
-		
-		Path startPath = Paths.get(lblSourceFolder.getText());
-		try {
-			Files.walkFileTree(startPath, new EmptyFolderWalker());
-		} catch (IOException e) {
-			e.printStackTrace();
-		} // try
+	
+	//=============================Do Test =================================================
 
-	}//doTest
+	private void doTest() {
+		log.addNL();
+		log.addInfo("Initializing...");
+
+		String startFolder = "C:\\Temp\\A";
+		lblSourceFolder.setText(startFolder);
+		/* @formatter:off */
+		String[] folders = new String[] {startFolder,
+				startFolder + "\\B3",
+					startFolder + "\\B3"+ "\\E0",startFolder + "\\B3"+ "\\F0",startFolder + "\\B3"+ "\\G0",
+				startFolder + "\\C0",
+				startFolder + "\\D2",
+				startFolder + "\\D2" + "\\I0",
+				startFolder + "\\D2" + "\\H3",
+						startFolder + "\\D2" + "\\H3" + "\\J1",
+							startFolder + "\\D2" +"\\H3" + "\\J1" + "\\M0",
+						startFolder + "\\D2" + "\\H3" + "\\K0",startFolder + "\\D2" +"\\H3" + "\\L0"
+		};				
+/* @formatter:on  */
+
+		removeFolders(folders);
+		log.addNL();
+		makeFolders(folders);
+	}// doBtnOne
+
+	private void makeFolders(String[] folders) {
+		log.addInfo("[makeFolders]....");
+		for (String f : folders) {
+			Path path = Paths.get(f);
+			path.toFile().mkdir();
+			log.addInfo(f);
+		} // for
+
+	}// makeFolders
+
+	private void removeFolders(String[] folders) {
+		log.addInfo("[removeFolders]....");
+		for (int i = folders.length - 1; i >= 0; i--) {
+			Path path = Paths.get(folders[i]);
+			path.toFile().delete();
+		} // for
+	}// makeFolders
+//=============================Do Test =================================================
 
 	private void doTakeCensus() {
-		log.addInfo("Take Census");	
-		log.addInfo("   Starting Folder: "+ lblSourceFolder.getText());
+		log.addInfo("Take Census");
+		log.addInfo("   Starting Folder: " + lblSourceFolder.getText());
 		utilityCensusTableModel.clear();
 		utilityTable.setModel(utilityCensusTableModel);
 		fileTypeCensus.clear();
@@ -1363,26 +1393,25 @@ public class Identic {
 		} catch (IOException e) {
 			e.printStackTrace();
 		} // try
-		
+
 		Set<Entry<String, Integer>> fileTypeCensusSet = fileTypeCensus.entrySet();
 		for (Entry<String, Integer> entry : fileTypeCensusSet) {
-			utilityCensusTableModel.addRow(new Object[] {entry.getValue(),entry.getKey()});
-		} // for - entry		
+			utilityCensusTableModel.addRow(new Object[] { entry.getValue(), entry.getKey() });
+		} // for - entry
 		setCensusColumns();
-		
+
 		utilityTable.setRowSorter(new TableRowSorter<UtilityCensusTableModel>(utilityCensusTableModel));
 
 		utilityTable.updateUI();
 	}// doTest
-	
-	private void 	doFindEmptyFolders() {
-		log.addInfo("Find Empty Folders");	
-		log.addInfo("   Starting Folder: "+ lblSourceFolder.getText());
-		
+
+	private void doFindEmptyFolders() {
+		log.addInfo("Find Empty Folders");
+		log.addInfo("   Starting Folder: " + lblSourceFolder.getText());
+
 		utilityEmptyFolderTableModel.clear();
 		utilityTable.setModel(utilityEmptyFolderTableModel);
 
-		
 		Path startPath = Paths.get(lblSourceFolder.getText());
 		try {
 			Files.walkFileTree(startPath, new EmptyFolderWalker());
@@ -1392,47 +1421,88 @@ public class Identic {
 		setEmptyFoldersColumns();
 		utilityTable.setRowSorter(new TableRowSorter<UtilityEmptyFolderTableModel>(utilityEmptyFolderTableModel));
 
-		setRemoveFoldersState(utilityTable.getRowCount()!=0);
-	}//doFindEmptyFolders
-	
+		setRemoveFoldersState(utilityTable.getRowCount() != 0);// turn remove buttons on/off
+	}// doFindEmptyFolders
+
 	private void setRemoveFoldersState(boolean state) {
 		btnRemoveEmptyFoldersTree.setEnabled(state);
 		btnRemoveEmptyFolders.setEnabled(state);
-	}//setRemoveFoldersState
-	
-	
+	}// setRemoveFoldersState
 
-	private void doRemoveEmptyFoldersTree(){
-		System.out.println("Identic.doRemoveEmptyFoldersTree()");
-	}//doRemoveEmptyFoldersTree
+	private void doRemoveEmptyFoldersTree() {
+		log.addInfo("Identic.doRemoveEmptyFoldersTree()");
+		doRemoveEmptyFolders(true);
+	}// doRemoveEmptyFoldersTree
 	
-	
+	private void doRemoveEmptyFolders() {
+		log.addInfo("Identic.doRemoveEmptyFolders()");
+		doRemoveEmptyFolders(false);
+	}//doRemoveEmptyFolders - worker
 
-	private void doRemoveEmptyFolders(){
-		System.out.println("Identic.doRemoveEmptyFolders()");
-		
-		String sourcePathString = "";
-		SortedSet<String> targetFolders = new TreeSet<String>(Collections.reverseOrder());
+	private void doRemoveEmptyFolders(boolean tree) {
+		Path sourcePath;
+		SortedSet<Path> targetFolders = new TreeSet<Path>(Collections.reverseOrder());
 		int actionColumn = utilityEmptyFolderTableModel.findColumn(UtilityEmptyFolderTableModel.ACTION);
 		int folderColumn = utilityEmptyFolderTableModel.findColumn(UtilityEmptyFolderTableModel.FOLDER);
 		LinkedList<Integer> rowsToRemove = new LinkedList<Integer>();
+
 		for (int row = 0; row < utilityEmptyFolderTableModel.getRowCount(); row++) {
 			if (!(boolean) utilityEmptyFolderTableModel.getValueAt(row, actionColumn)) {
 				continue; // skip this row
 			} // if
-			sourcePathString = (String) utilityEmptyFolderTableModel.getValueAt(row, folderColumn);
-			targetFolders.add(sourcePathString);
-			String msg = String.format("[doActionDelete] Folder Deleted: %s", sourcePathString);
+			sourcePath = (Path) utilityEmptyFolderTableModel.getValueAt(row, folderColumn);
+			targetFolders.add(sourcePath);
 			rowsToRemove.addFirst(row);
-			log.addInfo(msg);
-
-			
 		} // for rows
-//		removeRows(rowsToRemove, actionTable, actionTableModel);
-//		removeEmptyFolders(targetFolders);
+		
+		removeRows(rowsToRemove, utilityTable, utilityEmptyFolderTableModel);
+		removeEmptyFolders(targetFolders,tree);
+		// sourcePath = null;
+	}// doRemoveEmptyFolders
 
+//	private void removeEmptyFolders(SortedSet<Path> targetFolders) {
+//		
+//		File file;
+//		for (Path folder : targetFolders) {
+//			file = folder.toFile();
+//			if (file.isDirectory() & (file.list().length == 0)) {
+//				file.delete();
+//			} // if
+//		} // for
+//	}// removeEmptyFolders
 
-	}//doRemoveEmptyFolders
+	private void removeEmptyFolders(SortedSet<Path> targetFolders, boolean tree) {
+		
+			File file;
+			for (Path folder : targetFolders) {
+				file = folder.toFile();
+				if(!file.isDirectory()) {
+					continue;
+				}else if(file.list().length == 0) {
+					file.delete();
+					if (tree) {
+						removeParent(file.getParentFile());
+					} //  inner if
+				}//if - file or directory
+
+			} // for
+
+	}// removeEmptyFolders
+
+	private void removeParent(File file) {
+		Path path = file.toPath();
+		if (path == path.getRoot()) {
+			return;
+		} // exit at root
+		path = null;
+		
+		if(file.listFiles().length==0) {
+			File parent = file.getParentFile();
+			file.delete();
+			removeParent(parent);
+		}//if
+		
+	}// removeParent
 
 	// Swing code ///////////////////////////////////////////////////////////////
 
@@ -1554,7 +1624,7 @@ public class Identic {
 
 		@SuppressWarnings("unused")
 		TableColumnManager tcmResults = new TableColumnManager(resultsTable);
-		
+
 		setRemoveFoldersState(false);
 
 		// actionSelectionModel = actionTable.getSelectionModel();
@@ -2553,7 +2623,7 @@ public class Identic {
 		gbl_panelUtilityLeft.columnWeights = new double[] { 1.0, Double.MIN_VALUE };
 		gbl_panelUtilityLeft.rowWeights = new double[] { 0.0, 0.0, 1.0, 0.0, 1.0, Double.MIN_VALUE };
 		panelUtilityLeft.setLayout(gbl_panelUtilityLeft);
-		
+
 		Component verticalStrut_18 = Box.createVerticalStrut(20);
 		verticalStrut_18.setPreferredSize(new Dimension(0, 50));
 		GridBagConstraints gbc_verticalStrut_18 = new GridBagConstraints();
@@ -2564,7 +2634,9 @@ public class Identic {
 		panelUtilityLeft.add(verticalStrut_18, gbc_verticalStrut_18);
 
 		JPanel panelLeftUtility1 = new JPanel();
-		panelLeftUtility1.setBorder(new CompoundBorder(new BevelBorder(BevelBorder.LOWERED, null, null, null, null), new TitledBorder(new LineBorder(new Color(0, 0, 0), 1, true), "File Types", TitledBorder.CENTER, TitledBorder.ABOVE_TOP, null, new Color(0, 0, 0))));
+		panelLeftUtility1.setBorder(new CompoundBorder(new BevelBorder(BevelBorder.LOWERED, null, null, null, null),
+				new TitledBorder(new LineBorder(new Color(0, 0, 0), 1, true), "File Types", TitledBorder.CENTER,
+						TitledBorder.ABOVE_TOP, null, new Color(0, 0, 0))));
 		GridBagConstraints gbc_panelLeftUtility1 = new GridBagConstraints();
 		gbc_panelLeftUtility1.insets = new Insets(0, 0, 5, 0);
 		gbc_panelLeftUtility1.fill = GridBagConstraints.BOTH;
@@ -2577,11 +2649,11 @@ public class Identic {
 		gbl_panelLeftUtility1.columnWeights = new double[] { 1.0, Double.MIN_VALUE };
 		gbl_panelLeftUtility1.rowWeights = new double[] { 0.0, 0.0, Double.MIN_VALUE };
 		panelLeftUtility1.setLayout(gbl_panelLeftUtility1);
-		
+
 		JButton btnFileTypeCensus = new JButton("Take Census");
 		btnFileTypeCensus.setName(BTN_TAKE_CENSUS);
 		btnFileTypeCensus.addActionListener(identicAdapter);
-		
+
 		Component verticalStrut_19 = Box.createVerticalStrut(20);
 		verticalStrut_19.setPreferredSize(new Dimension(0, 40));
 		GridBagConstraints gbc_verticalStrut_19 = new GridBagConstraints();
@@ -2594,7 +2666,7 @@ public class Identic {
 		gbc_btnFileTypeCensus.gridx = 0;
 		gbc_btnFileTypeCensus.gridy = 1;
 		panelLeftUtility1.add(btnFileTypeCensus, gbc_btnFileTypeCensus);
-		
+
 		Component verticalStrut_20 = Box.createVerticalStrut(20);
 		verticalStrut_20.setPreferredSize(new Dimension(0, 100));
 		GridBagConstraints gbc_verticalStrut_20 = new GridBagConstraints();
@@ -2604,7 +2676,9 @@ public class Identic {
 		panelUtilityLeft.add(verticalStrut_20, gbc_verticalStrut_20);
 
 		JPanel panelLeftUtility2 = new JPanel();
-		panelLeftUtility2.setBorder(new CompoundBorder(new BevelBorder(BevelBorder.LOWERED, null, null, null, null), new TitledBorder(new LineBorder(new Color(0, 0, 0), 1, true), "Empty Folders", TitledBorder.CENTER, TitledBorder.ABOVE_TOP, null, new Color(0, 0, 0))));
+		panelLeftUtility2.setBorder(new CompoundBorder(new BevelBorder(BevelBorder.LOWERED, null, null, null, null),
+				new TitledBorder(new LineBorder(new Color(0, 0, 0), 1, true), "Empty Folders", TitledBorder.CENTER,
+						TitledBorder.ABOVE_TOP, null, new Color(0, 0, 0))));
 		GridBagConstraints gbc_panelLeftUtility2 = new GridBagConstraints();
 		gbc_panelLeftUtility2.fill = GridBagConstraints.BOTH;
 		gbc_panelLeftUtility2.gridx = 0;
@@ -2616,7 +2690,7 @@ public class Identic {
 		gbl_panelLeftUtility2.columnWeights = new double[] { 0.0, 1.0, Double.MIN_VALUE };
 		gbl_panelLeftUtility2.rowWeights = new double[] { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, Double.MIN_VALUE };
 		panelLeftUtility2.setLayout(gbl_panelLeftUtility2);
-		
+
 		Component verticalStrut_21 = Box.createVerticalStrut(20);
 		verticalStrut_21.setPreferredSize(new Dimension(0, 40));
 		GridBagConstraints gbc_verticalStrut_21 = new GridBagConstraints();
@@ -2624,7 +2698,7 @@ public class Identic {
 		gbc_verticalStrut_21.gridx = 0;
 		gbc_verticalStrut_21.gridy = 0;
 		panelLeftUtility2.add(verticalStrut_21, gbc_verticalStrut_21);
-		
+
 		JButton btnFindEmptyFolders = new JButton("Find");
 		btnFindEmptyFolders.setName(BTN_FIND_EMPTY_FOLDERS);
 		btnFindEmptyFolders.addActionListener(identicAdapter);
@@ -2634,14 +2708,14 @@ public class Identic {
 		gbc_btnFindEmptyFolders.gridx = 1;
 		gbc_btnFindEmptyFolders.gridy = 1;
 		panelLeftUtility2.add(btnFindEmptyFolders, gbc_btnFindEmptyFolders);
-		
+
 		Component verticalStrut_22 = Box.createVerticalStrut(20);
 		GridBagConstraints gbc_verticalStrut_22 = new GridBagConstraints();
 		gbc_verticalStrut_22.insets = new Insets(0, 0, 5, 0);
 		gbc_verticalStrut_22.gridx = 1;
 		gbc_verticalStrut_22.gridy = 2;
 		panelLeftUtility2.add(verticalStrut_22, gbc_verticalStrut_22);
-		
+
 		btnRemoveEmptyFolders = new JButton("Remove Folders");
 		btnRemoveEmptyFolders.setName(BTN_REMOVE_EMPTY_FOLDERS);
 		btnRemoveEmptyFolders.addActionListener(identicAdapter);
@@ -2652,7 +2726,7 @@ public class Identic {
 		gbc_btnRemoveEmptyFolders.gridx = 1;
 		gbc_btnRemoveEmptyFolders.gridy = 3;
 		panelLeftUtility2.add(btnRemoveEmptyFolders, gbc_btnRemoveEmptyFolders);
-		
+
 		Component verticalStrut_23 = Box.createVerticalStrut(20);
 		verticalStrut_23.setPreferredSize(new Dimension(0, 10));
 		GridBagConstraints gbc_verticalStrut_23 = new GridBagConstraints();
@@ -2660,11 +2734,12 @@ public class Identic {
 		gbc_verticalStrut_23.gridx = 1;
 		gbc_verticalStrut_23.gridy = 4;
 		panelLeftUtility2.add(verticalStrut_23, gbc_verticalStrut_23);
-		
+
 		btnRemoveEmptyFoldersTree = new JButton("Remove Folders & Trees");
 		btnRemoveEmptyFoldersTree.setName(BTN_REMOVE_EMPTY_FOLDERS_TREE);
 		btnRemoveEmptyFoldersTree.addActionListener(identicAdapter);
-		btnRemoveEmptyFoldersTree.setToolTipText("Remove selected folderd and any parents that become empty by this removal");
+		btnRemoveEmptyFoldersTree
+				.setToolTipText("Remove selected folderd and any parents that become empty by this removal");
 		GridBagConstraints gbc_btnRemoveEmptyFoldersTree = new GridBagConstraints();
 		gbc_btnRemoveEmptyFoldersTree.fill = GridBagConstraints.HORIZONTAL;
 		gbc_btnRemoveEmptyFoldersTree.gridx = 1;
@@ -2674,13 +2749,13 @@ public class Identic {
 		JScrollPane scrollPaneUtilities = new JScrollPane();
 		splitPaneUtilities.setRightComponent(scrollPaneUtilities);
 
-//		tableUtility = new JTable();
+		// tableUtility = new JTable();
 		scrollPaneUtilities.setViewportView(utilityTable);
 		splitPaneUtilities.setDividerLocation(200);
-		
+
 		popupUtility = new JPopupMenu();
 		addPopup(utilityTable, popupUtility);
-		
+
 		JMenuItem popupUtilitySelect = new JMenuItem("Select");
 		popupUtilitySelect.setName(PUM_UTILITY_SELECT);
 		popupUtilitySelect.setActionCommand(PUM_UTILITY_SELECT);
@@ -2692,8 +2767,6 @@ public class Identic {
 		popupUtilityDeselect.setActionCommand(PUM_UTILITY_DESELECT);
 		popupUtilityDeselect.addActionListener(utilityAdapter);
 		popupUtility.add(popupUtilityDeselect);
-
-
 
 		JPanel tabLog = new JPanel();
 		tabLog.setName(TAB_LOG);
@@ -2986,9 +3059,9 @@ public class Identic {
 
 	private static final String PUM_LOG_PRINT = "popupLogPrint";
 	private static final String PUM_LOG_CLEAR = "popupLogClear";
-	
+
 	private static final String BTN_TAKE_CENSUS = "btnTakeCensus";
-	
+
 	private static final String BTN_FIND_EMPTY_FOLDERS = "btnFindEmptyFolders";
 	private static final String BTN_REMOVE_EMPTY_FOLDERS = "btnRemoveEmptyFolders";
 	private static final String BTN_REMOVE_EMPTY_FOLDERS_TREE = "btnRemoveEmptyFoldersTree";
@@ -3034,7 +3107,7 @@ public class Identic {
 	private JPopupMenu popupActions;
 	private JPopupMenu popupLog;
 	private JPopupMenu popupUtility;
-//	private JTable tableUtility;
+	// private JTable tableUtility;
 	private JButton btnRemoveEmptyFolders;
 	private JButton btnRemoveEmptyFoldersTree;
 	// private JList lstCatalogInUse;
@@ -3087,7 +3160,7 @@ public class Identic {
 			@Override
 			public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
 				String fileName = file.toString();
-//				String fileName = file.getFileName().toString();
+				// String fileName = file.getFileName().toString();
 
 				String lastModifieTime = Files.getLastModifiedTime(file).toString();
 				long fileSize = Files.size(file);
@@ -3315,16 +3388,16 @@ public class Identic {
 
 	// -------------------------------------------------------------------
 
-	class CensusWalker implements FileVisitor<Path>{
+	class CensusWalker implements FileVisitor<Path> {
 		Pattern patternFileType = Pattern.compile("\\.([^.]+$)");
 		Matcher matcher;
-		
+
 		public CensusWalker() {
-		}//Constructor
-		
+		}// Constructor
+
 		@Override
 		public FileVisitResult visitFile(Path file, BasicFileAttributes arg1) throws IOException {
-//			String fileName = file.toString();
+			// String fileName = file.toString();
 			String fileName = file.getFileName().toString();
 			matcher = patternFileType.matcher(fileName);
 			String fileType = matcher.find() ? matcher.group(1).toLowerCase() : NONE;
@@ -3334,76 +3407,74 @@ public class Identic {
 					fileTypeCensus.put(fileType, 1);
 				} else {
 					fileTypeCensus.put(fileType, occurances + 1);
-				} // if unique	
-			}//if type found
+				} // if unique
+			} // if type found
 			return FileVisitResult.CONTINUE;
-		}//visitFile
+		}// visitFile
 
 		@Override
 		public FileVisitResult postVisitDirectory(Path arg0, IOException arg1) throws IOException {
 			return FileVisitResult.CONTINUE;
-		}//postVisitDirectory
+		}// postVisitDirectory
 
 		@Override
 		public FileVisitResult preVisitDirectory(Path file, BasicFileAttributes arg1) throws IOException {
 			return FileVisitResult.CONTINUE;
-		}//preVisitDirectory
+		}// preVisitDirectory
 
 		@Override
 		public FileVisitResult visitFileFailed(Path file, IOException arg1) throws IOException {
 			log.addError("Failed to visit " + file.toString());
 			return FileVisitResult.CONTINUE;
-		}//visitFileFailed
-		
-	}//class CensusWalker
-	
-	class EmptyFolderWalker implements FileVisitor<Path>{
+		}// visitFileFailed
+
+	}// class CensusWalker
+
+	class EmptyFolderWalker implements FileVisitor<Path> {
 		Pattern patternFileType = Pattern.compile("\\.([^.]+$)");
 		Matcher matcher;
-		
+
 		public EmptyFolderWalker() {
-		}//Constructor
-		
+		}// Constructor
+
 		@Override
 		public FileVisitResult visitFile(Path file, BasicFileAttributes arg1) throws IOException {
 			return FileVisitResult.CONTINUE;
-		}//visitFile
+		}// visitFile
 
 		@Override
 		public FileVisitResult postVisitDirectory(Path folder, IOException arg1) throws IOException {
-			File f = new java.io.File(folder.toAbsolutePath().toString());
+			File f = folder.toFile();
+			// File f = new java.io.File(folder.toAbsolutePath().toString());
 			String[] contents = f.list();
 			int count = contents.length;
-			int nameCount = folder.getNameCount();
-			String msg = String.format("nameCount: %2d, count: %,5d   %s",nameCount, count,folder.toAbsolutePath().toString());
+
+			String msg = String.format("count: %,5d %s", count, folder.toAbsolutePath().toString());
 			log.addInfo(msg);
-			if (count==0) {
-				utilityEmptyFolderTableModel.addRow(new Object[] {false,folder.toAbsolutePath().toString()});
+
+			if (count == 0) {
+				utilityEmptyFolderTableModel.addRow(new Object[] { true, folder });
 				log.addSpecial("delete " + msg);
-			}//
+			} // if
+
 			return FileVisitResult.CONTINUE;
-		}//postVisitDirectory
+		}// postVisitDirectory
 
 		@Override
 		public FileVisitResult preVisitDirectory(Path folder, BasicFileAttributes arg1) throws IOException {
 			return FileVisitResult.CONTINUE;
-		}//preVisitDirectory
+		}// preVisitDirectory
 
 		@Override
 		public FileVisitResult visitFileFailed(Path file, IOException arg1) throws IOException {
 			log.addError("[EmptyFolderWalker] Failed to visit " + file.toString());
 			return FileVisitResult.CONTINUE;
-		}//visitFileFailed
-		
-	}//class EmptyFolderWalker
-	
+		}// visitFileFailed
 
+	}// class EmptyFolderWalker
 
-	
 	// -------------------------------------------------------------------
 
-
-	
 	//////////////////////////// [[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[
 
 	@SuppressWarnings("serial")
@@ -3546,20 +3617,19 @@ public class Identic {
 			case BTN_ACTION_DELETE:
 				doActionDelete();
 				break;
-			
-				
+
 			case BTN_TAKE_CENSUS:
 				doTakeCensus();
-				break;		
-				
+				break;
+
 			case BTN_FIND_EMPTY_FOLDERS:
 				doFindEmptyFolders();
 				break;
-				
+
 			case BTN_REMOVE_EMPTY_FOLDERS_TREE:
 				doRemoveEmptyFoldersTree();
 				break;
-				
+
 			case BTN_REMOVE_EMPTY_FOLDERS:
 				doRemoveEmptyFolders();
 				break;
