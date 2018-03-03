@@ -51,7 +51,7 @@ import javax.swing.event.ListSelectionListener;
 public class ManageLists extends JDialog {
 	private static final long serialVersionUID = 1L;
 	private final JPanel contentPanel = new JPanel();
-	
+
 	private String fileListDirectory;
 
 	private DefaultListModel<String> availableListsModel = new DefaultListModel<>();
@@ -135,16 +135,16 @@ public class ManageLists extends JDialog {
 					"Save File Suffix List", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
 			if (ans == JOptionPane.NO_OPTION) {
 				return;
-			}//inner if
-		}// if file exists
-		
+			} // inner if
+		} // if file exists
+
 		try {
 			Files.deleteIfExists(listPath);
 			Files.createFile(listPath);
 		} catch (IOException e) {
 			e.printStackTrace();
 
-		} //try
+		} // try
 
 		ArrayList<String> lines = new ArrayList<>();
 		for (int i = 0; i < editListModel.getSize(); i++) {
@@ -236,29 +236,32 @@ public class ManageLists extends JDialog {
 		if (fileListDirectory.equals(EMPTY_STRING)) {
 			fileListDirectory = System.getProperty("java.io.tmpdir");
 			fileListDirectory = fileListDirectory.replace("Temp", "Identic");
-
-			Path p = Paths.get(fileListDirectory);
-			if (!Files.exists(p)) {
-				JOptionPane.showMessageDialog(this, "Initializing File Type lists in " + p.toString(), "Initialization",
-						JOptionPane.INFORMATION_MESSAGE);
-				System.err.println("Making new directory");
-				try {
-					Files.createDirectories(p);
-				} catch (IOException e) {
-					e.printStackTrace();
-				} // try
-			} // if exits
-
-		} // if not there
+		} // if no established fileListDirectory
+		
+		File targetDirectory = new File(fileListDirectory);
+		
+//		Path p = Paths.get(fileListDirectory);
+		if (!targetDirectory.exists()) {
+			JOptionPane.showMessageDialog(this, "Initializing File Type lists in " + fileListDirectory, "Initialization",
+					JOptionPane.INFORMATION_MESSAGE);
+			System.err.println("Making new directory");
+			//try {
+				targetDirectory.mkdirs();
+			//} catch (IOException e) {
+			//	e.printStackTrace();
+			//} // try
+		} // if exits
 
 		// we have the directory, do we have lists ?
 
-		File targetDirectory = new File(fileListDirectory);
+		// File targetDirectory = new File(fileListDirectory);
+//		File targetDirectory = p.toFile();
+
 		File[] files = targetDirectory.listFiles(new ListFilter(LIST_SUFFIX_DOT));
 
 		// if files empty - initialize the directory
-		
-		if (files==null|files.length == 0) {
+
+		if (files == null | files.length == 0) {
 
 			String[] initalListFiles = new String[] { "/VB.typeList", "/Music.typeList", "/MusicAndPictures.typeList",
 					"/Pictures.typeList" };
@@ -307,7 +310,7 @@ public class ManageLists extends JDialog {
 		myPrefs.putInt("LocX", point.x);
 		myPrefs.putInt("LocY", point.y);
 
-//		myPrefs.put("ListDirectory", fileListDirectory);
+		// myPrefs.put("ListDirectory", fileListDirectory);
 		myPrefs = null;
 		dispose();
 	}// appClose
@@ -595,10 +598,10 @@ public class ManageLists extends JDialog {
 
 	class ListFilter implements FilenameFilter {
 		String suffix;
-		
+
 		public ListFilter(String suffix) {
-			this.suffix=suffix;
-		}//Constructor
+			this.suffix = suffix;
+		}// Constructor
 
 		@Override
 		public boolean accept(File arg0, String arg1) {
@@ -699,9 +702,9 @@ public class ManageLists extends JDialog {
 		// --------------------------------------------------------------------
 
 	private static final String NEW_LIST = "<NEW>";
-//	private static final String NOT_SET = "<Not Set>";
+	// private static final String NOT_SET = "<Not Set>";
 	private static final String EMPTY_STRING = "";
-//	private static final String LIST_SUFFIX = "typeList";
+	// private static final String LIST_SUFFIX = "typeList";
 	private static final String LIST_SUFFIX_DOT = ".typeList";
 
 	private static final String EDIT_ADD = "Add";

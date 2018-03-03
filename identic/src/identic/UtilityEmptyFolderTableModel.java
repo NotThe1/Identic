@@ -4,7 +4,7 @@ import java.nio.file.Path;
 
 public class UtilityEmptyFolderTableModel extends MyTableModel {
 	private static final long serialVersionUID = 1L;
-	
+
 	UtilityEmptyFolderTableModel() {
 		super(new String[] { ACTION, FOLDER });
 	}// Constructor
@@ -15,22 +15,21 @@ public class UtilityEmptyFolderTableModel extends MyTableModel {
 
 	@Override
 	public Class<?> getColumnClass(int columnIndex) {
-
+		Class<?> ans;
 		switch (columnIndex) {
 		case 0:// "Action"
-			return Boolean.class;
+			ans = Boolean.class;
+			break;
 		case 1:// "Folder"
-			return Path.class;
-
+			ans = Path.class;
+			break;
 		default:
-			return super.getColumnClass(columnIndex);
+			ans = super.getColumnClass(columnIndex);
 		}// switch
+		return ans;
 	}// getColumnClass
 
 	public static final String ACTION = "Action";
 	public static final String FOLDER = "Folder";
-
-	private static final String[] headers = new String[] { ACTION, FOLDER };
-	private static final int columns = headers.length;
 
 }// class EmptyFolderTableModel

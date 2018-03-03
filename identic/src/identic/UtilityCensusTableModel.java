@@ -21,15 +21,18 @@ public class UtilityCensusTableModel extends MyTableModel {
 			throw new IllegalArgumentException(msg);
 		}//if
 		
-		Class<?> ans = String.class;
+		Class<?> ans;
 		switch (columnIndex) {
 		case 0:// "Count"
 			ans = Integer.class;
+			break;
 		case 1:// "Directory"
 			ans = String.class;
+			break;
 		default:
-			return super.getColumnClass(columnIndex);
+			ans = super.getColumnClass(columnIndex);
 		}// switch
+		return ans;
 	}// getColumnClass
 
 	private static final String COUNT = "Count";

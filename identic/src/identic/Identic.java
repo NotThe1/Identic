@@ -28,9 +28,9 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.FilenameFilter;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.net.URISyntaxException;
 import java.nio.file.AccessDeniedException;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.FileVisitResult;
@@ -578,16 +578,12 @@ public class Identic {
 		// if files empty - initialize the directory
 		if (files.length == 0) {
 
-			String[] initalListFiles = new String[] { "/VB.typeList", "/Music.typeList", "/MusicAndPictures.typeList",
-					"/Pictures.typeList" };
-			Path newDir = Paths.get(workingDirectory);
-			Path source = null;
-			for (int i = 0; i < initalListFiles.length; i++) {
-				try {
-					// sources.add(Paths.get(this.getClass().getResource(initalListFiles[i] ).toURI()));
-					source = Paths.get(this.getClass().getResource(initalListFiles[i]).toURI());
-					Files.move(source, newDir.resolve(source.getFileName()), StandardCopyOption.REPLACE_EXISTING);
-				} catch (URISyntaxException | IOException e) {
+			for (int i = 0; i < INITIAL_LISTFILES.length; i++) {
+				try {	
+					InputStream inputStream = this.getClass().getResourceAsStream(INITIAL_LISTFILES[i]);
+					Path targetPath = Paths.get(workingDirectory, INITIAL_LISTFILES[i]);				
+					Files.copy(inputStream, targetPath, StandardCopyOption.REPLACE_EXISTING);
+				} catch (IOException e) {
 					e.printStackTrace();
 				} // try
 			} // for
@@ -1232,7 +1228,7 @@ public class Identic {
 			} // try delete
 		} // for rows
 		removeRows(rowsToRemove, actionTable, actionTableModel);
-		removeEmptyFolders(targetFolders,false);
+		removeEmptyFolders(targetFolders, false);
 	}// doActionDelete
 
 	private ArrayList<Path> findAncestors(Path subject) {
@@ -1335,53 +1331,14 @@ public class Identic {
 		} // try
 
 	}// doLogPrint
-	
-	
-	//=============================Do Test =================================================
+
+	// =============================Do Test =================================================
 
 	private void doTest() {
-		log.addNL();
-		log.addInfo("Initializing...");
 
-		String startFolder = "C:\\Temp\\A";
-		lblSourceFolder.setText(startFolder);
-		/* @formatter:off */
-		String[] folders = new String[] {startFolder,
-				startFolder + "\\B3",
-					startFolder + "\\B3"+ "\\E0",startFolder + "\\B3"+ "\\F0",startFolder + "\\B3"+ "\\G0",
-				startFolder + "\\C0",
-				startFolder + "\\D2",
-				startFolder + "\\D2" + "\\I0",
-				startFolder + "\\D2" + "\\H3",
-						startFolder + "\\D2" + "\\H3" + "\\J1",
-							startFolder + "\\D2" +"\\H3" + "\\J1" + "\\M0",
-						startFolder + "\\D2" + "\\H3" + "\\K0",startFolder + "\\D2" +"\\H3" + "\\L0"
-		};				
-/* @formatter:on  */
-
-		removeFolders(folders);
-		log.addNL();
-		makeFolders(folders);
 	}// doBtnOne
 
-	private void makeFolders(String[] folders) {
-		log.addInfo("[makeFolders]....");
-		for (String f : folders) {
-			Path path = Paths.get(f);
-			path.toFile().mkdir();
-			log.addInfo(f);
-		} // for
-
-	}// makeFolders
-
-	private void removeFolders(String[] folders) {
-		log.addInfo("[removeFolders]....");
-		for (int i = folders.length - 1; i >= 0; i--) {
-			Path path = Paths.get(folders[i]);
-			path.toFile().delete();
-		} // for
-	}// makeFolders
-//=============================Do Test =================================================
+	// =============================Do Test =================================================
 
 	private void doTakeCensus() {
 		log.addInfo("Take Census");
@@ -1435,11 +1392,11 @@ public class Identic {
 		log.addInfo("Identic.doRemoveEmptyFoldersTree()");
 		doRemoveEmptyFolders(true);
 	}// doRemoveEmptyFoldersTree
-	
+
 	private void doRemoveEmptyFolders() {
 		log.addInfo("Identic.doRemoveEmptyFolders()");
 		doRemoveEmptyFolders(false);
-	}//doRemoveEmptyFolders - worker
+	}// doRemoveEmptyFolders - worker
 
 	private void doRemoveEmptyFolders(boolean tree) {
 		Path sourcePath;
@@ -1456,38 +1413,38 @@ public class Identic {
 			targetFolders.add(sourcePath);
 			rowsToRemove.addFirst(row);
 		} // for rows
-		
+
 		removeRows(rowsToRemove, utilityTable, utilityEmptyFolderTableModel);
-		removeEmptyFolders(targetFolders,tree);
+		removeEmptyFolders(targetFolders, tree);
 		// sourcePath = null;
 	}// doRemoveEmptyFolders
 
-//	private void removeEmptyFolders(SortedSet<Path> targetFolders) {
-//		
-//		File file;
-//		for (Path folder : targetFolders) {
-//			file = folder.toFile();
-//			if (file.isDirectory() & (file.list().length == 0)) {
-//				file.delete();
-//			} // if
-//		} // for
-//	}// removeEmptyFolders
+	// private void removeEmptyFolders(SortedSet<Path> targetFolders) {
+	//
+	// File file;
+	// for (Path folder : targetFolders) {
+	// file = folder.toFile();
+	// if (file.isDirectory() & (file.list().length == 0)) {
+	// file.delete();
+	// } // if
+	// } // for
+	// }// removeEmptyFolders
 
 	private void removeEmptyFolders(SortedSet<Path> targetFolders, boolean tree) {
-		
-			File file;
-			for (Path folder : targetFolders) {
-				file = folder.toFile();
-				if(!file.isDirectory()) {
-					continue;
-				}else if(file.list().length == 0) {
-					file.delete();
-					if (tree) {
-						removeParent(file.getParentFile());
-					} //  inner if
-				}//if - file or directory
 
-			} // for
+		File file;
+		for (Path folder : targetFolders) {
+			file = folder.toFile();
+			if (!file.isDirectory()) {
+				continue;
+			} else if (file.list().length == 0) {
+				file.delete();
+				if (tree) {
+					removeParent(file.getParentFile());
+				} // inner if
+			} // if - file or directory
+
+		} // for
 
 	}// removeEmptyFolders
 
@@ -1497,13 +1454,13 @@ public class Identic {
 			return;
 		} // exit at root
 		path = null;
-		
-		if(file.listFiles().length==0) {
+
+		if (file.listFiles().length == 0) {
 			File parent = file.getParentFile();
 			file.delete();
 			removeParent(parent);
-		}//if
-		
+		} // if
+
 	}// removeParent
 
 	// Swing code ///////////////////////////////////////////////////////////////
@@ -1535,7 +1492,6 @@ public class Identic {
 	private void appInit() {
 		txtLog.setText(EMPTY_STRING);
 		log.setDoc(txtLog.getStyledDocument());
-
 
 		workingDirectory = getApplcationWorkingDirectory();
 
@@ -2918,6 +2874,7 @@ public class Identic {
 		panelLeft.add(verticalStrut_17, gbc_verticalStrut_17);
 
 		JButton btnTest = new JButton("Test");
+		btnTest.setVisible(false);
 		btnTest.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent arg0) {
 				doTest();
@@ -3015,6 +2972,8 @@ public class Identic {
 	private static final String NEW_LIST = "<NEW>";
 	private static final String LIST_SUFFIX = "typeList";
 	private static final String LIST_SUFFIX_DOT = "." + LIST_SUFFIX;
+	private static final String[] INITIAL_LISTFILES = new String[] { "/VB" + LIST_SUFFIX_DOT,
+			"/Music" + LIST_SUFFIX_DOT, "/MusicAndPictures" + LIST_SUFFIX_DOT, "/Pictures" + LIST_SUFFIX_DOT };
 
 	// Catalog Constants
 	private static final String BTN_START = "btnStart";
@@ -3158,14 +3117,14 @@ public class Identic {
 
 			@Override
 			public FileVisitResult visitFile(Path path, BasicFileAttributes attrs) throws IOException {
-				
+
 				File file = path.toFile();
 				Date date = new Date(file.lastModified());
-				Format myFormat = new SimpleDateFormat("yyyy-MM-dd  HH:mm:ss");		
-				String lastModifieTime =myFormat.format(date);
+				Format myFormat = new SimpleDateFormat("yyyy-MM-dd  HH:mm:ss");
+				String lastModifieTime = myFormat.format(date);
 
 				long fileSize = Files.size(path);
-//				long fileSize = file.length();
+				// long fileSize = file.length();
 
 				String fileName = path.toString();
 				matcher = patternFileType.matcher(fileName);
