@@ -1,6 +1,5 @@
 package identic;
 
-
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
@@ -44,11 +43,7 @@ import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.text.Format;
 import java.text.MessageFormat;
-import java.text.SimpleDateFormat;
 import java.util.AbstractSet;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -57,12 +52,16 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.Map.Entry;
-import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.StringJoiner;
 import java.util.TreeSet;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.prefs.Preferences;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -108,10 +107,13 @@ import javax.swing.table.AbstractTableModel;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableColumn;
 import javax.swing.table.TableRowSorter;
+
 /*
- *  2018-11-09   2.0.0 Adding concurrent processing for File I/O part of application
+ *  2018-11-09   3.0.0 Adding concurrent processing for File I/O part of application
  */
 public class Identic {
+
+	private static final int PROCESSORS = Runtime.getRuntime().availableProcessors();
 
 	private AdapterIdentic identicAdapter = new AdapterIdentic();
 	private AdapterManageLists manageListsAdapter = new AdapterManageLists();
@@ -127,9 +129,13 @@ public class Identic {
 	private ButtonGroup bgActions = new ButtonGroup();
 
 	// Find
-	private LinkedBlockingQueue<FileStat> qSubjects = new LinkedBlockingQueue<FileStat>();
-	private LinkedBlockingQueue<FileStatReject> qRejects = new LinkedBlockingQueue<FileStatReject>();
-	private LinkedBlockingQueue<FileStat> qHashes = new LinkedBlockingQueue<FileStat>();
+	// private LinkedBlockingQueue<FileStat> qSubjects = new LinkedBlockingQueue<FileStat>();
+	// private LinkedBlockingQueue<FileStatReject> qRejects = new LinkedBlockingQueue<FileStatReject>();
+	// private LinkedBlockingQueue<FileStat> qHashes = new LinkedBlockingQueue<FileStat>();
+	private static ConcurrentLinkedQueue<FileStat> qSubjects = new ConcurrentLinkedQueue<>();
+	private static ConcurrentLinkedQueue<FileStatReject> qRejects = new ConcurrentLinkedQueue<>();
+	private static ConcurrentLinkedQueue<FileStat> qHashes = new ConcurrentLinkedQueue<FileStat>();
+
 	private HashMap<String, Integer> excludedFileTypes = new HashMap<>();
 	private HashMap<String, Integer> fileTypeCensus = new HashMap<>();
 
@@ -146,8 +152,10 @@ public class Identic {
 	private JTable actionTable = new JTable();
 	private JTable utilityTable = new JTable();
 
-	private HashMap<String, Integer> hashCounts = new HashMap<String, Integer>();;
-	private HashMap<String, Integer> hashIDs = new HashMap<String, Integer>();
+	// private HashMap<String, Integer> hashCounts = new HashMap<String, Integer>();
+	private static ConcurrentHashMap<String, Integer> hashCounts = new ConcurrentHashMap<String, Integer>();
+
+	// private HashMap<String, Integer> hashIDs = new HashMap<String, Integer>();
 
 	// Type List
 	private DefaultListModel<String> availableListsModel = new DefaultListModel<>();
@@ -582,9 +590,9 @@ public class Identic {
 		if (files.length == 0) {
 
 			for (int i = 0; i < INITIAL_LISTFILES.length; i++) {
-				try {	
+				try {
 					InputStream inputStream = this.getClass().getResourceAsStream(INITIAL_LISTFILES[i]);
-					Path targetPath = Paths.get(workingDirectory, INITIAL_LISTFILES[i]);				
+					Path targetPath = Paths.get(workingDirectory, INITIAL_LISTFILES[i]);
 					Files.copy(inputStream, targetPath, StandardCopyOption.REPLACE_EXISTING);
 				} catch (IOException e) {
 					e.printStackTrace();
@@ -667,34 +675,80 @@ public class Identic {
 
 		log.addInfo("Starting Folder:");
 		log.addInfo("     " + lblSourceFolder.getText());
+		// ------------------------------------------------------------------------------------
 
-		IdentifySubjects identifySubjects = new IdentifySubjects();
-		Thread threadIdentify = new Thread(identifySubjects);
-		threadIdentify.start();
+		MakeFileKeys makeFileKeys = new MakeFileKeys(qSubjects, qHashes);
+		ThreadPoolExecutor executeMakeFileKeys = (ThreadPoolExecutor) Executors.newFixedThreadPool(PROCESSORS);
 
-		MakeFileKey makeFileKey = new MakeFileKey(threadIdentify);
-		Thread threadMakeFileKey = new Thread(makeFileKey);
-		threadMakeFileKey.start();
+		FillMainTable fillMainTable = new FillMainTable(subjectTableModel, qHashes, hashCounts);
+		ThreadPoolExecutor executeFillMainTable = (ThreadPoolExecutor) Executors.newFixedThreadPool(PROCESSORS);
 
-		ShowRejects showRejects = new ShowRejects(threadIdentify);
-		Thread threadRejects = new Thread(showRejects);
-		if (cbSaveExcludedFiles.isSelected()) {
-			threadRejects.start();
-		} // if
+		Pattern patternSubjects = Pattern.compile(targetListRegex);
 
-		IdentifyDuplicates identifyDuplicates = new IdentifyDuplicates(threadMakeFileKey);
-		Thread threadIdentifyDuplicates = new Thread(identifyDuplicates);
-		threadIdentifyDuplicates.start();
+		ForkJoinPool poolIdentify = new ForkJoinPool(PROCESSORS);
+		IdentifyFiles identifyFiles = new IdentifyFiles(new File(lblSourceFolder.getText()), patternSubjects, qSubjects,
+				qRejects);
+		poolIdentify.execute(identifyFiles);
+
+		for (int i = 0; i < PROCESSORS; i++) {
+			executeMakeFileKeys.execute(makeFileKeys);
+		} // for - i
+
+		for (int i = 0; i < PROCESSORS; i++) {
+			executeFillMainTable.execute(fillMainTable);
+		} // for - i
+
+		while (!poolIdentify.isQuiescent()) {
+			// psuedo join
+		}
+		qSubjects.add(END_OF_SUBJECT);
+		qRejects.add(END_OF_REJECT);
 
 		try {
-			threadIdentify.join();
-			threadMakeFileKey.join();
-			threadRejects.join();
-			threadIdentifyDuplicates.join();
-		} catch (InterruptedException e) {
-			e.printStackTrace();
-		} // try
+			executeMakeFileKeys.shutdown();
+			executeMakeFileKeys.awaitTermination(1, TimeUnit.DAYS);
 
+			qHashes.add(END_OF_SUBJECT);
+			Thread threadFillRejectTable = new Thread(new FillRejectTable(rejectTableModel, qRejects));
+			threadFillRejectTable.start();
+
+			executeFillMainTable.shutdown();
+			executeFillMainTable.awaitTermination(1, TimeUnit.DAYS);
+			threadFillRejectTable.join();
+
+		} catch (InterruptedException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
+
+		// -----------------------------------------------------------------------------------
+		// IdentifySubjects identifySubjects = new IdentifySubjects();
+		// Thread threadIdentify = new Thread(identifySubjects);
+		// threadIdentify.start();
+		//
+		// MakeFileKey makeFileKey = new MakeFileKey(threadIdentify);
+		// Thread threadMakeFileKey = new Thread(makeFileKey);
+		// threadMakeFileKey.start();
+		//
+		// ShowRejects showRejects = new ShowRejects(threadIdentify);
+		// Thread threadRejects = new Thread(showRejects);
+		// if (cbSaveExcludedFiles.isSelected()) {
+		// threadRejects.start();
+		// } // if
+		//
+		// IdentifyDuplicates identifyDuplicates = new IdentifyDuplicates(threadMakeFileKey);
+		// Thread threadIdentifyDuplicates = new Thread(identifyDuplicates);
+		// threadIdentifyDuplicates.start();
+		//
+		// try {
+		// threadIdentify.join();
+		// threadMakeFileKey.join();
+		// threadRejects.join();
+		// threadIdentifyDuplicates.join();
+		// } catch (InterruptedException e) {
+		// e.printStackTrace();
+		// } // try
+		//
 	}// doStartNoCatalog
 
 	private void doStartOnlyCatalogs() {
@@ -702,7 +756,7 @@ public class Identic {
 		CatalogItem catalogItem;
 		for (int i = 0; i < inUseCatalogItemModel.getSize(); i++) {
 			catalogItem = inUseCatalogItemModel.get(i);
-			log.addInfo("     " + catalogItem.getEntryName());
+			log.addInfo(" " + catalogItem.getEntryName());
 			System.out.println(catalogItem.getEntryName());
 		} // for - each catalog Item
 
@@ -710,13 +764,18 @@ public class Identic {
 		Thread threadGather = new Thread(gatherFromCatalogs);
 		threadGather.start();
 
-		IdentifyDuplicates identifyDuplicates = new IdentifyDuplicates(threadGather);
-		Thread threadIdentifyDuplicates = new Thread(identifyDuplicates);
-		threadIdentifyDuplicates.start();
+		FillMainTable fillMainTable = new FillMainTable(subjectTableModel, qHashes, hashCounts);
+		Thread threadFillMainTable = new Thread(fillMainTable);
+		threadFillMainTable.start();
+
+		// IdentifyDuplicates identifyDuplicates = new IdentifyDuplicates(threadGather);
+		// Thread threadIdentifyDuplicates = new Thread(identifyDuplicates);
+		// threadIdentifyDuplicates.start();
 
 		try {
 			threadGather.join();
-			threadIdentifyDuplicates.join();
+			threadFillMainTable.join();
+			// threadIdentifyDuplicates.join();
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		} // try
@@ -746,7 +805,7 @@ public class Identic {
 		subjectTableModel.clear();
 		actionTableModel.clear();
 		rejectTableModel.clear();
-		hashIDs.clear();
+		// hashIDs.clear();
 		hashCounts.clear();
 
 		resultsTable.setModel(new DefaultTableModel());
@@ -1608,7 +1667,7 @@ public class Identic {
 	 */
 	private void initialize() {
 		frmIdentic = new JFrame();
-		frmIdentic.setTitle("Identic 2.1");
+		frmIdentic.setTitle("Identic 3.0");
 		frmIdentic.setBounds(100, 100, 450, 621);
 
 		frmIdentic.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -2929,6 +2988,10 @@ public class Identic {
 	}// initialize
 
 	// Constants
+
+	public static final FileStat END_OF_SUBJECT = new FileStat("<END OF QUEUE>", -1L, "0000-00-00  00:00:00");
+	public static final FileStatReject END_OF_REJECT = new FileStatReject("<END OF QUEUE>", -1L, "0000-00-00  00:00:00",
+			"END OF QUEUE");
 	private static final String EMPTY_STRING = "";
 	private static final String NONE = "<none>";
 
@@ -3085,233 +3148,233 @@ public class Identic {
 	 * which extends FileStatSubject with 'reason' for reject. it also tracks the number of occurrences of each file
 	 * suffix
 	 */
-	public class IdentifySubjects implements Runnable {
+	// public class IdentifySubjects implements Runnable {
+	//
+	// public IdentifySubjects() {
+	// }// Constructor
+	//
+	// @Override
+	// public void run() {
+	// excludedFileTypes.clear();
+	// IdentifyWalker myWalker = new IdentifyWalker();
+	// Path startPath = Paths.get(lblSourceFolder.getText());
+	// try {
+	// Files.walkFileTree(startPath, myWalker);
+	// } catch (IOException e) {
+	// e.printStackTrace();
+	// } // try
+	// // logSummary();
+	// }// run
+	//
+	// class IdentifyWalker implements FileVisitor<Path> {
+	// Pattern patternSubjects = Pattern.compile(targetListRegex);
+	// Pattern patternFileType = Pattern.compile("\\.([^.]+$)");
+	// Matcher matcher;
+	//
+	// @Override
+	// public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+	// return FileVisitResult.CONTINUE;
+	// }// FileVisitResult
+	//
+	// @Override
+	// public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+	// return FileVisitResult.CONTINUE;
+	// }// FileVisitResult
+	//
+	// @Override
+	// public FileVisitResult visitFile(Path path, BasicFileAttributes attrs) throws IOException {
+	//
+	// File file = path.toFile();
+	// Date date = new Date(file.lastModified());
+	// Format myFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+	// String lastModifieTime = myFormat.format(date);
+	//
+	// long fileSize = Files.size(path);
+	// // long fileSize = file.length();
+	//
+	// String fileName = path.toString();
+	// matcher = patternFileType.matcher(fileName);
+	// String fileType = matcher.find() ? matcher.group(1).toLowerCase() : NONE;
+	//
+	// matcher = patternSubjects.matcher(fileType);
+	// if (matcher.matches()) {// find
+	// qSubjects.add(new FileStat(fileName, fileSize, lastModifieTime));
+	// } else {
+	// keepSuffixCount(fileType);
+	// qRejects.add(new FileStatReject(fileName, fileSize, lastModifieTime, FileStat.NOT_ON_LIST));
+	// } // if - match
+	//
+	// return FileVisitResult.CONTINUE;
+	// }// FileVisitResult
+	//
+	// @Override
+	// public FileVisitResult visitFileFailed(Path file, IOException exc) throws IOException {
+	// qRejects.add(new FileStatReject(file.toString(), 0, null, FileStat.IO_EXCEPTION));
+	// return FileVisitResult.CONTINUE;
+	// }// FileVisitResult
+	//
+	// private void keepSuffixCount(String suffix) {
+	//
+	// Integer occurances = excludedFileTypes.get(suffix);
+	// if (occurances == null) {
+	// excludedFileTypes.put(suffix, 1);
+	// excludeModel.addElement(suffix);
+	// } else {
+	// excludedFileTypes.put(suffix, occurances + 1);
+	// } // if unique
+	// }// keepSuffixCount
+	// }// class MyWalker
+	// }// class IdentifySubjects
+	// //////////////////////
 
-		public IdentifySubjects() {
-		}// Constructor
-
-		@Override
-		public void run() {
-			excludedFileTypes.clear();
-			IdentifyWalker myWalker = new IdentifyWalker();
-			Path startPath = Paths.get(lblSourceFolder.getText());
-			try {
-				Files.walkFileTree(startPath, myWalker);
-			} catch (IOException e) {
-				e.printStackTrace();
-			} // try
-				// logSummary();
-		}// run
-
-		class IdentifyWalker implements FileVisitor<Path> {
-			Pattern patternSubjects = Pattern.compile(targetListRegex);
-			Pattern patternFileType = Pattern.compile("\\.([^.]+$)");
-			Matcher matcher;
-
-			@Override
-			public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
-				return FileVisitResult.CONTINUE;
-			}// FileVisitResult
-
-			@Override
-			public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
-				return FileVisitResult.CONTINUE;
-			}// FileVisitResult
-
-			@Override
-			public FileVisitResult visitFile(Path path, BasicFileAttributes attrs) throws IOException {
-
-				File file = path.toFile();
-				Date date = new Date(file.lastModified());
-				Format myFormat = new SimpleDateFormat("yyyy-MM-dd  HH:mm:ss");
-				String lastModifieTime = myFormat.format(date);
-
-				long fileSize = Files.size(path);
-				// long fileSize = file.length();
-
-				String fileName = path.toString();
-				matcher = patternFileType.matcher(fileName);
-				String fileType = matcher.find() ? matcher.group(1).toLowerCase() : NONE;
-
-				matcher = patternSubjects.matcher(fileType);
-				if (matcher.matches()) {// find
-					qSubjects.add(new FileStat(fileName, fileSize, lastModifieTime));
-				} else {
-					keepSuffixCount(fileType);
-					qRejects.add(new FileStatReject(fileName, fileSize, lastModifieTime, FileStat.NOT_ON_LIST));
-				} // if - match
-
-				return FileVisitResult.CONTINUE;
-			}// FileVisitResult
-
-			@Override
-			public FileVisitResult visitFileFailed(Path file, IOException exc) throws IOException {
-				qRejects.add(new FileStatReject(file.toString(), 0, null, FileStat.IO_EXCEPTION));
-				return FileVisitResult.CONTINUE;
-			}// FileVisitResult
-
-			private void keepSuffixCount(String suffix) {
-
-				Integer occurances = excludedFileTypes.get(suffix);
-				if (occurances == null) {
-					excludedFileTypes.put(suffix, 1);
-					excludeModel.addElement(suffix);
-				} else {
-					excludedFileTypes.put(suffix, occurances + 1);
-				} // if unique
-			}// keepSuffixCount
-		}// class MyWalker
-	}// class IdentifySubjects
-		//////////////////////
-
-	public class MakeFileKey implements Runnable {
-		private static final int bufSize = 1024;
-		String algorithm = "SHA-1"; // 160 bits
-		// String algorithm = "MD5"; // 128 bits
-		// String algorithm = "SHA-256"; // 256 bits
-		private Thread priorThread;
-		// private AppLogger appLogger = AppLogger.getInstance();
-
-		public MakeFileKey(Thread priorThread) {
-			this.priorThread = priorThread;
-		}// Constructor
-
-		@Override
-		public void run() {
-			FileStat fileStat;
-
-			// int count = 0;
-			String fileName = null;
-			String key = null;
-			while (true) {
-				try {
-					fileStat = qSubjects.remove();
-					fileName = fileStat.getFileName();
-					// count++;
-					try {
-						key = hashFile(fileStat.getFilePath(), algorithm);
-						fileStat.setHashKey(key);
-						qHashes.add(fileStat);
-						// appLogger.addInfo(key + " - " + fileName);
-					} catch (HashGenerationException e) {
-						log.addError("HashGenerationError", fileName);
-						e.printStackTrace();
-					} //
-				} catch (NoSuchElementException ex) {
-					if (priorThread.getState().equals(Thread.State.TERMINATED)) {
-						// log.addSpecial("From MakeFileKey count = " + count);
-						return;
-					} // if - done ?
-				} // try
-			} // while
-		}// run
-
-		private String hashFile(String file, String algorithm) throws HashGenerationException {
-			try (FileInputStream inputStream = new FileInputStream(file)) {
-				MessageDigest digest = MessageDigest.getInstance(algorithm);
-
-				byte[] bytesBuffer = new byte[bufSize];
-				int bytesRead = -1;
-
-				while ((bytesRead = inputStream.read(bytesBuffer)) != -1) {
-					digest.update(bytesBuffer, 0, bytesRead);
-				} // while
-				inputStream.close();
-				byte[] hashedBytes = digest.digest();
-
-				return convertByteArrayToHexString(hashedBytes);
-			} catch (NoSuchAlgorithmException | IOException ex) {
-				throw new HashGenerationException("Could not generate hash from file", ex);
-			} // try
-		}// hashFile
-
-		private String convertByteArrayToHexString(byte[] arrayBytes) {
-			StringBuffer stringBuffer = new StringBuffer();
-			for (int i = 0; i < arrayBytes.length; i++) {
-				stringBuffer.append(Integer.toString((arrayBytes[i] & 0xff) + 0x100, 16).substring(1));
-			} // for
-			return stringBuffer.toString();
-		}// convertByteArrayToHexString
-
-	}// class MakeFileKey
-
+	// public class MakeFileKey implements Runnable {
+	// private static final int bufSize = 1024;
+	// String algorithm = "SHA-1"; // 160 bits
+	// // String algorithm = "MD5"; // 128 bits
+	// // String algorithm = "SHA-256"; // 256 bits
+	// private Thread priorThread;
+	// // private AppLogger appLogger = AppLogger.getInstance();
+	//
+	// public MakeFileKey(Thread priorThread) {
+	// this.priorThread = priorThread;
+	// }// Constructor
+	//
+	// @Override
+	// public void run() {
+	// FileStat fileStat;
+	//
+	// // int count = 0;
+	// String fileName = null;
+	// String key = null;
+	// while (true) {
+	// try {
+	// fileStat = qSubjects.remove();
+	// fileName = fileStat.getFileName();
+	// // count++;
+	// try {
+	// key = hashFile(fileStat.getFilePath(), algorithm);
+	// fileStat.setHashKey(key);
+	// qHashes.add(fileStat);
+	// // appLogger.addInfo(key + " - " + fileName);
+	// } catch (HashGenerationException e) {
+	// log.addError("HashGenerationError", fileName);
+	// e.printStackTrace();
+	// } //
+	// } catch (NoSuchElementException ex) {
+	// if (priorThread.getState().equals(Thread.State.TERMINATED)) {
+	// // log.addSpecial("From MakeFileKey count = " + count);
+	// return;
+	// } // if - done ?
+	// } // try
+	// } // while
+	// }// run
+	//
+	// private String hashFile(String file, String algorithm) throws HashGenerationException {
+	// try (FileInputStream inputStream = new FileInputStream(file)) {
+	// MessageDigest digest = MessageDigest.getInstance(algorithm);
+	//
+	// byte[] bytesBuffer = new byte[bufSize];
+	// int bytesRead = -1;
+	//
+	// while ((bytesRead = inputStream.read(bytesBuffer)) != -1) {
+	// digest.update(bytesBuffer, 0, bytesRead);
+	// } // while
+	// inputStream.close();
+	// byte[] hashedBytes = digest.digest();
+	//
+	// return convertByteArrayToHexString(hashedBytes);
+	// } catch (NoSuchAlgorithmException | IOException ex) {
+	// throw new HashGenerationException("Could not generate hash from file", ex);
+	// } // try
+	// }// hashFile
+	//
+	// private String convertByteArrayToHexString(byte[] arrayBytes) {
+	// StringBuffer stringBuffer = new StringBuffer();
+	// for (int i = 0; i < arrayBytes.length; i++) {
+	// stringBuffer.append(Integer.toString((arrayBytes[i] & 0xff) + 0x100, 16).substring(1));
+	// } // for
+	// return stringBuffer.toString();
+	// }// convertByteArrayToHexString
+	//
+	// }// class MakeFileKey
+	//
 	//////////////////////////////////////////
 
 	///////////////////////////
 
-	public class ShowRejects implements Runnable {
-
-		private Thread priorThread;
-		// private AppLogger appLogger = AppLogger.getInstance();
-
-		public ShowRejects(Thread priorThread) {
-			this.priorThread = priorThread;
-		}// Constructor
-
-		@Override
-		public void run() {
-			String fileName = null;
-			FileStatReject reject;
-			while (true) {
-				try {
-					reject = qRejects.remove();
-					rejectTableModel.addRow(reject);
-					fileName = reject.getFileName();
-				} catch (NoSuchElementException ex) {
-					if (priorThread.getState().equals(Thread.State.TERMINATED)) {
-						log.addSpecial(fileName);
-						return;
-					} // if - done ?
-				} // try
-			} // while
-		}// run
-
-	}// class ShowRejects
-		///////////////////
+	// public class ShowRejects implements Runnable {
+	//
+	// private Thread priorThread;
+	// // private AppLogger appLogger = AppLogger.getInstance();
+	//
+	// public ShowRejects(Thread priorThread) {
+	// this.priorThread = priorThread;
+	// }// Constructor
+	//
+	// @Override
+	// public void run() {
+	// String fileName = null;
+	// FileStatReject reject;
+	// while (true) {
+	// try {
+	// reject = qRejects.remove();
+	// rejectTableModel.addRow(reject);
+	// fileName = reject.getFileName();
+	// } catch (NoSuchElementException ex) {
+	// if (priorThread.getState().equals(Thread.State.TERMINATED)) {
+	// log.addSpecial(fileName);
+	// return;
+	// } // if - done ?
+	// } // try
+	// } // while
+	// }// run
+	//
+	// }// class ShowRejects
+	// ///////////////////
 
 	////////////////////////////////////////////////
 
-	public class IdentifyDuplicates implements Runnable {
-		private Thread priorThread;
-		private Integer fileID;
-
-		public IdentifyDuplicates(Thread priorThread) {
-			this.priorThread = priorThread;
-		}// Constructor
-
-		@Override
-		public void run() {
-			fileID = 0;
-			// hashIDs.clear();
-			// hashCounts.clear();
-			FileStat subject;
-			while (true) {
-				try {
-					subject = qHashes.remove();
-					subjectTableModel.addRow(subject, keepHashKeyCount(subject.getHashKey()));
-				} catch (NoSuchElementException ex) {
-					if (priorThread.getState().equals(Thread.State.TERMINATED)) {
-						return;
-					} // if - done ?
-				} // try
-			} // while
-		}// run
-
-		private Integer keepHashKeyCount(String hashKey) {
-
-			Integer occurances = hashCounts.get(hashKey);
-			if (occurances == null) {
-				hashCounts.put(hashKey, 1);
-				hashIDs.put(hashKey, fileID++);
-				// excludeModel.addElement(filePart);
-			} else {
-				hashCounts.put(hashKey, occurances + 1);
-			} // if unique
-
-			return hashIDs.get(hashKey);
-		}// keepSuffixCount
-
-	}// class IdentifyDuplicates
+	// public class IdentifyDuplicates implements Runnable {
+	// private Thread priorThread;
+	// private Integer fileID;
+	//
+	// public IdentifyDuplicates(Thread priorThread) {
+	// this.priorThread = priorThread;
+	// }// Constructor
+	//
+	// @Override
+	// public void run() {
+	// fileID = 0;
+	// // hashIDs.clear();
+	// // hashCounts.clear();
+	// FileStat subject;
+	// while (true) {
+	// try {
+	// subject = qHashes.remove();
+	// subjectTableModel.addRow(subject, keepHashKeyCount(subject.getHashKey()));
+	// } catch (NoSuchElementException ex) {
+	// if (priorThread.getState().equals(Thread.State.TERMINATED)) {
+	// return;
+	// } // if - done ?
+	// } // try
+	// } // while
+	// }// run
+	//
+	// private Integer keepHashKeyCount(String hashKey) {
+	//
+	// Integer occurances = hashCounts.get(hashKey);
+	// if (occurances == null) {
+	// hashCounts.put(hashKey, 1);
+	// hashIDs.put(hashKey, fileID++);
+	// // excludeModel.addElement(filePart);
+	// } else {
+	// hashCounts.put(hashKey, occurances + 1);
+	// } // if unique
+	//
+	// return hashIDs.get(hashKey);
+	// }// keepSuffixCount
+	//
+	// }// class IdentifyDuplicates
 
 	/////////////////////////////////////////
 
@@ -3324,8 +3387,8 @@ public class Identic {
 			for (int i = 0; i < inUseCatalogItemModel.getSize(); i++) {
 				catalogItem = inUseCatalogItemModel.get(i);
 				qHashes.addAll(catalogItem.getFileStats());
-				// System.out.println(catalogItem.getEntryName());
 			} // for - each catalog Item
+			qHashes.add(END_OF_SUBJECT);
 		}// run
 	}// class GatherFromCatalogs
 
