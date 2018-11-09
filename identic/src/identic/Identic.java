@@ -1,5 +1,6 @@
 package identic;
 
+
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
@@ -107,7 +108,9 @@ import javax.swing.table.AbstractTableModel;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableColumn;
 import javax.swing.table.TableRowSorter;
-
+/*
+ *  2018-11-09   2.0.0 Adding concurrent processing for File I/O part of application
+ */
 public class Identic {
 
 	private AdapterIdentic identicAdapter = new AdapterIdentic();
