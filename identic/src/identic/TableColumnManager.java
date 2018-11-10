@@ -380,7 +380,7 @@ public class TableColumnManager
 	/*
 	 * Allows you to select a specific menu item when the popup is displayed. (ie. this is a bug? fix)
 	 */
-	class SelectPopupMenu extends JPopupMenu {
+	static class SelectPopupMenu extends JPopupMenu {
 		/**
 		 * 
 		 */
@@ -401,4 +401,4 @@ public class TableColumnManager
 			});
 		}
 	}// class SelectPopupMenu ;
-}
+}//class TableColumnManager

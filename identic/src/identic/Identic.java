@@ -133,7 +133,7 @@ public class Identic {
 	private static ConcurrentLinkedQueue<FileStatReject> qRejects = new ConcurrentLinkedQueue<>();
 	private static ConcurrentLinkedQueue<FileStat> qHashes = new ConcurrentLinkedQueue<FileStat>();
 
-	private HashMap<String, Integer> excludedFileTypes = new HashMap<>();
+	// private HashMap<String, Integer> excludedFileTypes = new HashMap<>();
 	private HashMap<String, Integer> fileTypeCensus = new HashMap<>();
 
 	private SubjectTableModel subjectTableModel = new SubjectTableModel();
@@ -150,7 +150,6 @@ public class Identic {
 	private JTable utilityTable = new JTable();
 
 	private static ConcurrentHashMap<String, Integer> hashCounts = new ConcurrentHashMap<String, Integer>();
-
 
 	// Type List
 	private DefaultListModel<String> availableListsModel = new DefaultListModel<>();
@@ -214,7 +213,9 @@ public class Identic {
 		File[] files = targetDirectory.listFiles(new ListFilter(CATALOG_SUFFIX));
 
 		// we have the directory, do we have lists ?
-
+		if (files == null) {
+			return;
+		} // if
 		if (files.length == 0) {
 			return;
 		} // if done if no catalog
@@ -227,7 +228,7 @@ public class Identic {
 				availableCatalogItemModel.add(catalogItem);
 				ois.close();
 				fis.close();
-			} catch (Exception e) {
+			} catch (ClassNotFoundException | IOException e) {
 				log.addError("[doCatalogLoad()] unable to load Catalog");
 			} // try
 		} // for file
@@ -582,7 +583,14 @@ public class Identic {
 		File[] files = targetDirectory.listFiles(new ListFilter(LIST_SUFFIX_DOT));
 
 		// if files empty - initialize the directory
-		if (files.length == 0) {
+		boolean needToInitializeDirectory = false;
+		if (files == null) {
+			needToInitializeDirectory = true;
+		} else if (files.length == 0) {
+			needToInitializeDirectory = true;
+		} // if
+
+		if (needToInitializeDirectory) {
 
 			for (int i = 0; i < INITIAL_LISTFILES.length; i++) {
 				try {
@@ -597,10 +605,11 @@ public class Identic {
 		} // if no type list files in target directory
 
 		availableListsModel.removeAllElements();
-		for (File file : files) {
-			availableListsModel.addElement(file.getName().replace(LIST_SUFFIX_DOT, EMPTY_STRING));
-		} // for - file
-
+		if (files != null) {
+			for (File file : files) {
+				availableListsModel.addElement(file.getName().replace(LIST_SUFFIX_DOT, EMPTY_STRING));
+			} // for - file
+		} // if
 	}// initFileTypes
 
 	private void doSourceFolder() {
@@ -698,7 +707,7 @@ public class Identic {
 
 		while (!poolIdentify.isQuiescent()) {
 			// psuedo join
-		}//while
+		} // while
 		qSubjects.add(END_OF_SUBJECT);
 		qRejects.add(END_OF_REJECT);
 
@@ -717,7 +726,7 @@ public class Identic {
 		} catch (InterruptedException e1) {
 			// TODO Auto-generated catch block
 			e1.printStackTrace();
-		}//try 
+		} // try
 
 	}// doStartNoCatalog
 
@@ -799,15 +808,15 @@ public class Identic {
 	}// markTheDuplicates
 
 	private void displaySummary() {
-		
-//		Set<Entry<String, Integer>> excludedFileTypesSet = rejectTableModel.entrySet();
-////		Set<Entry<String, Integer>> excludedFileTypesSet = excludedFileTypes.entrySet();
-//		int totalCountOfExcludedFiles = 0;
-//		for (Entry<String, Integer> entry : excludedFileTypesSet) {
-//			Integer value = (Integer) entry.getValue();
-//			totalCountOfExcludedFiles += value;
-//		} // for - entry
-		
+
+		// Set<Entry<String, Integer>> excludedFileTypesSet = rejectTableModel.entrySet();
+		//// Set<Entry<String, Integer>> excludedFileTypesSet = excludedFileTypes.entrySet();
+		// int totalCountOfExcludedFiles = 0;
+		// for (Entry<String, Integer> entry : excludedFileTypesSet) {
+		// Integer value = (Integer) entry.getValue();
+		// totalCountOfExcludedFiles += value;
+		// } // for - entry
+
 		int totalCountOfExcludedFiles = rejectTableModel.getRowCount();
 
 		int totalFileCount = totalCountOfExcludedFiles + subjectTableModel.getRowCount();
@@ -975,6 +984,8 @@ public class Identic {
 			case 5: // ID
 				tc.setMaxWidth(40);
 				break;
+			default:
+				tc.setPreferredWidth(40);
 			}// switch
 		} // for each column
 	}// setSubjectColumns
@@ -1006,6 +1017,8 @@ public class Identic {
 			case 6: // ID
 				tc.setMaxWidth(40);
 				break;
+			default:
+				tc.setPreferredWidth(40);
 			}// switch
 		} // for each column
 	}// setSubjectColumns
@@ -1252,19 +1265,19 @@ public class Identic {
 		removeEmptyFolders(targetFolders, false);
 	}// doActionDelete
 
-	private ArrayList<Path> findAncestors(Path subject) {
-		// does not return the root
-		ArrayList<Path> answer = new ArrayList<>();
-		answer.add(subject);
-		Path root = subject.getRoot();
-		Path parent = subject.getParent();
-		while (!root.equals(parent)) {
-			answer.add(parent);
-			parent = parent.getParent();
-		} // while
-
-		return answer;
-	}// findAncestor
+	// private ArrayList<Path> findAncestors(Path subject) {
+	// // does not return the root
+	// ArrayList<Path> answer = new ArrayList<>();
+	// answer.add(subject);
+	// Path root = subject.getRoot();
+	// Path parent = subject.getParent();
+	// while (!root.equals(parent)) {
+	// answer.add(parent);
+	// parent = parent.getParent();
+	// } // while
+	//
+	// return answer;
+	// }// findAncestor
 
 	private void removeRows(LinkedList<Integer> rows, JTable table, MyTableModel tableModel) {
 		int row;
@@ -1458,8 +1471,14 @@ public class Identic {
 			file = folder.toFile();
 			if (!file.isDirectory()) {
 				continue;
-			} else if (file.list().length == 0) {
-				file.delete();
+//			}else if(file.list() ==null) { // its a file
+//				continue;
+			} else if (file.list().length == 0) {// its a directory
+				try {
+					file.delete();
+				} catch (Exception e) {
+					// do something
+				}
 				if (tree) {
 					removeParent(file.getParentFile());
 				} // inner if
@@ -1478,7 +1497,11 @@ public class Identic {
 
 		if (file.listFiles().length == 0) {
 			File parent = file.getParentFile();
-			file.delete();
+			try {
+				file.delete();
+			} catch (Exception e) {
+				// do something
+			}
 			removeParent(parent);
 		} // if
 
@@ -1550,7 +1573,7 @@ public class Identic {
 		listTypesAvailable.setModel(availableListsModel);
 		listTypesEdit.setModel(editListModel);
 		initFileTypes();
-		
+
 		bgFindType.add(rbNoCatalog);
 		bgFindType.add(rbWithCatalog);
 		bgFindType.add(rbOnlyCatalogs);
@@ -1580,8 +1603,8 @@ public class Identic {
 		doCatalogLoad();
 		loadTargetList();
 
-		@SuppressWarnings("unused")
-		TableColumnManager tcmResults = new TableColumnManager(resultsTable);
+		// @SuppressWarnings("unused")
+		// TableColumnManager tcmResults = new TableColumnManager(resultsTable);
 
 		setRemoveFoldersState(false);
 
@@ -2384,7 +2407,6 @@ public class Identic {
 		gbc_btnCatalogNew.gridy = 3;
 		panelCatalogButtons.add(btnCatalogNew, gbc_btnCatalogNew);
 
-
 		JButton btnCatalogImport = new JButton("Import");
 		btnCatalogImport.setName(BTN_CATALOG_IMPORT);
 		btnCatalogImport.addActionListener(catalogAdapter);
@@ -3087,7 +3109,7 @@ public class Identic {
 
 	// ---------------------------------------------------------
 
-	class ListFilter implements FilenameFilter {
+	static class ListFilter implements FilenameFilter {
 		String suffix;
 
 		public ListFilter(String suffix) {
@@ -3148,8 +3170,8 @@ public class Identic {
 	}// class CensusWalker
 
 	class EmptyFolderWalker implements FileVisitor<Path> {
-		Pattern patternFileType = Pattern.compile("\\.([^.]+$)");
-		Matcher matcher;
+		// Pattern patternFileType = Pattern.compile("\\.([^.]+$)");
+		// Matcher matcher;
 
 		public EmptyFolderWalker() {
 		}// Constructor
@@ -3163,8 +3185,9 @@ public class Identic {
 		public FileVisitResult postVisitDirectory(Path folder, IOException arg1) throws IOException {
 			File f = folder.toFile();
 			// File f = new java.io.File(folder.toAbsolutePath().toString());
-			String[] contents = f.list();
-			int count = contents.length;
+			// String[] contents = f.list();
+			// int count = contents.length;
+			int count = f.list() == null ? 0 : f.list().length;
 
 			String msg = String.format("count: %,5d %s", count, folder.toAbsolutePath().toString());
 			log.addInfo(msg);
@@ -3195,7 +3218,7 @@ public class Identic {
 	//////////////////////////// [[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[
 
 	@SuppressWarnings("serial")
-	public class ListTransferHandler extends TransferHandler {
+	static class ListTransferHandler extends TransferHandler {
 
 		@Override
 		public boolean canImport(TransferSupport support) {

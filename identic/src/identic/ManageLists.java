@@ -237,31 +237,28 @@ public class ManageLists extends JDialog {
 			fileListDirectory = System.getProperty("java.io.tmpdir");
 			fileListDirectory = fileListDirectory.replace("Temp", "Identic");
 		} // if no established fileListDirectory
-		
+
 		File targetDirectory = new File(fileListDirectory);
-		
-//		Path p = Paths.get(fileListDirectory);
+
+		// Path p = Paths.get(fileListDirectory);
 		if (!targetDirectory.exists()) {
-			JOptionPane.showMessageDialog(this, "Initializing File Type lists in " + fileListDirectory, "Initialization",
-					JOptionPane.INFORMATION_MESSAGE);
+			JOptionPane.showMessageDialog(this, "Initializing File Type lists in " + fileListDirectory,
+					"Initialization", JOptionPane.INFORMATION_MESSAGE);
 			System.err.println("Making new directory");
-			//try {
-				targetDirectory.mkdirs();
-			//} catch (IOException e) {
-			//	e.printStackTrace();
-			//} // try
+
+			if (!targetDirectory.mkdirs()) {
+				System.out.printf("[ManageLists.initFileTypes]Did not create the directory %n");
+			} // if
+
 		} // if exits
 
 		// we have the directory, do we have lists ?
-
-		// File targetDirectory = new File(fileListDirectory);
-//		File targetDirectory = p.toFile();
 
 		File[] files = targetDirectory.listFiles(new ListFilter(LIST_SUFFIX_DOT));
 
 		// if files empty - initialize the directory
 
-		if (files == null | files.length == 0) {
+		if (files == null || files.length == 0) {
 
 			String[] initalListFiles = new String[] { "/VB.typeList", "/Music.typeList", "/MusicAndPictures.typeList",
 					"/Pictures.typeList" };
@@ -284,20 +281,12 @@ public class ManageLists extends JDialog {
 
 		availableListsModel.removeAllElements();
 
-		for (File f : files) {
-			availableListsModel.addElement(f.getName().replace(LIST_SUFFIX_DOT, EMPTY_STRING));
-		} // for
-
-		// cboTypeLists.setModel(typeListModel);
-
-		// Preferences myPrefs = Preferences.userNodeForPackage(Identic.class).node(this.getClass().getSimpleName());
-		// cboTypeLists.setSelectedItem(myPrefs.get("ActiveList", "Pictures"));
-		// listFileTypes.setModel(typeListModel);
-		// myPrefs = null;
-
-		// cboTypeLists.
-
-		// lblStatus.setText(url.getPath());
+		// if (files.length > 0) {
+		if (files != null) {
+			for (File f : files) {
+				availableListsModel.addElement(f.getName().replace(LIST_SUFFIX_DOT, EMPTY_STRING));
+			} // for
+		} // if
 	}// initFileTypes
 
 	private void appClose() {
@@ -596,7 +585,7 @@ public class ManageLists extends JDialog {
 
 	// ---------------------------------------------------------
 
-	class ListFilter implements FilenameFilter {
+	static class ListFilter implements FilenameFilter {
 		String suffix;
 
 		public ListFilter(String suffix) {

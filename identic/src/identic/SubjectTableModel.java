@@ -9,7 +9,7 @@ import java.nio.file.Paths;
  */
 public class SubjectTableModel extends MyTableModel {
 	private static final long serialVersionUID = 1L;
-	
+
 	public SubjectTableModel() {
 		super(new String[] { NAME, DIRECTORY, SIZE, DATE, DUP, ID, HASH_KEY });
 	}// Constructor
@@ -27,19 +27,16 @@ public class SubjectTableModel extends MyTableModel {
 		return columnCount - 1;
 	}// getColumnCount
 
-
 	public FileStat getFileStat(int rowNumber) {
-		String filePath = Paths.get(
-				(String)getValueAt(rowNumber,1), (String)getValueAt(rowNumber,0)).toString();
-		
-		FileStat fileStat = new FileStat(filePath, (long) getValueAt(rowNumber, 2),
-				(String) getValueAt(rowNumber, 3), (String) getValueAt(rowNumber, 6));
+		String filePath = Paths.get((String) getValueAt(rowNumber, 1), (String) getValueAt(rowNumber, 0)).toString();
+
+		FileStat fileStat = new FileStat(filePath, (long) getValueAt(rowNumber, 2), (String) getValueAt(rowNumber, 3),
+				(String) getValueAt(rowNumber, 6));
 		return fileStat;
 	}// getFileStat
 
-
 	public void addRow(FileStat subject) {
-		addRow(subject,-1);
+		addRow(subject, -1);
 	}// addRow
 
 	public void addRow(FileStat subject, Integer fileID) {
@@ -63,7 +60,7 @@ public class SubjectTableModel extends MyTableModel {
 			throw new IllegalArgumentException(msg);
 
 		} // if
-		Class<?> ans = String.class;
+		Class<?> ans;
 		switch (columnIndex) {
 		case 0: // Name
 			ans = String.class;
@@ -85,6 +82,9 @@ public class SubjectTableModel extends MyTableModel {
 			break;
 		case 6: // Hash Key
 			ans = String.class;
+			break;
+		default:
+			ans = String.class;
 		}// switch
 		return ans;
 	}// getColumnClass
@@ -96,6 +96,5 @@ public class SubjectTableModel extends MyTableModel {
 	public static final String DUP = "Dup";
 	public static final String ID = "ID";
 	public static final String HASH_KEY = "HashKey";
-
 
 }// class SubjectTableModel

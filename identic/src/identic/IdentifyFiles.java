@@ -11,29 +11,32 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class IdentifyFiles extends RecursiveAction {
+	
+	private static final long serialVersionUID = 1L;
+
 	private File directory;
 
-	private  ConcurrentLinkedQueue<FileStat> qSubjects;
-	private  ConcurrentLinkedQueue<FileStatReject> qRejects;
+	private   ConcurrentLinkedQueue<FileStat> qSubjects;
+	private   ConcurrentLinkedQueue<FileStatReject> qRejects;
 	
 	Pattern patternSubjects;
 	Pattern patternFileType = Pattern.compile("\\.([^.]+$)");
-	Matcher matcher;
+//	Matcher matcher;
 
 
-	FileFilter getDirectories = new FileFilter() {
-		@Override
-		public boolean accept(File fileContent) {
-			return fileContent.isDirectory();
-		}// accept
-	};
+//	private FileFilter getDirectories = new FileFilter() {
+//		@Override
+//		public boolean accept(File fileContent) {
+//			return fileContent.isDirectory();
+//		}// accept
+//	};
 
-	FileFilter getFiles = new FileFilter() {
-		@Override
-		public boolean accept(File fileContent) {
-			return fileContent.isFile();
-		}// accept
-	};
+//	xFileFilter getFiles = new FileFilter() {
+//		@Override
+//		public boolean accept(File fileContent) {
+//			return fileContent.isFile();
+//		}// accept
+//	};
 
 	public IdentifyFiles(File directory,Pattern patternSubjects, ConcurrentLinkedQueue<FileStat> qSubjects,
 			ConcurrentLinkedQueue<FileStatReject> qRejects) {
@@ -46,14 +49,26 @@ public class IdentifyFiles extends RecursiveAction {
 	@Override
 	protected void compute() {
 //		System.out.printf("[IdentifyFiles.compute]%s: %s%n", Thread.currentThread().getName(), directory);
-		File[] directories = directory.listFiles(getDirectories);
+		File[] directories = directory.listFiles(new FileFilter() {
+			@Override
+			public boolean accept(File fileContent) {
+				return fileContent.isDirectory();
+			}// accept
+		});
+		
+		
 		if (directories != null) {
 			for (File directory : directories) {
 				IdentifyFiles identifyFiles = new IdentifyFiles(directory,patternSubjects,qSubjects,qRejects);
 				identifyFiles.fork();
 			} // for each
 		} // if
-		File[] files = directory.listFiles(getFiles);
+		File[] files = directory.listFiles(new FileFilter() {
+			@Override
+			public boolean accept(File fileContent) {
+				return fileContent.isFile();
+			}// accept
+		});
 		if (files != null) {
 			for (File file : files) {
 				processFile(file);
@@ -70,7 +85,7 @@ public class IdentifyFiles extends RecursiveAction {
 		long fileSize = file.length();
 		String fileName = file.getName();
 		String fileFullPath = file.getAbsolutePath();
-		matcher = patternFileType.matcher(fileName);
+		Matcher matcher = patternFileType.matcher(fileName);
 		String fileType = matcher.find() ? matcher.group(1).toLowerCase() : NONE;
 		
 		matcher = patternSubjects.matcher(fileType);
