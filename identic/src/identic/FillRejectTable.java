@@ -17,6 +17,8 @@ public class FillRejectTable implements Runnable {
 		FileStatReject reject;
 		// boolean thereIsMore = true;
 		while (true) { // while(thereIsMore) {
+//			System.out.printf("[FillRejectTable.FillRejectTable]qRejects size: %d %n",qRejects.size() );
+
 			try {
 				reject = qRejects.remove();
 				if (reject.equals(Identic.END_OF_REJECT)) {
@@ -27,6 +29,7 @@ public class FillRejectTable implements Runnable {
 				//
 			} // try - done ?
 		} // while
+//		System.out.printf("[FillRejectTable.run]rowCount: %d%n", rejectTableModel.getRowCount());
 	}// run
 
 }// class FillRejectTable
