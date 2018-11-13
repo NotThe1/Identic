@@ -33,17 +33,17 @@ public class MyTableModel extends AbstractTableModel {
 	}// getColumnName
 
 	@Override
-	public int getRowCount() {
+	synchronized public int getRowCount() {
 		return rows;
 	}// getRowCount
 
-	public void clear() {
+	synchronized public void clear() {
 		data.clear();
 		rows = 0;
 	}// clear
 
 	@Override
-	public Object getValueAt(int row, int column) {
+	synchronized public Object getValueAt(int row, int column) {
 		if ((row < 0) || (column < 0) || (row > rows) || (column > columnCount - 1)) {
 			String msg = String.format("Invalid row/column setting. row = %d, Column = %d ", row, column);
 			throw new IllegalArgumentException(msg);
@@ -51,7 +51,7 @@ public class MyTableModel extends AbstractTableModel {
 		return data.get(new Point(row, column));
 	}// getValueAt
 
-	public void setValueAt(Object value, int row, int column) {
+	synchronized public void setValueAt(Object value, int row, int column) {
 		if ((row < 0) || (column < 0) || (row > rows) || (column > columnCount - 1)) {
 			String msg = String.format("Invalid row/column setting. row = %d, Column = %d ", row, column);
 			throw new IllegalArgumentException(msg);
@@ -66,7 +66,7 @@ public class MyTableModel extends AbstractTableModel {
 		} // for
 	}//addRow
 
-	public Object[] getRow(int rowNumber) {
+	synchronized public Object[] getRow(int rowNumber) {
 		if ((rowNumber < 0) || (rowNumber > rows)) {
 			String msg = String.format("[getRow] Invalid row. row = %d, max row = %d", rowNumber,rows);
 			throw new IllegalArgumentException(msg);

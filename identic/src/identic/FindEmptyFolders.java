@@ -21,7 +21,7 @@ public class FindEmptyFolders extends RecursiveAction {
 		}
 		File[] directories = directory.listFiles();
 		if (directories.length == 0) {
-				utilityEmptyFolderTableModel.addRow(new Object[] { true, directory.toPath() });
+				utilityEmptyFolderTableModel.addRow(new Object[] { false, directory.toPath() });
 		} else {
 			for (File directoryItem : directories) {
 				if (directoryItem.isDirectory()) {

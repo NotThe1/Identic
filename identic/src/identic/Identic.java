@@ -138,7 +138,7 @@ public class Identic {
 	private DefaultListModel<String> excludeModel = new DefaultListModel<>();
 
 	private UtilityCensusTableModel utilityCensusTableModel = new UtilityCensusTableModel();
-	private  UtilityEmptyFolderTableModel utilityEmptyFolderTableModel = new UtilityEmptyFolderTableModel();
+	private UtilityEmptyFolderTableModel utilityEmptyFolderTableModel = new UtilityEmptyFolderTableModel();
 
 	private JTable resultsTable = new JTable();
 	private JTable actionTable = new JTable();
@@ -804,14 +804,6 @@ public class Identic {
 
 	private void displaySummary() {
 
-		// Set<Entry<String, Integer>> excludedFileTypesSet = rejectTableModel.entrySet();
-		//// Set<Entry<String, Integer>> excludedFileTypesSet = excludedFileTypes.entrySet();
-		// int totalCountOfExcludedFiles = 0;
-		// for (Entry<String, Integer> entry : excludedFileTypesSet) {
-		// Integer value = (Integer) entry.getValue();
-		// totalCountOfExcludedFiles += value;
-		// } // for - entry
-
 		int totalCountOfExcludedFiles = rejectTableModel.getRowCount();
 
 		int totalFileCount = totalCountOfExcludedFiles + subjectTableModel.getRowCount();
@@ -1260,20 +1252,6 @@ public class Identic {
 		removeEmptyFolders(targetFolders, false);
 	}// doActionDelete
 
-	// private ArrayList<Path> findAncestors(Path subject) {
-	// // does not return the root
-	// ArrayList<Path> answer = new ArrayList<>();
-	// answer.add(subject);
-	// Path root = subject.getRoot();
-	// Path parent = subject.getParent();
-	// while (!root.equals(parent)) {
-	// answer.add(parent);
-	// parent = parent.getParent();
-	// } // while
-	//
-	// return answer;
-	// }// findAncestor
-
 	private void removeRows(LinkedList<Integer> rows, JTable table, MyTableModel tableModel) {
 		int row;
 		String msg;
@@ -1283,8 +1261,6 @@ public class Identic {
 			row = rows.poll();
 			tableModel.removeRow(row);
 		} // while
-
-		// table.setModel(new MyTableModel());
 
 		table.setModel(tableModel);
 		setActionColumns();
@@ -1321,7 +1297,6 @@ public class Identic {
 			fullPathParts = fullPath.split(regexString);
 			matchCount = Math.min(matchCount, fullPathParts.length);
 
-			// System.out.printf(": row %2d, %s%n", i, fullPath);
 			for (int mc = 0; mc < matchCount; mc++) {
 				if (baseParts[mc].equals(fullPathParts[mc])) {
 					matchCountTemp++;
@@ -1348,12 +1323,10 @@ public class Identic {
 
 		Font originalFont = txtLog.getFont();
 		try {
-			// textPane.setFont(new Font("Courier New", Font.PLAIN, 8));
 			txtLog.setFont(originalFont.deriveFont(8.0f));
 			MessageFormat header = new MessageFormat("Identic Log");
 			MessageFormat footer = new MessageFormat(new Date().toString() + "           Page - {0}");
 			txtLog.print(header, footer);
-			// textPane.setFont(new Font("Courier New", Font.PLAIN, 14));
 			txtLog.setFont(originalFont);
 		} catch (PrinterException e) {
 			e.printStackTrace();
@@ -1374,13 +1347,6 @@ public class Identic {
 		log.addInfo("   Starting Folder: " + lblSourceFolder.getText());
 		utilityCensusTableModel.clear();
 		utilityTable.setModel(utilityCensusTableModel);
-		// fileTypeCensus.clear();
-		// Path startPath = Paths.get(lblSourceFolder.getText());
-		// try {
-		// Files.walkFileTree(startPath, new CensusWalker());
-		// } catch (IOException e) {
-		// e.printStackTrace();
-		// } // try
 
 		fileTypes.clear();
 		FileTypeCensus fileTypeCensus = new FileTypeCensus(new File(lblSourceFolder.getText()), fileTypes);
@@ -1406,10 +1372,9 @@ public class Identic {
 	private void doFindEmptyFolders() {
 		log.addInfo("Find Empty Folders");
 		log.addInfo("   Starting Folder: " + lblSourceFolder.getText());
-		
 
 		utilityEmptyFolderTableModel.clear();
-//		utilityTable.setModel(utilityEmptyFolderTableModel);
+		// utilityTable.setModel(utilityEmptyFolderTableModel);
 		utilityTable.updateUI();
 
 		FindEmptyFolders findEmptyFolders = new FindEmptyFolders(new File(lblSourceFolder.getText()),
@@ -1463,20 +1428,7 @@ public class Identic {
 
 		removeRows(rowsToRemove, utilityTable, utilityEmptyFolderTableModel);
 		removeEmptyFolders(targetFolders, tree);
-		// sourcePath = null;
-	}// doRemoveEmptyFolders
-
-	// private boolean isDirectoryWithFiles(File file) {
-	//
-	// if (file.isFile()) {
-	// return false;
-	// } else if (file.list().length > 0) {
-	// return true;
-	// } else {
-	// return false;
-	// } // if
-	//
-	// }// isDirectoryWithFiles
+			}// doRemoveEmptyFolders
 
 	private boolean isDirectoryWithNoFiles(File file) {
 		boolean ans = true;
@@ -1503,45 +1455,26 @@ public class Identic {
 	}// removeEmptyFolders
 
 	private void removeEmptyDirectory(File file, boolean tree) {
-		try {
-			if (file.delete()) {
-				if (tree) {
-					Path path = file.toPath();
-					Path parentPath = path.getParent();
-					if (parentPath == path.getRoot()) {
-						return;
-					} // if root
-					File parentFile = parentPath.toFile();
-					if (isDirectoryWithNoFiles(parentFile)) {
-						removeEmptyDirectory(parentFile, tree);
-					} // if
-
-				} // if tree
-			} // if delete
-		} catch (Exception se) {
-			log.addInfo("Unable to delete directory: " + file.getAbsolutePath());
-		}//try
+		String action = "Deleted: %s";
+		if (file.delete()) {
+			if (tree) {
+				Path path = file.toPath();
+				Path parentPath = path.getParent();
+				if (parentPath == path.getRoot()) {
+					return;
+				} // if root
+				File parentFile = parentPath.toFile();
+				if (isDirectoryWithNoFiles(parentFile)) {
+					removeEmptyDirectory(parentFile, tree);
+				} // if
+			} // if tree
+		} else {
+			action = "**Not Deleted: %s";
+		} // if delete
+		String msg = String.format(action, file.getAbsolutePath());
+		log.addInfo(msg);
 
 	}// removeEmptyDirectory
-
-	// private void removeParent(File file) {
-	// Path path = file.toPath();
-	// if (path == path.getRoot()) {
-	// return;
-	// } // exit at root
-	// path = null;
-	//
-	// if (file.listFiles().length == 0) { // directory
-	// File parent = file.getParentFile();
-	// try {
-	// file.delete();
-	// } catch (Exception e) {
-	// // do something
-	// }
-	// removeParent(parent);
-	// } // if
-	//
-	// }// removeParent
 
 	// Swing code ///////////////////////////////////////////////////////////////
 
