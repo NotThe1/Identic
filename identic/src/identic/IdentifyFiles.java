@@ -21,22 +21,6 @@ public class IdentifyFiles extends RecursiveAction {
 	
 	Pattern patternSubjects;
 	Pattern patternFileType = Pattern.compile("\\.([^.]+$)");
-//	Matcher matcher;
-
-
-//	private FileFilter getDirectories = new FileFilter() {
-//		@Override
-//		public boolean accept(File fileContent) {
-//			return fileContent.isDirectory();
-//		}// accept
-//	};
-
-//	xFileFilter getFiles = new FileFilter() {
-//		@Override
-//		public boolean accept(File fileContent) {
-//			return fileContent.isFile();
-//		}// accept
-//	};
 
 	public IdentifyFiles(File directory,Pattern patternSubjects, ConcurrentLinkedQueue<FileStat> qSubjects,
 			ConcurrentLinkedQueue<FileStatReject> qRejects) {

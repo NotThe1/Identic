@@ -33,8 +33,6 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.nio.file.AccessDeniedException;
 import java.nio.file.FileAlreadyExistsException;
-import java.nio.file.FileVisitResult;
-import java.nio.file.FileVisitor;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.NoSuchFileException;
@@ -42,13 +40,12 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
-import java.nio.file.attribute.BasicFileAttributes;
 import java.text.MessageFormat;
+import java.util.AbstractMap;
 import java.util.AbstractSet;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.Map.Entry;
@@ -63,7 +60,6 @@ import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.prefs.Preferences;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import javax.swing.Box;
@@ -133,8 +129,7 @@ public class Identic {
 	private static ConcurrentLinkedQueue<FileStatReject> qRejects = new ConcurrentLinkedQueue<>();
 	private static ConcurrentLinkedQueue<FileStat> qHashes = new ConcurrentLinkedQueue<FileStat>();
 
-	// private HashMap<String, Integer> excludedFileTypes = new HashMap<>();
-	private HashMap<String, Integer> fileTypeCensus = new HashMap<>();
+	private AbstractMap<String, Integer> fileTypes = new ConcurrentHashMap<>();
 
 	private SubjectTableModel subjectTableModel = new SubjectTableModel();
 	private ActionTableModel actionTableModel = new ActionTableModel();
@@ -143,7 +138,7 @@ public class Identic {
 	private DefaultListModel<String> excludeModel = new DefaultListModel<>();
 
 	private UtilityCensusTableModel utilityCensusTableModel = new UtilityCensusTableModel();
-	private UtilityEmptyFolderTableModel utilityEmptyFolderTableModel = new UtilityEmptyFolderTableModel();
+	private  UtilityEmptyFolderTableModel utilityEmptyFolderTableModel = new UtilityEmptyFolderTableModel();
 
 	private JTable resultsTable = new JTable();
 	private JTable actionTable = new JTable();
@@ -1379,15 +1374,25 @@ public class Identic {
 		log.addInfo("   Starting Folder: " + lblSourceFolder.getText());
 		utilityCensusTableModel.clear();
 		utilityTable.setModel(utilityCensusTableModel);
-		fileTypeCensus.clear();
-		Path startPath = Paths.get(lblSourceFolder.getText());
-		try {
-			Files.walkFileTree(startPath, new CensusWalker());
-		} catch (IOException e) {
-			e.printStackTrace();
-		} // try
+		// fileTypeCensus.clear();
+		// Path startPath = Paths.get(lblSourceFolder.getText());
+		// try {
+		// Files.walkFileTree(startPath, new CensusWalker());
+		// } catch (IOException e) {
+		// e.printStackTrace();
+		// } // try
 
-		Set<Entry<String, Integer>> fileTypeCensusSet = fileTypeCensus.entrySet();
+		fileTypes.clear();
+		FileTypeCensus fileTypeCensus = new FileTypeCensus(new File(lblSourceFolder.getText()), fileTypes);
+
+		ForkJoinPool poolCensus = new ForkJoinPool(PROCESSORS);
+		poolCensus.execute(fileTypeCensus);
+		while (!poolCensus.isQuiescent()) {
+			// psuedo join
+		} // while
+
+		Set<Entry<String, Integer>> fileTypeCensusSet = fileTypes.entrySet();
+		// Set<Entry<String, Integer>> fileTypeCensusSet = fileTypeCensus.entrySet();
 		for (Entry<String, Integer> entry : fileTypeCensusSet) {
 			utilityCensusTableModel.addRow(new Object[] { entry.getValue(), entry.getKey() });
 		} // for - entry
@@ -1401,16 +1406,24 @@ public class Identic {
 	private void doFindEmptyFolders() {
 		log.addInfo("Find Empty Folders");
 		log.addInfo("   Starting Folder: " + lblSourceFolder.getText());
+		
 
 		utilityEmptyFolderTableModel.clear();
-		utilityTable.setModel(utilityEmptyFolderTableModel);
+//		utilityTable.setModel(utilityEmptyFolderTableModel);
+		utilityTable.updateUI();
 
-		Path startPath = Paths.get(lblSourceFolder.getText());
-		try {
-			Files.walkFileTree(startPath, new EmptyFolderWalker());
-		} catch (IOException e) {
-			e.printStackTrace();
-		} // try
+		FindEmptyFolders findEmptyFolders = new FindEmptyFolders(new File(lblSourceFolder.getText()),
+				utilityEmptyFolderTableModel);
+
+		ForkJoinPool poolEmptyFolders = new ForkJoinPool(PROCESSORS); // PROCESSORS
+		poolEmptyFolders.execute(findEmptyFolders);
+		while (!poolEmptyFolders.isQuiescent()) {
+			// psuedo join
+		} // while
+
+		utilityTable.setModel(utilityEmptyFolderTableModel);
+		utilityTable.updateUI();
+
 		setEmptyFoldersColumns();
 		utilityTable.setRowSorter(new TableRowSorter<UtilityEmptyFolderTableModel>(utilityEmptyFolderTableModel));
 
@@ -1453,59 +1466,82 @@ public class Identic {
 		// sourcePath = null;
 	}// doRemoveEmptyFolders
 
-	// private void removeEmptyFolders(SortedSet<Path> targetFolders) {
+	// private boolean isDirectoryWithFiles(File file) {
 	//
-	// File file;
-	// for (Path folder : targetFolders) {
-	// file = folder.toFile();
-	// if (file.isDirectory() & (file.list().length == 0)) {
-	// file.delete();
+	// if (file.isFile()) {
+	// return false;
+	// } else if (file.list().length > 0) {
+	// return true;
+	// } else {
+	// return false;
 	// } // if
-	// } // for
-	// }// removeEmptyFolders
+	//
+	// }// isDirectoryWithFiles
+
+	private boolean isDirectoryWithNoFiles(File file) {
+		boolean ans = true;
+		if (file.isFile()) {
+			ans = false;
+		} else if (file.list() == null) {
+			ans = true;
+		} else if (file.list().length == 0) {
+			ans = true;
+		} // if
+		return ans;
+	}// isDirectoryWithFiles
 
 	private void removeEmptyFolders(SortedSet<Path> targetFolders, boolean tree) {
 
 		File file;
 		for (Path folder : targetFolders) {
 			file = folder.toFile();
-			if (!file.isDirectory()) {
-				continue;
-//			}else if(file.list() ==null) { // its a file
-//				continue;
-			} else if (file.list().length == 0) {// its a directory
-				try {
-					file.delete();
-				} catch (Exception e) {
-					// do something
-				}
-				if (tree) {
-					removeParent(file.getParentFile());
-				} // inner if
-			} // if - file or directory
-
+			if (isDirectoryWithNoFiles(file)) {
+				removeEmptyDirectory(file, tree);
+			} // if
 		} // for
-
+			//
 	}// removeEmptyFolders
 
-	private void removeParent(File file) {
-		Path path = file.toPath();
-		if (path == path.getRoot()) {
-			return;
-		} // exit at root
-		path = null;
+	private void removeEmptyDirectory(File file, boolean tree) {
+		try {
+			if (file.delete()) {
+				if (tree) {
+					Path path = file.toPath();
+					Path parentPath = path.getParent();
+					if (parentPath == path.getRoot()) {
+						return;
+					} // if root
+					File parentFile = parentPath.toFile();
+					if (isDirectoryWithNoFiles(parentFile)) {
+						removeEmptyDirectory(parentFile, tree);
+					} // if
 
-		if (file.listFiles().length == 0) {
-			File parent = file.getParentFile();
-			try {
-				file.delete();
-			} catch (Exception e) {
-				// do something
-			}
-			removeParent(parent);
-		} // if
+				} // if tree
+			} // if delete
+		} catch (Exception se) {
+			log.addInfo("Unable to delete directory: " + file.getAbsolutePath());
+		}//try
 
-	}// removeParent
+	}// removeEmptyDirectory
+
+	// private void removeParent(File file) {
+	// Path path = file.toPath();
+	// if (path == path.getRoot()) {
+	// return;
+	// } // exit at root
+	// path = null;
+	//
+	// if (file.listFiles().length == 0) { // directory
+	// File parent = file.getParentFile();
+	// try {
+	// file.delete();
+	// } catch (Exception e) {
+	// // do something
+	// }
+	// removeParent(parent);
+	// } // if
+	//
+	// }// removeParent
 
 	// Swing code ///////////////////////////////////////////////////////////////
 
@@ -2939,7 +2975,7 @@ public class Identic {
 	public static final FileStatReject END_OF_REJECT = new FileStatReject("<END OF QUEUE>", -1L, "0000-00-00  00:00:00",
 			"END OF QUEUE");
 	private static final String EMPTY_STRING = "";
-	private static final String NONE = "<none>";
+	// private static final String NONE = "<none>";
 
 	// private static final int COLUMN_NAME_SUBJECT = 0;
 	// private static final int COLUMN_DIRECTORY_SUBJECT = 1;
@@ -3103,8 +3139,6 @@ public class Identic {
 		}// run
 	}// class GatherFromCatalogs
 
-	//////////////////////////// [[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[
-
 	//////////////////////////////////
 
 	// ---------------------------------------------------------
@@ -3124,94 +3158,6 @@ public class Identic {
 			return false;
 		}// accept
 	}// ListFilter
-
-	// -------------------------------------------------------------------
-
-	class CensusWalker implements FileVisitor<Path> {
-		Pattern patternFileType = Pattern.compile("\\.([^.]+$)");
-		Matcher matcher;
-
-		public CensusWalker() {
-		}// Constructor
-
-		@Override
-		public FileVisitResult visitFile(Path file, BasicFileAttributes arg1) throws IOException {
-			// String fileName = file.toString();
-			String fileName = file.getFileName().toString();
-			matcher = patternFileType.matcher(fileName);
-			String fileType = matcher.find() ? matcher.group(1).toLowerCase() : NONE;
-			if (!fileType.equals(NONE)) {
-				Integer occurances = fileTypeCensus.get(fileType);
-				if (occurances == null) {
-					fileTypeCensus.put(fileType, 1);
-				} else {
-					fileTypeCensus.put(fileType, occurances + 1);
-				} // if unique
-			} // if type found
-			return FileVisitResult.CONTINUE;
-		}// visitFile
-
-		@Override
-		public FileVisitResult postVisitDirectory(Path arg0, IOException arg1) throws IOException {
-			return FileVisitResult.CONTINUE;
-		}// postVisitDirectory
-
-		@Override
-		public FileVisitResult preVisitDirectory(Path file, BasicFileAttributes arg1) throws IOException {
-			return FileVisitResult.CONTINUE;
-		}// preVisitDirectory
-
-		@Override
-		public FileVisitResult visitFileFailed(Path file, IOException arg1) throws IOException {
-			log.addError("Failed to visit " + file.toString());
-			return FileVisitResult.CONTINUE;
-		}// visitFileFailed
-
-	}// class CensusWalker
-
-	class EmptyFolderWalker implements FileVisitor<Path> {
-		// Pattern patternFileType = Pattern.compile("\\.([^.]+$)");
-		// Matcher matcher;
-
-		public EmptyFolderWalker() {
-		}// Constructor
-
-		@Override
-		public FileVisitResult visitFile(Path file, BasicFileAttributes arg1) throws IOException {
-			return FileVisitResult.CONTINUE;
-		}// visitFile
-
-		@Override
-		public FileVisitResult postVisitDirectory(Path folder, IOException arg1) throws IOException {
-			File f = folder.toFile();
-			// File f = new java.io.File(folder.toAbsolutePath().toString());
-			// String[] contents = f.list();
-			// int count = contents.length;
-			int count = f.list() == null ? 0 : f.list().length;
-
-			String msg = String.format("count: %,5d %s", count, folder.toAbsolutePath().toString());
-			log.addInfo(msg);
-
-			if (count == 0) {
-				utilityEmptyFolderTableModel.addRow(new Object[] { true, folder });
-				log.addSpecial("delete " + msg);
-			} // if
-
-			return FileVisitResult.CONTINUE;
-		}// postVisitDirectory
-
-		@Override
-		public FileVisitResult preVisitDirectory(Path folder, BasicFileAttributes arg1) throws IOException {
-			return FileVisitResult.CONTINUE;
-		}// preVisitDirectory
-
-		@Override
-		public FileVisitResult visitFileFailed(Path file, IOException arg1) throws IOException {
-			log.addError("[EmptyFolderWalker] Failed to visit " + file.toString());
-			return FileVisitResult.CONTINUE;
-		}// visitFileFailed
-
-	}// class EmptyFolderWalker
 
 	// -------------------------------------------------------------------
 

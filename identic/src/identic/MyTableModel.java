@@ -59,7 +59,7 @@ public class MyTableModel extends AbstractTableModel {
 		data.put(new Point(row, column), value);
 	}// setValueAt
 	
-	public void addRow(Object[] values) {
+	public synchronized void addRow(Object[] values) {
 		rows++;
 		for (int i = 0; i < values.length; i++) {
 			data.put(new Point(rows - 1, i), values[i]);
